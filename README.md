@@ -29,6 +29,7 @@ refs/
 templates/
 ├── agent-auth.example.yaml       ← auth file template (Level 1/2/3)
 ├── preflight-report.md           ← preflight output template
+├── start-task-prompts.md         ← copy/paste prompts for starting tasks
 └── tooling-preflight.sh          ← parallel audit script (runs in background jobs)
 examples/
 └── preflight-report.example.md   ← filled example with auth section

@@ -29,6 +29,12 @@ Tell the agent what you want to do:
 "Analyze the repo architecture"
 ```
 
+Prompt templates are available in:
+
+```text
+templates/start-task-prompts.md
+```
+
 Optionally include links — the agent fetches them automatically:
 - **Jira ticket** → reads acceptance criteria + auto-follows linked Confluence/Figma
 - **Figma link** → reads screens, states, CTA labels
