@@ -1,6 +1,6 @@
 # Contracts, Artifacts, and Gates
 
-_Skill version: 4.2.7 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 4.3.0 — update this when SKILL.md bumps a minor or major version._
 
 ---
 
@@ -46,6 +46,10 @@ Full example: `examples/preflight-report.example.md`
 
 ### 1) `docs/ai/clarification/context-pack.json`
 
+**Sparse format rule:** Only include keys that have actual values. Omit keys with empty arrays `[]`, `null`, `false` (defaults), or `0`. This reduces token cost when context-pack is re-read in later stages.
+
+Exception: always include `feature_id`, `clarity_score`, `outcome`, `blocked`, `graph_impact`, `auth_status.file`.
+
 ```json
 {
   "feature_id": "ANDROID-123 | task-brief | <slug>",
@@ -86,10 +90,19 @@ Full example: `examples/preflight-report.example.md`
   },
   "graph_path": "<ComponentA -> ComponentB -> ComponentC | none>",
   "god_nodes_touched": [],
+  "graph_impact": "low | medium | high",
   "blocked": false,
   "clarity_score": 0,
   "outcome": "ready | blocked | research-loop"
 }
+
+// graph_impact guidance:
+// low    — change is isolated (1 component, no shared dependencies, no god nodes)
+//          → skip /graphify . --update in Stage 5
+// medium — change touches 2-4 components or one shared utility
+//          → run /graphify . --update in Stage 5
+// high   — change touches god nodes, crosses layer boundaries, or affects >4 components
+//          → run /graphify . --update in Stage 5; optional before/after compare in Stage 6
 ```
 
 ---
@@ -161,6 +174,71 @@ Required:
 - Karpathy diff review passed,
 - final execution report written,
 - no unresolved blockers remain.
+
+---
+
+---
+
+## Local memory schemas
+
+Stored in `.project-orchestration/memory/` (gitignored). Agent reads on startup, writes on completion.
+
+### `tooling-cache.json`
+
+Cache kết quả Stage -1 để skip preflight nếu tooling không đổi.
+
+```json
+{
+  "checked_at": "2026-05-05T09:00:00Z",
+  "valid_until": "2026-05-06T09:00:00Z",
+  "graph_commit": "abc1234",
+  "ai_devkit": "2.1.0 | missing",
+  "android_cli": "present | missing",
+  "android_cli_version": "34",
+  "graphify": "0.9.1 | missing",
+  "karpathy": "installed | manual | missing",
+  "auth_file": "present | missing"
+}
+```
+
+**Skip rule:** If `valid_until` > now AND `graph_commit` == `git rev-parse HEAD` → skip Stage -1 tool checks entirely. Load cached values into preflight context and proceed to Stage 0.  
+**Invalidate when:** any tool is installed/updated, or TTL expires (default 24h).
+
+### `session.json`
+
+Trạng thái task đang dở — cho phép resume sau khi bị interrupt.
+
+```json
+{
+  "task_id": "ANDROID-42 | task-slug",
+  "started_at": "2026-05-05T09:00:00Z",
+  "updated_at": "2026-05-05T11:30:00Z",
+  "stage_reached": -1,
+  "stage_status": "complete | in_progress | blocked",
+  "code_owner": "agent-name | null",
+  "source_mode": "A | B | C",
+  "requirements_approved": false,
+  "blocker": "waiting for human approval at Stage 2 | null"
+}
+```
+
+**Resume rule:** At Stage -1, if `session.json` exists and `stage_reached >= 0` and `stage_status != complete` → ask user: "Resume task `<task_id>` from Stage `<stage_reached>`?" If yes, skip stages already completed. If no, overwrite session.
+
+### `graph-stamp.json`
+
+Metadata về lần chạy Graphify gần nhất.
+
+```json
+{
+  "built_at": "2026-05-05T08:00:00Z",
+  "commit_sha": "abc1234",
+  "graph_report": "graphify-out/GRAPH_REPORT.md",
+  "god_nodes": ["AppModule", "NetworkClient"],
+  "component_count": 42
+}
+```
+
+**Freshness rule:** If `commit_sha` == `git rev-parse HEAD` → graph is fresh; skip rebuild check. If commits have landed since `built_at` → flag graph as potentially stale in preflight.
 
 ---
 

@@ -1,6 +1,6 @@
 # Android Agent Orchestrator — Complete Flow
 
-_Phản ánh skill v4.2.7. Cập nhật khi SKILL.md thay đổi._
+_Phản ánh skill v4.3.0. Cập nhật khi SKILL.md thay đổi._
 
 ---
 
@@ -39,6 +39,34 @@ Tất cả task type đều bắt đầu bằng Stage -1.
 │  STAGE -1: TOOLING PREFLIGHT                                    │
 │  Ref: refs/provisioning-preflight.md                            │
 └─────────────────────────────────────────────────────────────────┘
+                            │
+                            ▼
+    ┌───────────────────────────────────────────────────────┐
+    │  Auth init (refs/auth-bootstrap.md Bước 1):           │
+    │  .agent-auth.yaml present? No → auto-create           │
+    └───────────────────────────────────────────────────────┘
+                            │
+                            ▼
+    ┌───────────────────────────────────────────────────────┐
+    │  Cache check (tooling-cache.json):                    │
+    │                                                       │
+    │  valid_until in future                                │
+    │  AND graph_commit == git rev-parse HEAD?              │
+    │         │                                             │
+    │    ┌────┴────┐                                        │
+    │   Yes        No                                       │
+    │    │          │                                       │
+    │    ▼          ▼                                       │
+    │  CACHE HIT   Run full preflight.sh (parallel)        │
+    │  → skip tool  → write tooling-cache.json             │
+    │    checks     → write/update session.json            │
+    └───────────────────────────────────────────────────────┘
+                            │
+    ┌───────────────────────┴───────────────────────────────┐
+    │  session.json: interrupted task present?              │
+    │    Yes → offer user: "Resume <task_id> from Stage N?" │
+    │    No  → continue                                     │
+    └───────────────────────────────────────────────────────┘
                             │
               ┌─────────────┴──────────────┐
               │  Developer yêu cầu gì?     │

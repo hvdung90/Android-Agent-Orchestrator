@@ -1,6 +1,6 @@
 # Clarification & Synthesis Workflow
 
-_Skill version: 4.2.7 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 4.3.0 — update this when SKILL.md bumps a minor or major version._
 
 ## Purpose
 

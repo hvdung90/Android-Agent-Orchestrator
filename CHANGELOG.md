@@ -1,5 +1,31 @@
 # Changelog
 
+## v4.3.0
+
+### Added
+
+- **QUICKSTART.md**: new file — 3-step quick start for humans; ref-load tier table; key files; common commands.
+- **`templates/tooling-preflight.sh`**: rewritten with parallel bash checks (7 checks run concurrently via background jobs + temp files); auth token presence check; memory cache read (`tooling-cache.json`, `session.json`).
+- **Local memory layer** (`.project-orchestration/memory/`):
+  - `tooling-cache.json` — 24h TTL cache of Stage -1 results; skip preflight if `valid_until` in future AND `graph_commit` matches HEAD.
+  - `session.json` — interrupted-task resume state (task_id, stage_reached, stage_status, code_owner, requirements_approved).
+  - `graph-stamp.json` — Graphify freshness tracking (built_at, commit_sha, god_nodes, component_count).
+- **`refs/contracts-and-artifacts.md`**: local memory schemas section (tooling-cache, session, graph-stamp); `graph_impact: low|medium|high` field in context-pack with Stage 5 skip guidance; sparse format rule for context-pack.
+- **`SKILL.md` § Activation**: trigger phrases section so agents know when to load the skill.
+- **`SKILL.md` § When to load refs**: LIGHT/MEDIUM/HEAVY/FULL tier table — lazy-load refs on demand.
+- **`SKILL.md` § Minimal operating algorithm**: step 2 cache check + session resume; step 5 ref tier determination; step 12 `graph_impact`-gated Graphify update.
+- **Stage -1 cache-first path**: read `tooling-cache.json` before running any tool checks; write cache after preflight completes.
+- **Stage 5 `graph_impact` skip condition**: if `graph_impact` is `low`, skip `/graphify . --update`; record skip reason in execution report.
+
+### Changed
+
+- All `refs/` version headers: 4.2.7 → 4.3.0.
+- `SKILL.md`: version → 4.3.0; directory layout thêm `.project-orchestration/memory/`; Stage -1 thêm cache check + `bash templates/tooling-preflight.sh` explicit call.
+- `README.md`: version → 4.3.0; file map thêm `QUICKSTART.md` + memory dir; What changed table thêm v4.3.0 row.
+- `docs/FLOW.md`: Stage -1 block updated — auth init → cache HIT/MISS branch → session resume offer → provisioning mode → parallel checks → apply actions.
+
+---
+
 ## v4.2.8 — Doc sync
 
 ### Changed (doc-only, no behavior change)

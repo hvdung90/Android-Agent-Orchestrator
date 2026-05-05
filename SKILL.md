@@ -3,7 +3,7 @@ name: android-agent-orchestrator
 description: Meta-skill for Android projects coordinating auth bootstrap, provisioning preflight, AI DevKit, Android skills, Android CLI, Graphify, and Karpathy guardrails into one disciplined workflow. Single .agent-auth.yaml manages all tokens; just-in-time token check per tool.
 license: MIT
 metadata:
-  version: 4.2.7
+  version: 4.3.0
   category: orchestration
   lanes:
     - ai-devkit
@@ -20,7 +20,17 @@ metadata:
     - refs/playbooks.md
 ---
 
-# Android Agent Orchestrator v4.2.7
+# Android Agent Orchestrator v4.3.0
+
+## Activation
+
+Load this skill when the user asks to **start, plan, analyze, or implement an Android task**.
+
+Trigger phrases: `start task` · `new feature` · `fix bug` · `analyze repo` · `migrate` · `upgrade` · `set up agents` · `implement` · `review architecture`
+
+Do not load this skill for non-Android projects or purely conversational questions.
+
+---
 
 ## TL;DR
 
@@ -75,6 +85,22 @@ metadata:
 | Implementation | One code owner only | All other lanes advisory only |
 | Verify | Android CLI runs build/device/capture; Graphify updates | Code frozen |
 | QA gate | AI DevKit + Karpathy review diff | No new changes |
+
+---
+
+## When to load refs
+
+Load refs on demand — **do not load all refs upfront**. Match tier to task complexity.
+
+| Tier | Condition | Load |
+|---|---|---|
+| **LIGHT** | Mode C · single-file fix · no external sources | SKILL.md only |
+| **MEDIUM** | Mode B · docs-only · no Jira/Figma | + `refs/clarification-workflow.md` |
+| **HEAVY** | Mode A (Jira/Figma links) | + `refs/sub-agents.md` |
+| **FULL** | Migration · AGP · unfamiliar codebase · god nodes in path | + `refs/playbooks.md` + all refs |
+
+Always load at Stage -1: `refs/auth-bootstrap.md`, `refs/provisioning-preflight.md`.  
+Always load when writing artifacts: `refs/contracts-and-artifacts.md`.
 
 ---
 
@@ -140,7 +166,11 @@ Sub-agents are internal workers activated by the parent orchestrator during Disc
 Run before Intake.
 
 → **Load `refs/auth-bootstrap.md`** — chạy Bước 1 (khởi tạo file auth) ngay đầu Stage -1.
-→ **Load `refs/provisioning-preflight.md`** for full decision tables and safety rules.
+→ **Load `refs/provisioning-preflight.md`** for full decision tables, cache check, and safety rules.
+
+**Cache check first:** Read `.project-orchestration/memory/tooling-cache.json`. If `valid_until` is in the future AND `graph_commit` matches `git rev-parse HEAD` → skip tool checks, use cached result, go directly to Stage 0.
+
+**Otherwise run:** `bash templates/tooling-preflight.sh` — all checks run in parallel; output is the preflight report draft.
 
 Determine:
 - active provisioning mode,
@@ -215,6 +245,8 @@ Exactly one code owner edits code.
 
 Android CLI gathers runtime evidence. Graphify runs update after implementation if graph exists.
 
+**Graphify skip condition:** If `context-pack.json → graph_impact` is `low`, skip `/graphify . --update`. Record skip reason in execution report. Run update only when `graph_impact` is `medium` or `high`.
+
 ### Stage 6 — QA gate
 
 AI DevKit + Karpathy review diff, evidence, graph update, acceptance coverage, and scope discipline.
@@ -287,6 +319,10 @@ The parent orchestrator must wait:
 ├── reports/
 │   ├── preflight.md
 │   └── execution.md
+├── memory/
+│   ├── tooling-cache.json  ← skip Stage -1 nếu valid
+│   ├── session.json        ← resume interrupted task
+│   └── graph-stamp.json    ← graph freshness check
 └── evidence/
     ├── logs/
     └── screenshots/
@@ -312,16 +348,18 @@ graphify-out/
 ## Minimal operating algorithm
 
 1. **Auth init** — check `.agent-auth.yaml`; auto-create if missing (refs/auth-bootstrap.md Bước 1).
-2. **Tooling Preflight** — choose provisioning mode (default `audit`); check tools + graph state; write `preflight.md`.
-3. **Intake** — collect links from developer; derive source mode (A/B/C); resolve credential set per project key.
-4. **Discovery** — read Graphify if present; activate source readers; auto-follow Jira attachments (1 level).
-5. **Token check** — just before each source reader runs, verify its token (refs/auth-bootstrap.md Bước 2); hỏi user nếu thiếu.
-6. **Clarification** — if any trigger fires, run workers in parallel; parent synthesizes context-pack + brief.
-7. **Requirements** — AI DevKit writes canonical doc; **stop for human approval**.
-8. **Design split** — AI DevKit + Android skills write docs in parallel; select single code owner.
-9. **Implementation** — one owner edits code; all other lanes advisory only.
-10. **Verify** — Android CLI gathers evidence; Graphify updates graph.
-11. **QA gate** — AI DevKit + Karpathy review diff; write execution report; close.
+2. **Cache check** — read `tooling-cache.json`; if valid → skip to step 4. If `session.json` shows interrupted task → offer resume.
+3. **Tooling Preflight** — run `bash templates/tooling-preflight.sh`; write `preflight.md`; write `tooling-cache.json`.
+4. **Intake** — collect links; derive source mode (A/B/C); resolve credential set; write/update `session.json`.
+5. **Determine ref tier** — LIGHT / MEDIUM / HEAVY / FULL; load only needed refs.
+6. **Discovery** — read Graphify if present; activate source readers; auto-follow Jira attachments (1 level).
+7. **Token check** — just before each source reader, verify its token; hỏi user nếu thiếu.
+8. **Clarification** — if any trigger fires, run workers in parallel; parent synthesizes context-pack + brief (sparse format).
+9. **Requirements** — AI DevKit writes canonical doc; **stop for human approval**; update `session.json → requirements_approved: true`.
+10. **Design split** — AI DevKit + Android skills in parallel; select code owner; update `session.json`.
+11. **Implementation** — one owner edits code; all other lanes advisory only.
+12. **Verify** — Android CLI gathers evidence; Graphify updates graph only if `graph_impact` is medium/high.
+13. **QA gate** — AI DevKit + Karpathy review diff; write execution report; mark `session.json → stage_status: complete`.
 
 ---
 

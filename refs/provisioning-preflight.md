@@ -1,12 +1,27 @@
 # Provisioning Preflight
 
-_Skill version: 4.2.7 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 4.3.0 — update this when SKILL.md bumps a minor or major version._
 
 ## Purpose
 
 Stage -1 Tooling Preflight ensures the agent knows whether required orchestration tools exist, are usable, and are allowed to be installed or updated before any task workflow begins.
 
 It prevents agents from assuming tool availability, inventing commands, reading a stale graph, or mutating global tooling during a read-only analysis task.
+
+---
+
+## Cache check (run before anything else)
+
+Read `.project-orchestration/memory/tooling-cache.json`:
+
+| Condition | Action |
+|---|---|
+| File missing | Run full preflight via `bash templates/tooling-preflight.sh` |
+| `valid_until` expired | Run full preflight; overwrite cache |
+| `graph_commit` ≠ `git rev-parse HEAD` | Run full preflight; overwrite cache |
+| `valid_until` in future AND `graph_commit` matches | **Skip tool checks**; load cached values; write brief preflight.md noting "cache hit"; go to Stage 0 |
+
+Cache TTL default: **24 hours**. Invalidated immediately after any install/update action.
 
 ---
 
@@ -237,6 +252,24 @@ Record in preflight report:
 - github.personal_access_token: set | empty
 - project overrides: <count> defined
 ```
+
+---
+
+## Memory write — after preflight completes
+
+After Stage -1 finishes (cache miss path only), write:
+
+**`.project-orchestration/memory/tooling-cache.json`**
+- `checked_at`: now (ISO 8601)
+- `valid_until`: now + 24h
+- `graph_commit`: output of `git rev-parse HEAD`
+- tool versions/states from preflight results
+
+**`.project-orchestration/memory/session.json`** — only if no existing session or user chose not to resume:
+- `task_id`: from Intake (Stage 0) — write after source mode is determined
+- `stage_reached`: -1
+- `stage_status`: complete
+- `requirements_approved`: false
 
 ---
 

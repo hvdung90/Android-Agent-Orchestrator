@@ -5,7 +5,7 @@
 
 `android-agent-orchestrator` is a behavioral orchestration skill for AI coding agents working on Android projects. It coordinates setup/provisioning, process control, Android domain guidance, runtime verification, architecture graphing, and code-quality guardrails into one disciplined workflow.
 
-Current skill version: **v4.2.7**
+Current skill version: **v4.3.0**
 
 ---
 
@@ -16,25 +16,30 @@ This repository does **not** contain an Android app, Gradle plugin, SDK, or exec
 The agent entry point is `SKILL.md`. The refs, templates, and examples support it — use the whole pack, not just this README.
 
 ```text
+QUICKSTART.md                     ← start here (3 steps)
 SKILL.md                          ← agent entry point
 .agent-auth.yaml                  ← gitignored; tạo tự động; tất cả token
 refs/
 ├── auth-bootstrap.md             ← auth init + just-in-time token check
-├── provisioning-preflight.md     ← Stage -1 full decision tables
+├── provisioning-preflight.md     ← Stage -1: cache check, decision tables
 ├── clarification-workflow.md     ← Stage 1.5 sequence, triggers, scoring
 ├── sub-agents.md                 ← worker catalog with YAML output contracts
-├── contracts-and-artifacts.md    ← artifact schemas and stage gates
+├── contracts-and-artifacts.md    ← artifact schemas, memory schemas, stage gates
 └── playbooks.md                  ← task-type → workflow mapping
 templates/
 ├── agent-auth.example.yaml       ← auth file template (Level 1/2/3)
 ├── preflight-report.md           ← preflight output template
-└── tooling-preflight.sh          ← idempotent audit script
+└── tooling-preflight.sh          ← parallel audit script (runs in background jobs)
 examples/
 └── preflight-report.example.md   ← filled example with auth section
 docs/
 ├── FLOW.md                       ← complete flow diagram, all use cases
 └── archive/
     └── README_4.1.md             ← previous version docs
+.project-orchestration/memory/    ← runtime cache (gitignored)
+    ├── tooling-cache.json        ← skip Stage -1 if valid (24h TTL)
+    ├── session.json              ← resume interrupted task
+    └── graph-stamp.json          ← graph freshness tracking
 ```
 
 ---
@@ -53,6 +58,7 @@ v4.1 formalized Clarification & Synthesis. v4.2.x builds the full orchestration 
 | **v4.2.5** | `.agent-auth.yaml` Level 1/2/3; credential resolution per project key |
 | **v4.2.6** | FLOW.md rewrite đầy đủ |
 | **v4.2.7** | `refs/auth-bootstrap.md`: auth init + just-in-time token check per tool; MCP mapping; hard rule #14 |
+| **v4.3.0** | Activation trigger; `QUICKSTART.md`; lazy-load ref tiers (LIGHT/MEDIUM/HEAVY/FULL); parallel `tooling-preflight.sh`; `graph_impact` field + Stage 5 skip; local memory layer (`tooling-cache.json`, `session.json`, `graph-stamp.json`); cache-first Stage -1; sparse context-pack rule |
 
 ---
 
