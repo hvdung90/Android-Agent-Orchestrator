@@ -1,0 +1,11 @@
+# Secrets — never commit
+.agent-auth.yaml
+
+# macOS
+.DS_Store
+
+# Agent runtime output (project-specific, not part of the skill pack)
+.project-orchestration/
+graphify-out/
+.ai-devkit.json
+.skills/
