@@ -1,0 +1,72 @@
+# agent-auth.example.yaml
+# Template cho file auth của Android Agent Orchestrator.
+#
+# FILE NÀY:   templates/agent-auth.example.yaml  (committed, không có secret)
+# FILE THẬT:  .agent-auth.yaml                   (gitignored, tạo tự động khi skill chạy lần đầu)
+#
+# KHÔNG tự copy file này — skill sẽ tự tạo .agent-auth.yaml nếu chưa có.
+# Token sẽ được hỏi tại thời điểm cần dùng tool tương ứng.
+#
+# Ref: refs/auth-bootstrap.md
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ══════════════════════════════════════════════════════════════
+# LEVEL 1 — Workspace
+# ══════════════════════════════════════════════════════════════
+workspace:
+  name: ""                   # Tên team / công ty (dùng để label trong reports)
+  default_jira_project: ""   # Prefix mặc định, vd: "ANDROID"
+
+# ══════════════════════════════════════════════════════════════
+# LEVEL 2 — Tool credentials (mặc định, dùng khi không có project override)
+# ══════════════════════════════════════════════════════════════
+
+# ── Atlassian — Jira + Confluence dùng chung 1 token ──────────
+# MCP: mcp__claude_ai_Atlassian__*
+atlassian:
+  domain: ""          # vd: mycompany.atlassian.net  (không có https://)
+  email: ""           # email đăng nhập Atlassian
+  api_token: ""       # https://id.atlassian.com/manage-profile/security/api-tokens
+                      # → Create API token → Copy
+
+# ── Figma ──────────────────────────────────────────────────────
+# API: Figma REST API (personal access token)
+figma:
+  personal_access_token: ""
+  # Figma → Account Settings → Security → Personal access tokens
+  # → Generate new token → Quyền: File content (read-only) → Copy
+
+# ── GitHub (tuỳ chọn) ──────────────────────────────────────────
+# MCP: mcp__plugin_everything-claude-code_github__*
+github:
+  personal_access_token: ""
+  # GitHub → Settings → Developer settings → Personal access tokens → Fine-grained
+  # → Quyền: Contents (read-only), Metadata (read-only) → Generate → Copy
+
+# ══════════════════════════════════════════════════════════════
+# LEVEL 3 — Per-project overrides (tuỳ chọn)
+# Dùng khi làm việc với nhiều Atlassian instance hoặc Figma account khác nhau.
+# Mỗi project override hoàn toàn LEVEL 2 cho prefix ticket tương ứng.
+# Field nào không khai báo → fallback về LEVEL 2.
+# ══════════════════════════════════════════════════════════════
+projects: []
+
+# Ví dụ:
+#
+# projects:
+#   - name: "client-alpha"
+#     jira_project_key: "CA"        # agent match prefix "CA-42" → dùng block này
+#     atlassian:
+#       domain: "client-alpha.atlassian.net"
+#       email: "contractor@client-alpha.com"
+#       api_token: ""               # để trống → agent sẽ hỏi khi cần
+#     figma:
+#       personal_access_token: ""   # để trống → agent sẽ hỏi khi cần
+#
+#   - name: "internal-platform"
+#     jira_project_key: "PLAT"
+#     atlassian:
+#       domain: "mycompany.atlassian.net"
+#       email: "dev@mycompany.com"
+#       api_token: ""
+#     # figma không khai báo → dùng LEVEL 2

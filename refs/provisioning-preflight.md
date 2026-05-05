@@ -1,5 +1,7 @@
 # Provisioning Preflight
 
+_Skill version: 4.2.7 — update this when SKILL.md bumps a minor or major version._
+
 ## Purpose
 
 Stage -1 Tooling Preflight ensures the agent knows whether required orchestration tools exist, are usable, and are allowed to be installed or updated before any task workflow begins.
@@ -210,6 +212,34 @@ Do not block Stage 0 when:
 
 ---
 
+## Auth credentials check
+
+→ **Load `refs/auth-bootstrap.md`** for full bootstrap procedure and just-in-time token check rules.
+
+At Stage -1, run Bước 1 (auth init):
+
+```bash
+test -f .agent-auth.yaml && echo "present" || echo "missing"
+```
+
+- Present → load, note which tokens have values vs empty.
+- Missing → auto-create from template (all tokens empty); notify user.
+
+Token check cho từng tool xảy ra **just-in-time** tại thời điểm tool đó được gọi — không check trước toàn bộ tại Stage -1.
+
+Record in preflight report:
+
+```markdown
+## Auth
+- .agent-auth.yaml: present | created-empty | missing
+- atlassian.api_token: set | empty
+- figma.personal_access_token: set | empty
+- github.personal_access_token: set | empty
+- project overrides: <count> defined
+```
+
+---
+
 ## Safety rules
 
 - Never run global install/update in `audit`.
@@ -217,3 +247,5 @@ Do not block Stage 0 when:
 - Never delete `graphify-out/` unless user asked for reset.
 - Never hand-edit `graphify-out/**`.
 - Never assume a skill name if `android skills find` did not confirm it.
+- Never log or print token values from `.agent-auth.yaml`.
+- Never commit `.agent-auth.yaml` (verify `.gitignore` covers it).

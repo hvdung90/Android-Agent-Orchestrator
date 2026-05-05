@@ -10,6 +10,15 @@
 - Blocking gaps:
 - Non-blocking gaps:
 
+## Auth
+
+- `.agent-auth.yaml`: present | created-empty | missing
+- `atlassian.api_token`: set | empty
+- `figma.personal_access_token`: set | empty
+- `github.personal_access_token`: set | empty
+- Project overrides defined: <count>
+- Notes:
+
 ## AI DevKit
 
 - CLI present:
@@ -61,3 +70,4 @@
 - Required human decisions:
 - Required installs/updates:
 - Required graph action:
+- Tokens to request from user (just-in-time, khi cần):

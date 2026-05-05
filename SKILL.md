@@ -1,9 +1,9 @@
 ---
 name: android-agent-orchestrator
-description: Meta-skill for Android projects coordinating provisioning preflight, AI DevKit, Android skills, Android CLI, Graphify, and Karpathy guardrails into one disciplined workflow. v4.2 adds Stage -1 Tooling Preflight with audit/bootstrap/update/refresh-graph/force-reinstall modes and explicit install/update decision rules.
+description: Meta-skill for Android projects coordinating auth bootstrap, provisioning preflight, AI DevKit, Android skills, Android CLI, Graphify, and Karpathy guardrails into one disciplined workflow. Single .agent-auth.yaml manages all tokens; just-in-time token check per tool.
 license: MIT
 metadata:
-  version: 4.2.0
+  version: 4.2.7
   category: orchestration
   lanes:
     - ai-devkit
@@ -12,6 +12,7 @@ metadata:
     - graphify
     - karpathy
   refs:
+    - refs/auth-bootstrap.md
     - refs/provisioning-preflight.md
     - refs/clarification-workflow.md
     - refs/sub-agents.md
@@ -19,32 +20,43 @@ metadata:
     - refs/playbooks.md
 ---
 
-# Android Agent Orchestrator v4.2
+# Android Agent Orchestrator v4.2.7
 
 ## TL;DR
 
-**Keep the five-lane skeleton. Add Stage -1 Tooling Preflight before Intake.**
+**Five-lane skeleton. Stage -1 Tooling Preflight + Auth Bootstrap. Single `.agent-auth.yaml` quản lý tất cả token.**
 
-- Stage -1 audits whether AI DevKit, Android CLI, Android skills, Graphify, and Karpathy guidelines exist, are usable, and need install/update/rebuild.
+- Stage -1 khởi tạo auth file, audit tool readiness, rồi mới vào Intake.
+- `.agent-auth.yaml` là nguồn sự thật duy nhất cho mọi token (Atlassian, Figma, GitHub). Token được hỏi just-in-time khi tool cần dùng.
 - AI DevKit remains the conductor and the only owner of requirements, synthesis, routing, and final go/no-go.
 - Android skills remain Android advisory specialists.
 - Android CLI remains runtime verification and official Android skill management.
 - Graphify remains the architecture map.
 - Karpathy remains the code-touching quality gate.
 - Sub-agents are internal workers used during Discovery and Clarification. They do not become independent lanes and they never own final decisions or product-code edits.
+- Jira Reader tự động theo dõi `linked_docs` và `linked_designs` (1 level deep).
 
-> **Audit first. Parallel by lane, serial by file. Parallel by worker, serial by decision.**
+> **Auth first. Audit tools. Read the map. Clarify before planning. Approve before coding.**
 
 ---
 
-## What changed in v4.2
+## What changed in v4.2.x
 
-1. Stage -1 Tooling Preflight added before Stage 0 Intake.
-2. Provisioning modes are explicit: `audit`, `bootstrap`, `update`, `refresh-graph`, `force-reinstall`.
-3. Safe default is `audit`; no install/update/reinstall unless the user explicitly requests it.
-4. Tool lifecycle is formalized for AI DevKit, Android CLI, Android skills, Graphify, and Karpathy.
-5. Graphify freshness is explicit.
-6. Preflight report is canonical: `.project-orchestration/reports/preflight.md`.
+**v4.2.0** — Stage -1 Tooling Preflight, provisioning modes (`audit`/`bootstrap`/`update`/`refresh-graph`/`force-reinstall`), Graphify freshness policy.
+
+**v4.2.1** — README slim (human-facing only); SKILL.md explicit `→ Load refs/` per stage; Stage 1.5 binary trigger checklist; Mode C escape hatch; refs version headers; README_4.1.md archived.
+
+**v4.2.2** — Source integrations: Jira/Figma/Confluence link-driven (không cần setup trước); source mode derivation table (A/B/C).
+
+**v4.2.3** — `docs/FLOW.md`: complete ASCII flow diagram, all 10 use cases, worker matrix, Graphify map.
+
+**v4.2.4** — Jira Reader auto-follow: tự đọc `linked_docs` và `linked_designs` (Confluence, Figma, Doc, Jira child — 1 level).
+
+**v4.2.5** — `.gitignore`; `templates/agent-auth.example.yaml` (Level 1/2/3); auth check tại Stage -1; credential resolution per project key prefix.
+
+**v4.2.6** — `docs/FLOW.md` rewrite phản ánh đầy đủ v4.2.5.
+
+**v4.2.7** — `refs/auth-bootstrap.md`: auth management tập trung — Bước 1 (auto-create file), Bước 2 (just-in-time token check per tool), Bước 3 (Level 1/2/3 resolve), Bước 4 (lưu an toàn). MCP mapping table. Required auth per source reader.
 
 ---
 
@@ -81,6 +93,7 @@ metadata:
 11. No invented commands.
 12. Karpathy applies to every code-touching step.
 13. If sources disagree, record the conflict.
+14. `.agent-auth.yaml` is the single source of truth for all tokens. Never log token values. Never commit the file.
 
 ---
 
@@ -105,11 +118,29 @@ v4.2 does **not** add a sixth lane. Stage -1 is a stage.
 
 ---
 
+## Sub-agents
+
+→ **Load `refs/sub-agents.md`** for the full worker catalog with YAML output contracts.
+
+Sub-agents are internal workers activated by the parent orchestrator during Discovery and Clarification. They are **read-only or advisory** — they never own final decisions or product-code edits.
+
+| Category | Workers |
+|---|---|
+| Source readers | Jira Reader, Confluence Reader, Figma Reader, Doc Reader, Graph Impact Reader |
+| Analysis workers | Ambiguity Detector, Conflict Detector, Missing-info Detector, State Extractor, Dependency Impact Analyzer |
+| Advisory workers | Research Advisor, Android Advisor, QA Scenario Advisor, Rollout/Risk Advisor |
+| Preflight | Tooling Preflight Auditor |
+
+---
+
 ## Stage model
 
 ### Stage -1 — Tooling Preflight
 
 Run before Intake.
+
+→ **Load `refs/auth-bootstrap.md`** — chạy Bước 1 (khởi tạo file auth) ngay đầu Stage -1.
+→ **Load `refs/provisioning-preflight.md`** for full decision tables and safety rules.
 
 Determine:
 - active provisioning mode,
@@ -129,11 +160,15 @@ Default mode is `audit`.
 Deliverable:
 - `.project-orchestration/reports/preflight.md`
 
-See `refs/provisioning-preflight.md`.
-
 ### Stage 0 — Intake
 
 Open the task, confirm source availability, determine whether external task/design sources exist, and consume Stage -1 findings.
+
+→ **Load `refs/clarification-workflow.md` § Source integrations** for source mode derivation.
+
+Intake must record:
+- Jira / Figma / Confluence links provided by developer, if any
+- Source mode (A / B / C) derived from what was provided
 
 ### Stage 1 — Discovery
 
@@ -141,20 +176,36 @@ Read `.project-orchestration/reports/preflight.md`, `graphify-out/GRAPH_REPORT.m
 
 ### Stage 1.5 — Clarification & Synthesis
 
-Run when ambiguity, conflicts, missing acceptance criteria, or graph/source mismatches exist.
+→ **Load `refs/clarification-workflow.md`** for sequence, exit criteria, and clarity scoring.
+
+Run Stage 1.5 if **ANY** of the following are true:
+- [ ] Task brief is < 50 words and has no linked ticket or design source
+- [ ] No acceptance criteria are explicitly stated
+- [ ] Two or more sources contradict each other on behavior or scope
+- [ ] Graph exists and shows affected components not mentioned in sources
+- [ ] Graph shows god nodes in the change path
+- [ ] API, state handling, or error behavior is unspecified
+
+Skip or minimize when: docs are detailed, acceptance criteria are testable, no conflicts exist, and graph shows a clean isolated change surface.
 
 Source modes:
-- Mode A: Jira/Figma/Confluence.
-- Mode B: docs-only.
-- Mode C: no sources; block and ask for a brief.
+- **Mode A** — Jira/Figma/Confluence present: run full clarification with source readers and analysis workers.
+- **Mode B** — docs-only (`docs/ai/inputs/`): run Doc Reader + Graph Impact Reader + Ambiguity Detector + Missing-info Detector.
+- **Mode C** — no sources:
+  - If task is clearly bounded (single-file refactor, rename, or documented bug with reproduction steps): treat as Mode B using the user's message as the sole doc.
+  - Otherwise: block and ask the human for a task brief before proceeding.
 
 ### Stage 2 — Requirements
 
 AI DevKit writes canonical requirements from synthesized context. Stop for human review.
 
+→ **Load `refs/contracts-and-artifacts.md`** for `requirements/<task>.md` schema and Gate D criteria.
+
 ### Stage 3 — Design split
 
 AI DevKit writes design/planning docs. Android skills write Android memo. No product-code changes.
+
+→ **Load `refs/playbooks.md`** to select the correct workflow for the task type.
 
 ### Stage 4 — Implementation lock
 
@@ -253,27 +304,24 @@ docs/ai/
 graphify-out/
 .skills/
 .ai-devkit.json
+.agent-auth.yaml        ← gitignored; tạo tự động; chứa tất cả token
 ```
 
 ---
 
 ## Minimal operating algorithm
 
-1. Run Stage -1 Tooling Preflight.
-2. Choose provisioning mode; default `audit`.
-3. Record tool readiness and graph state.
-4. Intake sources.
-5. Read Graphify if present.
-6. Read raw docs and task/design sources.
-7. If source clarity is weak, run Clarification.
-8. Synthesize one `context-pack` and one `clarification brief`.
-9. Generate one canonical requirements doc.
-10. Stop for human review.
-11. Resume with design split.
-12. Lock one code owner for implementation.
-13. Verify with Android CLI and Graphify update.
-14. Run QA gate.
-15. Publish final report.
+1. **Auth init** — check `.agent-auth.yaml`; auto-create if missing (refs/auth-bootstrap.md Bước 1).
+2. **Tooling Preflight** — choose provisioning mode (default `audit`); check tools + graph state; write `preflight.md`.
+3. **Intake** — collect links from developer; derive source mode (A/B/C); resolve credential set per project key.
+4. **Discovery** — read Graphify if present; activate source readers; auto-follow Jira attachments (1 level).
+5. **Token check** — just before each source reader runs, verify its token (refs/auth-bootstrap.md Bước 2); hỏi user nếu thiếu.
+6. **Clarification** — if any trigger fires, run workers in parallel; parent synthesizes context-pack + brief.
+7. **Requirements** — AI DevKit writes canonical doc; **stop for human approval**.
+8. **Design split** — AI DevKit + Android skills write docs in parallel; select single code owner.
+9. **Implementation** — one owner edits code; all other lanes advisory only.
+10. **Verify** — Android CLI gathers evidence; Graphify updates graph.
+11. **QA gate** — AI DevKit + Karpathy review diff; write execution report; close.
 
 ---
 

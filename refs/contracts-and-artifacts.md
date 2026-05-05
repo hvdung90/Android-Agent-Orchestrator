@@ -1,5 +1,7 @@
 # Contracts, Artifacts, and Gates
 
+_Skill version: 4.2.7 — update this when SKILL.md bumps a minor or major version._
+
 ---
 
 ## Canonical artifacts
@@ -21,13 +23,24 @@ audit | bootstrap | update | refresh-graph | force-reinstall
 - Blocking gaps:
 - Non-blocking gaps:
 
+## Auth
+- .agent-auth.yaml: present | created-empty | missing
+- atlassian.api_token: set | empty
+- figma.personal_access_token: set | empty
+- github.personal_access_token: set | empty
+- Project overrides defined: <count>
+
 ## AI DevKit
 ## Android CLI
 ## Android skills
 ## Graphify
 ## Karpathy
 ## Decisions
+- Tokens to request from user (just-in-time, khi cần):
 ```
+
+Full template: `templates/preflight-report.md`  
+Full example: `examples/preflight-report.example.md`
 
 ---
 
@@ -64,6 +77,13 @@ audit | bootstrap | update | refresh-graph | force-reinstall
     "graphify": "ready | graph-missing | cli-missing | stale | unknown",
     "karpathy": "installed | manual | missing | unknown"
   },
+  "auth_status": {
+    "file": "present | created-empty | missing",
+    "atlassian": "set | empty",
+    "figma": "set | empty",
+    "github": "set | empty",
+    "active_project_override": "<name> | none"
+  },
   "graph_path": "<ComponentA -> ComponentB -> ComponentC | none>",
   "god_nodes_touched": [],
   "blocked": false,
@@ -79,6 +99,8 @@ audit | bootstrap | update | refresh-graph | force-reinstall
 ### Gate -1 — Tooling Preflight complete
 
 Required:
+- `.agent-auth.yaml` initialized (present or auto-created),
+- token status recorded (set / empty) for atlassian, figma, github,
 - provisioning mode recorded,
 - AI DevKit checked,
 - Android CLI checked,

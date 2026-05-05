@@ -1,5 +1,7 @@
 # Playbooks
 
+_Skill version: 4.2.7 — update this when SKILL.md bumps a minor or major version._
+
 Each playbook maps a task type to the correct provisioning mode, stage sequence, source mode, clarification workers, and Graphify queries.
 
 ---

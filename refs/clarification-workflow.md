@@ -1,5 +1,7 @@
 # Clarification & Synthesis Workflow
 
+_Skill version: 4.2.7 — update this when SKILL.md bumps a minor or major version._
+
 ## Purpose
 
 This subflow converts noisy or incomplete inputs into a trustworthy development brief before requirements are written.
@@ -17,6 +19,63 @@ Clarification should consume:
 - preflight report summary,
 - Graphify availability and graph path if present,
 - docs/tickets/design inputs.
+
+---
+
+## Source integrations
+
+Jira and Figma are **link-driven** — the agent activates a source reader only when the developer provides a link.
+
+→ **Load `refs/auth-bootstrap.md`** for full token check and credential resolution procedure.
+
+Before running any source reader:
+1. Resolve credentials (Bước 3 trong auth-bootstrap.md): match project key prefix → Level 3 override hoặc Level 2 top-level.
+2. Kiểm tra token của reader đó (Bước 2): nếu trống → hỏi user → lưu → tiếp tục.
+3. Nếu user từ chối cung cấp → skip reader, ghi nhận trong report.
+
+### Jira
+
+If the developer provides a Jira ticket URL:
+
+```
+https://<domain>.atlassian.net/browse/ANDROID-123
+```
+
+The agent fetches the ticket and runs the Jira Reader. Extracts: summary, acceptance criteria, linked docs, linked designs, status signals, open questions.
+
+**Auto-follow attachments:** After reading the ticket, immediately fetch every item in `linked_docs` and `linked_designs` using the matching reader — Confluence Reader for Confluence pages, Figma Reader for Figma links, Doc Reader for other docs. One level deep only.
+
+If no link is provided → Jira Reader does not run. Treat as Mode B or Mode C depending on other sources.
+
+### Figma
+
+If the developer provides a Figma share link:
+
+```
+https://www.figma.com/design/<file-id>/<name>?node-id=<frame-id>
+```
+
+To get a share link: Figma → right-click frame → Copy link.
+
+The agent fetches the frame and runs the Figma Reader. Extracts: screens, components, visible states, CTA labels, notes, missing states.
+
+If only a link is provided with no annotations: Missing-info Detector will flag missing UI states as a Clarification gap.
+
+If no link is provided → Figma Reader does not run.
+
+### Confluence
+
+If the developer provides a Confluence page URL, the agent fetches and runs the Confluence Reader. If no link → skip.
+
+---
+
+### Source mode derivation at Intake
+
+| Developer provides | Source mode |
+|---|---|
+| At least one Jira / Figma / Confluence link | Mode A |
+| Only local docs in `docs/ai/inputs/` | Mode B |
+| Nothing | Mode C |
 
 ---
 

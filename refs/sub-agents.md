@@ -1,5 +1,7 @@
 # Sub-agent Catalog and Dependency Rules
 
+_Skill version: 4.2.7 — update this when SKILL.md bumps a minor or major version._
+
 ## Design principle
 
 Sub-agents are workers, not authorities.
@@ -11,6 +13,11 @@ They may read, extract, compare, score, or recommend. They do not own final requ
 ## Source readers
 
 ### Jira Reader
+
+Required auth (check trước khi chạy — xem `refs/auth-bootstrap.md` Bước 2):
+- `atlassian.domain`
+- `atlassian.email`
+- `atlassian.api_token`
 
 ```yaml
 source_type: jira
@@ -24,7 +31,22 @@ status_signals: []
 open_questions_found: []
 ```
 
+**Auto-follow rule:** After extracting the ticket, immediately fetch and run the appropriate reader for each item in `linked_docs` and `linked_designs`:
+
+| Attachment type | Reader to run |
+|---|---|
+| Confluence page URL | Confluence Reader |
+| Figma link | Figma Reader |
+| Google Doc / PDF / markdown | Doc Reader |
+| Another Jira ticket | Jira Reader (one level deep only) |
+| Image / screenshot | record URL in `linked_designs`, do not fetch |
+
+Do not follow links recursively beyond one level. If a linked Confluence page itself links further pages, stop at the first page.
+
 ### Confluence Reader
+
+Required auth: `atlassian.domain` + `atlassian.email` + `atlassian.api_token`
+(Cùng token với Jira. Nếu Jira Reader đã xác thực trong session → dùng lại, không hỏi lại.)
 
 ```yaml
 source_type: confluence
@@ -37,6 +59,8 @@ unknowns_found: []
 ```
 
 ### Figma Reader
+
+Required auth: `figma.personal_access_token`
 
 ```yaml
 source_type: figma
