@@ -1,33 +1,33 @@
 # Android Agent Orchestrator — Complete Flow
 
-_Phản ánh skill v4.3.0. Cập nhật khi SKILL.md thay đổi._
+_Reflects skill v4.3.0. Update when SKILL.md changes._
 
 ---
 
-## 1. Entry point — Xác định task type
+## 1. Entry point — Determine task type
 
 ```
-Developer đưa task
+Developer provides task
         │
         ▼
 ┌───────────────────────────────────────────────────────────┐
-│  Task này thuộc loại nào?                                 │
+│  What type of task is this?                               │
 └───────────────────────────────────────────────────────────┘
         │
-        ├── Phân tích / xem repo          ──► [A] Analyze repo
-        ├── Setup / cài tool lần đầu      ──► [B] Bootstrap repo
+        ├── Analyze / inspect repo        ──► [A] Analyze repo
+        ├── Setup / first-time tool install ─► [B] Bootstrap repo
         ├── Update tooling                ──► [C] Update tools
         ├── Rebuild architecture graph    ──► [D] Refresh graph
-        ├── Feature mới                   ──► [E] New feature
-        ├── Sửa feature có sẵn            ──► [F] Edit feature
+        ├── New feature                   ──► [E] New feature
+        ├── Edit existing feature         ──► [F] Edit feature
         ├── Fix bug                       ──► [G] Bug fix
         ├── XML → Compose migration       ──► [H] Migration
         ├── AGP / build modernization     ──► [I] AGP upgrade
-        └── Codebase lạ + brief thô       ──► [J] Unfamiliar codebase
+        └── Unfamiliar codebase + raw brief ─► [J] Unfamiliar codebase
 
-Tất cả task type đều bắt đầu bằng Stage -1.
-[A][B][C][D] kết thúc sau Stage -1.
-[E]–[J] đi qua toàn bộ Stage 0–6.
+All task types start with Stage -1.
+[A][B][C][D] end after Stage -1.
+[E]–[J] go through the full Stage 0–6 flow.
 ```
 
 ---
@@ -42,7 +42,7 @@ Tất cả task type đều bắt đầu bằng Stage -1.
                             │
                             ▼
     ┌───────────────────────────────────────────────────────┐
-    │  Auth init (refs/auth-bootstrap.md Bước 1):           │
+    │  Auth init (refs/auth-bootstrap.md Step 1):           │
     │  .agent-auth.yaml present? No → auto-create           │
     └───────────────────────────────────────────────────────┘
                             │
@@ -69,13 +69,13 @@ Tất cả task type đều bắt đầu bằng Stage -1.
     └───────────────────────────────────────────────────────┘
                             │
               ┌─────────────┴──────────────┐
-              │  Developer yêu cầu gì?     │
+              │  What did the developer request? │
               └─────────────┬──────────────┘
                             │
         ┌───────────────────┼──────────────────────────────┐
         │                   │                              │
-   "analyze"/"xem"    "set up"/"init"             "update tools"
-   (mặc định)               │                              │
+   "analyze"/"inspect" "set up"/"init"             "update tools"
+   (default)                │                              │
         │                   ▼                              ▼
         ▼             mode=bootstrap                mode=update
    mode=audit               │                              │
@@ -88,17 +88,17 @@ Tất cả task type đều bắt đầu bằng Stage -1.
                             │
                             ▼
     ┌───────────────────────────────────────────────────────┐
-    │  Auth init — Bước 1 (refs/auth-bootstrap.md):         │
+    │  Auth init — Step 1 (refs/auth-bootstrap.md):         │
     │                                                       │
-    │  .agent-auth.yaml tồn tại?                           │
-    │    Có  → Load; note tokens set vs empty               │
-    │    Không → Auto-create từ template (tokens rỗng)      │
+    │  .agent-auth.yaml exists?                            │
+    │    Yes → Load; note tokens set vs empty               │
+    │    No  → Auto-create from template (empty tokens)     │
     │            Notify user                                │
     └───────────────────────────────────────────────────────┘
                             │
                             ▼
     ┌───────────────────────────────────────────────────────┐
-    │  Parallel checks (read-only, mọi mode):               │
+    │  Parallel checks (read-only, all modes):              │
     │                                                       │
     │  ① AI DevKit    — CLI present? .ai-devkit.json?       │
     │  ② Android CLI  — present? android info?             │
@@ -106,7 +106,7 @@ Tất cả task type đều bắt đầu bằng Stage -1.
     │  ④ Graphify     — CLI/package? GRAPH_REPORT.md?       │
     │                   graph.json?                         │
     │  ⑤ Karpathy     — plugin / skill / CLAUDE.md?         │
-    │  ⑥ Auth status  — tokens set / empty (từ Bước 1)      │
+    │  ⑥ Auth status  — tokens set / empty (from Step 1)    │
     └───────────────────────────────────────────────────────┘
                             │
             ┌───────────────┴───────────────┐
@@ -115,7 +115,7 @@ Tất cả task type đều bắt đầu bằng Stage -1.
             │                      refresh-graph / force-reinstall
             ▼                               │
     Report gaps only                Apply tool actions
-    (không cài gì)                  per decision tables
+    (install nothing)               per decision tables
             │                               │
             └───────────────┬───────────────┘
                             │
@@ -123,7 +123,7 @@ Tất cả task type đều bắt đầu bằng Stage -1.
     ┌───────────────────────────────────────────────────────┐
     │  Write: .project-orchestration/reports/preflight.md   │
     │                                                       │
-    │  Ghi nhận:                                            │
+    │  Record:                                              │
     │  - provisioning mode                                  │
     │  - tool readiness (①–⑤)                              │
     │  - auth readiness (⑥)                                 │
@@ -137,8 +137,8 @@ Tất cả task type đều bắt đầu bằng Stage -1.
               │                           │
               ▼                           ▼
     STOP — fix first         [A][B][C][D] → DONE
-    (mode không cho phép     [E]–[J]      → Stage 0
-     hành động cần thiết)
+    (mode does not allow     [E]–[J]      → Stage 0
+     required action)
 ```
 
 ---
@@ -153,23 +153,23 @@ Tất cả task type đều bắt đầu bằng Stage -1.
                             │
                             ▼
     ┌───────────────────────────────────────────────────────┐
-    │  Tiêu thụ preflight.md:                               │
+    │  Consume preflight.md:                                │
     │  - tool readiness summary                             │
     │  - auth readiness (.agent-auth.yaml status)           │
     │  - graph present / absent                             │
     └───────────────────────────────────────────────────────┘
                             │
                             ▼
-    Developer cung cấp link nào?
+    Which links did the developer provide?
                             │
         ┌───────────────────┼───────────────────────┐
         │                   │                       │
-  Jira / Figma /       Chỉ có file            Không có gì
+  Jira / Figma /       Only files             Nothing
   Confluence link      docs/ai/inputs/
         │                   │                       │
         ▼                   ▼                       ▼
      Mode A              Mode B                  Mode C
-  (External)           (Docs-only)        Task rõ ràng?
+  (External)           (Docs-only)        Clear task?
                                           (1-file refactor /
                                            rename / bug+repro)
                                                    │
@@ -179,25 +179,25 @@ Tất cả task type đều bắt đầu bằng Stage -1.
                                          │                   │
                                          ▼                   ▼
                                   Treat as Mode B       BLOCK —
-                                  (message của dev      yêu cầu dev
-                                   là sole doc)         cung cấp brief
+                                  (developer message    require developer
+                                   is the sole doc)     to provide a brief
                             │
                             ▼
     ┌───────────────────────────────────────────────────────┐
-    │  Credential resolution (refs/auth-bootstrap.md Bước 3)│
-    │  Xảy ra just-in-time khi reader được kích hoạt:       │
+    │  Credential resolution (refs/auth-bootstrap.md Step 3)│
+    │  Occurs just-in-time when the reader is activated:    │
     │                                                       │
-    │  1. Extract project key prefix (vd "CA" từ "CA-42")   │
-    │  2. Match trong projects[] → dùng Level 3 override    │
-    │     No match → dùng Level 2 top-level                 │
-    │  3. Check token của tool đó (Bước 2):                 │
+    │  1. Extract project key prefix (e.g. "CA" from "CA-42")│
+    │  2. Match in projects[] → use Level 3 override        │
+    │     No match → use Level 2 top-level                  │
+    │  3. Check that tool's token (Step 2):                 │
     │       Set   → proceed                                  │
-    │       Empty → hỏi user → lưu vào file → proceed       │
-    │       User từ chối → skip reader, ghi nhận report     │
+    │       Empty → ask user → save to file → proceed       │
+    │       User refuses → skip reader, record in report    │
     └───────────────────────────────────────────────────────┘
                             │
                             ▼
-    Ghi lại: source mode (A/B/C), links, credential source
+    Record: source mode (A/B/C), links, credential source
     → Stage 1
 ```
 
@@ -231,10 +231,10 @@ Tất cả task type đều bắt đầu bằng Stage -1.
                     │  Figma link    → Figma Rdr │
                     │  Doc / PDF     → Doc Rdr   │
                     │  Jira child    → Jira Rdr  │
-                    │  Image/screenshot → ghi URL│
+                    │  Image/screenshot → record URL │
                     └─────────────┬─────────────┘
                                   │
-                    (parallel với Jira Reader gốc)
+                    (parallel with the original Jira Reader)
                                   │
         └───────────────────┬─────┘
                             │
@@ -253,31 +253,31 @@ Tất cả task type đều bắt đầu bằng Stage -1.
 └─────────────────────────────────────────────────────────────────┘
                             │
                             ▼
-    Cần chạy Clarification không?
-    Chạy nếu BẤT KỲ điều nào dưới đây đúng:
+    Should Clarification run?
+    Run if ANY condition below is true:
     ┌───────────────────────────────────────────────────┐
-    │  ☐ Brief < 50 words, không có ticket/design       │
-    │  ☐ Không có acceptance criteria                   │
-    │  ☐ ≥2 sources mâu thuẫn nhau                     │
-    │  ☐ Graph có component không được đề cập trong doc │
-    │  ☐ Graph có god node trong change path            │
-    │  ☐ API / state / error behavior không rõ          │
+    │  ☐ Brief < 50 words, no ticket/design             │
+    │  ☐ No acceptance criteria                         │
+    │  ☐ ≥2 sources contradict each other               │
+    │  ☐ Graph has component not mentioned in docs      │
+    │  ☐ Graph has god node in change path              │
+    │  ☐ API / state / error behavior unclear           │
     └───────────────────────────────────────────────────┘
                             │
             ┌───────────────┴───────────────┐
             │                               │
-      ≥1 điều đúng                  Không điều nào đúng
+      ≥1 condition true             No conditions true
             │                               │
             ▼                               ▼
-    Chạy Clarification                Skip / minimize
-            │                          → Stage 2 trực tiếp
+    Run Clarification                 Skip / minimize
+            │                          → Stage 2 directly
             ▼
     ┌─────────────────────────────────────────────────────┐
-    │  Parallel workers (theo Source mode):               │
+    │  Parallel workers (by Source mode):                 │
     │                                                     │
     │  Mode A ─► Jira Reader          ┐                   │
     │            Confluence Reader    │ parallel          │
-    │            Figma Reader         │ (credentials từ   │
+    │            Figma Reader         │ (credentials from │
     │            Graph Impact Reader  ┘  .agent-auth.yaml)│
     │            ─────────────────────────────────────    │
     │            Ambiguity Detector   ┐                   │
@@ -291,7 +291,7 @@ Tất cả task type đều bắt đầu bằng Stage -1.
     │            Ambiguity Detector   │                   │
     │            Missing-info Det.    ┘                   │
     │                                                     │
-    │  Advisory (on demand, bất kỳ mode):                 │
+    │  Advisory (on demand, any mode):                    │
     │            Android Advisor                          │
     │            Research Advisor                         │
     │            QA Scenario Advisor                      │
@@ -319,7 +319,7 @@ Tất cả task type đều bắt đầu bằng Stage -1.
       ready    ready +           research-   blocked
                assumptions         loop         │
         │           │                │      Ask human
-        └─────┬─────┘           Loop thêm   (không
+        └─────┬─────┘           More        (do not
               │                 research    fabricate)
               ▼
           Stage 2
@@ -336,12 +336,12 @@ Tất cả task type đều bắt đầu bằng Stage -1.
 └─────────────────────────────────────────────────────────────────┘
         │
         ▼
-  AI DevKit viết docs/ai/requirements/<task>.md
+  AI DevKit writes docs/ai/requirements/<task>.md
         │
         ▼
   ██████████████████████████████████████████████
   █  MANDATORY STOP — Human approval           █
-  █  Không tiếp tục nếu chưa approve          █
+  █  Do not continue until approved           █
   ██████████████████████████████████████████████
         │
         │  Human approves
@@ -352,7 +352,7 @@ Tất cả task type đều bắt đầu bằng Stage -1.
 └─────────────────────────────────────────────────────────────────┘
         │
         ▼
-  Parallel (không có code changes):
+  Parallel (no code changes):
   ┌────────────────────────┬──────────────────────────────┐
   │  AI DevKit             │  Android skills              │
   │  docs/ai/design/       │  docs/ai/android-memo/       │
@@ -369,7 +369,7 @@ Tất cả task type đều bắt đầu bằng Stage -1.
         │
         ▼
   Exactly ONE code owner edits code
-  Tất cả lanes khác: advisory only, không edit
+  All other lanes: advisory only, no edits
         │
         ▼
 ┌─────────────────────────────────────────────────────────────────┐
@@ -379,7 +379,7 @@ Tất cả task type đều bắt đầu bằng Stage -1.
         ▼
   Parallel:
   ┌──────────────────────────┬───────────────────────────────┐
-  │  Android CLI             │  Graphify (nếu graph tồn tại) │
+  │  Android CLI             │  Graphify (if graph exists)   │
   │  build + device tests    │  /graphify . --update         │
   │  screenshots + logs  →   │  graphify-out/ updated        │
   │  .project-orchestration/ │                               │
@@ -413,53 +413,53 @@ Tất cả task type đều bắt đầu bằng Stage -1.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│  .agent-auth.yaml  (gitignored — không commit)                  │
+│  .agent-auth.yaml  (gitignored — do not commit)                 │
 │  Template: templates/agent-auth.example.yaml                    │
 └─────────────────────────────────────────────────────────────────┘
 
   Level 1 — Workspace
   ├── workspace.name
-  └── workspace.default_jira_project   (vd: "ANDROID")
+  └── workspace.default_jira_project   (e.g. "ANDROID")
 
-  Level 2 — Tool credentials (mặc định toàn bộ session)
-  ├── atlassian.domain / email / api_token   ← Jira + Confluence chung
+  Level 2 — Tool credentials (default for the whole session)
+  ├── atlassian.domain / email / api_token   ← Jira + Confluence shared
   ├── figma.personal_access_token
-  └── github.personal_access_token           (tuỳ chọn)
+  └── github.personal_access_token           (optional)
 
-  Level 3 — Per-project overrides            (tuỳ chọn)
+  Level 3 — Per-project overrides            (optional)
   └── projects[]
       ├── name: "client-alpha"
       ├── jira_project_key: "CA"
       ├── atlassian.*                        ← override Level 2
-      └── figma.*                            ← nếu không set → fallback Level 2
+      └── figma.*                            ← if unset → fallback to Level 2
 
-Resolve flow khi agent nhận link:
+Resolve flow when the agent receives a link:
   ─────────────────────────────────────────────────────────────
-  Dev cung cấp "CA-42"
+  Dev provides "CA-42"
         │
         ▼
   Extract prefix → "CA"
         │
         ▼
-  Tìm trong projects[].jira_project_key
+  Find in projects[].jira_project_key
         │
    ┌────┴────┐
   Match    No match
    │          │
    ▼          ▼
-  Dùng      Dùng Level 2
+  Use       Use Level 2
   Level 3   (top-level)
   override       │
    │             │
    └──────┬──────┘
           │
           ▼
-  Fetch source với credentials đúng
+  Fetch source with the correct credentials
 
   .agent-auth.yaml missing + link provided:
-  → WARN trong preflight.md
+  → WARN in preflight.md
   → Source reader skip
-  → Không fabricate content
+  → Do not fabricate content
 ```
 
 ---
@@ -469,7 +469,7 @@ Resolve flow khi agent nhận link:
 ### [A] Analyze repo
 ```
 Stage -1 (audit) → report gaps → DONE
-Không chạy Stage 0–6 trừ khi task docs cũng được phân tích
+Do not run Stage 0–6 unless task docs are also analyzed
 ```
 
 ### [B] Bootstrap repo
@@ -477,7 +477,7 @@ Không chạy Stage 0–6 trừ khi task docs cũng được phân tích
 Stage -1 (bootstrap)
   → Install missing tools
   → ai-devkit init / android init
-  → Build graph nếu codebase tồn tại + approved
+  → Build graph if codebase exists + approved
   → Write preflight.md
 → DONE
 ```
@@ -487,7 +487,7 @@ Stage -1 (bootstrap)
 Stage -1 (update)
   → android update / ai-devkit install
   → Refresh skills list
-  → Update Graphify package nếu approved
+  → Update Graphify package if approved
   → Write preflight.md
 → DONE
 ```
@@ -497,7 +497,7 @@ Stage -1 (update)
 Stage -1 (refresh-graph)
   → /graphify .          (graph missing)
   → /graphify . --update (graph exists)
-  → Không touch product code
+  → Do not touch product code
 → DONE
 ```
 
@@ -506,7 +506,7 @@ Stage -1 (refresh-graph)
 -1 (audit + auth check)
 → 0 (collect links → Mode A/B/C → resolve credentials)
 → 1 (read graph + source readers + auto-follow Jira attachments)
-→ 1.5 (minimal clarification, chỉ chạy nếu trigger fire)
+→ 1.5 (minimal clarification, only run if a trigger fires)
 → 2 (requirements) → STOP human approval
 → 3 (design + Android memo)
 → 4 (one owner implements)
@@ -518,7 +518,7 @@ Stage -1 (refresh-graph)
 ```
 -1 (audit + auth check)
 → 0 (collect links)
-→ 1 (graphify path query nếu graph exists + source readers)
+→ 1 (graphify path query if graph exists + source readers)
 → 1.5 (Ambiguity + Missing-info + Dependency Impact)
 → 2 (requirements: graph path + out-of-scope list) → STOP
 → 4 (surgical changes only — Karpathy)
@@ -530,11 +530,11 @@ Stage -1 (refresh-graph)
 ```
 -1 (audit Android CLI + Graphify + auth check)
 → 0 (collect: repro steps, device, version, expected behavior)
-→ 1 (graph path + runtime evidence nếu available)
-→ 1.5 (clarify chỉ khi repro không rõ)
+→ 1 (graph path + runtime evidence if available)
+→ 1.5 (clarify only when repro is unclear)
 → 2 (minimal bug requirements) → STOP
 → 4 (smallest safe patch)
-→ 5 (runtime evidence + graph update nếu graph exists)
+→ 5 (runtime evidence + graph update if graph exists)
 → 6 (QA gate)
 ```
 
@@ -545,7 +545,7 @@ Stage -1 (refresh-graph)
       android skills find "compose")
 → 1.5 (Android Advisor + Dependency Impact + Rollout/Risk)
 → 2 (migration plan) → STOP
-→ 4 (per-batch, single owner mỗi batch)
+→ 4 (per-batch, single owner for each batch)
 → 5 (visual evidence + graph update)
 → 6 (QA gate)
 ```
@@ -565,12 +565,12 @@ Stage -1 (refresh-graph)
 
 ### [J] Unfamiliar codebase + raw brief
 ```
--1 (audit + auth check; refresh-graph chỉ khi approved)
+-1 (audit + auth check; refresh-graph only if approved)
 → 0 (collect task brief)
 → 1 (read GRAPH_REPORT.md + Doc Reader reads docs/ai/inputs/)
 → 1.5 (Ambiguity + Missing-info + Graph Impact
          + Dependency Impact — full clarification)
-→ 2 (requirements sau khi outcome=ready) → STOP
+→ 2 (requirements after outcome=ready) → STOP
 → 3–6 (normal flow)
 ```
 
@@ -605,11 +605,11 @@ Rollout/Risk Adv.       on demand        on demand        –
 ```
 Stage -1   → check CLI + graph files + freshness
 Stage 0    → note graph present / absent
-Stage 1    → READ GRAPH_REPORT.md (nếu present)
+Stage 1    → READ GRAPH_REPORT.md (if present)
 Stage 1.5  → Graph Impact Reader feeds context-pack
-Stage 3    → dùng graph rationale cho design decisions
-Stage 4    → KHÔNG query graph trong khi coding
-Stage 5    → /graphify . --update (nếu graph exists)
+Stage 3    → use graph rationale for design decisions
+Stage 4    → DO NOT query graph while coding
+Stage 5    → /graphify . --update (if graph exists)
 Stage 6    → optional before/after compare; check god nodes
 ```
 
@@ -618,11 +618,11 @@ Stage 6    → optional before/after compare; check god nodes
 ## 11. Parallel vs Serial
 
 ```
-PARALLEL được phép                   SERIAL bắt buộc
+PARALLEL allowed                     SERIAL required
 ─────────────────────────────────    ──────────────────────────────────
-Tooling read-only checks (Stage -1)  Install/update cùng 1 tool
+Tooling read-only checks (Stage -1)  Install/update the same tool
 Auth check (Stage -1)                2 workers publish requirements
-Source readers (Stage 1 / 1.5)       2 workers edit cùng file code
+Source readers (Stage 1 / 1.5)       2 workers edit the same code file
 Auto-follow readers (Stage 1)        Credential resolution (per link)
 Analysis workers (Stage 1.5)         Parent synthesis
 Advisory workers (Stage 1.5)         Requirements → human approval
@@ -637,13 +637,13 @@ QA review (AI DevKit + Karpathy)
 ## 12. Hard stop points
 
 ```
-①  Stage -1 → Stage 0  :  Blocker trong preflight chưa giải quyết
-②  Stage -1 → Stage 0  :  .agent-auth.yaml thiếu + external links có → WARN
-                           (không block, nhưng source readers sẽ skip)
-③  Stage 0  (Mode C)   :  Task không rõ ràng → yêu cầu dev cung cấp brief
-④  Stage 1.5 outcome   :  blocked → hỏi human, không fabricate requirements
+①  Stage -1 → Stage 0  :  Blocker in preflight is unresolved
+②  Stage -1 → Stage 0  :  .agent-auth.yaml missing + external links present → WARN
+                           (does not block, but source readers will skip)
+③  Stage 0  (Mode C)   :  Task unclear → require developer to provide a brief
+④  Stage 1.5 outcome   :  blocked → ask human, do not fabricate requirements
 ⑤  Stage 2 → Stage 3   :  MANDATORY human approval requirements
-⑥  Stage 3 → Stage 4   :  Chưa có design doc + single code owner
-⑦  Stage 5 → Stage 6   :  Chưa có runtime evidence + graph update
-⑧  Stage 6 → Close     :  Karpathy review chưa pass
+⑥  Stage 3 → Stage 4   :  Missing design doc + single code owner
+⑦  Stage 5 → Stage 6   :  Missing runtime evidence + graph update
+⑧  Stage 6 → Close     :  Karpathy review has not passed
 ```

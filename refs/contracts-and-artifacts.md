@@ -37,7 +37,7 @@ audit | bootstrap | update | refresh-graph | force-reinstall
 ## Karpathy
 ## Serena
 ## Decisions
-- Tokens to request from user (just-in-time, khi cần):
+- Tokens to request from user (just-in-time, when needed):
 ```
 
 Full template: `templates/preflight-report.md`  
@@ -189,7 +189,7 @@ Stored in `.project-orchestration/memory/` (gitignored). Agent reads on startup,
 
 ### `tooling-cache.json`
 
-Cache kết quả Stage -1 để skip preflight nếu tooling không đổi.
+Cache Stage -1 results to skip preflight if tooling has not changed.
 
 ```json
 {
@@ -210,7 +210,7 @@ Cache kết quả Stage -1 để skip preflight nếu tooling không đổi.
 
 ### `session.json`
 
-Trạng thái task đang dở — cho phép resume sau khi bị interrupt.
+In-progress task state — allows resume after an interruption.
 
 ```json
 {
@@ -230,7 +230,7 @@ Trạng thái task đang dở — cho phép resume sau khi bị interrupt.
 
 ### `graph-stamp.json`
 
-Metadata về lần chạy Graphify gần nhất.
+Metadata about the most recent Graphify run.
 
 ```json
 {

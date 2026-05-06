@@ -18,7 +18,7 @@ The agent entry point is `SKILL.md`. The refs, templates, and examples support i
 ```text
 QUICKSTART.md                     ← start here (3 steps)
 SKILL.md                          ← agent entry point
-.agent-auth.yaml                  ← gitignored; tạo tự động; tất cả token
+.agent-auth.yaml                  ← gitignored; auto-created; all tokens
 refs/
 ├── auth-bootstrap.md             ← auth init + just-in-time token check
 ├── provisioning-preflight.md     ← Stage -1: cache check, decision tables
@@ -53,11 +53,11 @@ v4.1 formalized Clarification & Synthesis. v4.2.x builds the full orchestration 
 |---|---|
 | **v4.2.0** | Stage -1 Tooling Preflight; provisioning modes; Graphify freshness |
 | **v4.2.1** | README slim; explicit `→ Load refs/` per stage; Stage 1.5 binary trigger; Mode C escape hatch |
-| **v4.2.2** | Jira/Figma/Confluence link-driven (không cần setup trước); source mode derivation |
+| **v4.2.2** | Jira/Figma/Confluence link-driven (no upfront setup required); source mode derivation |
 | **v4.2.3** | `docs/FLOW.md` complete flow diagram |
 | **v4.2.4** | Jira Reader auto-follow linked_docs/linked_designs (1 level) |
 | **v4.2.5** | `.agent-auth.yaml` Level 1/2/3; credential resolution per project key |
-| **v4.2.6** | FLOW.md rewrite đầy đủ |
+| **v4.2.6** | FLOW.md rewrite — fully reflects v4.2.5 |
 | **v4.2.7** | `refs/auth-bootstrap.md`: auth init + just-in-time token check per tool; MCP mapping; hard rule #14 |
 | **v4.3.0** | Activation trigger; `QUICKSTART.md`; lazy-load ref tiers (LIGHT/MEDIUM/HEAVY/FULL); parallel `tooling-preflight.sh`; `graph_impact` field + Stage 5 skip; local memory layer (`tooling-cache.json`, `session.json`, `graph-stamp.json`); cache-first Stage -1; sparse context-pack rule |
 | **v4.4.0** | **Serena Code Analysis Worker**: symbol-level LSP queries (not a lane); agent-decided activation per stage; mandatory/optional/never tool classification; JetBrains backend dev opt-in; Kotlin LS stability gate; hard rule #15 |

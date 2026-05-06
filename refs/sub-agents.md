@@ -14,7 +14,7 @@ They may read, extract, compare, score, or recommend. They do not own final requ
 
 ### Jira Reader
 
-Required auth (check trước khi chạy — xem `refs/auth-bootstrap.md` Bước 2):
+Required auth (check before running — see `refs/auth-bootstrap.md` Step 2):
 - `atlassian.domain`
 - `atlassian.email`
 - `atlassian.api_token`
@@ -46,7 +46,7 @@ Do not follow links recursively beyond one level. If a linked Confluence page it
 ### Confluence Reader
 
 Required auth: `atlassian.domain` + `atlassian.email` + `atlassian.api_token`
-(Cùng token với Jira. Nếu Jira Reader đã xác thực trong session → dùng lại, không hỏi lại.)
+(Same token as Jira. If Jira Reader has already authenticated in this session → reuse it and do not ask again.)
 
 ```yaml
 source_type: confluence

@@ -85,6 +85,6 @@
   - Approve Karpathy plugin install or confirm manual application is acceptable
 - Required installs/updates: none in audit mode
 - Required graph action: none in audit mode; request refresh-graph mode to build
-- Tokens to request from user (just-in-time, khi cần):
-  - `atlassian.api_token` — khi developer cung cấp Jira hoặc Confluence link
-  - `figma.personal_access_token` — khi developer cung cấp Figma link
+- Tokens to request from user (just-in-time, when needed):
+  - `atlassian.api_token` — when the developer provides a Jira or Confluence link
+  - `figma.personal_access_token` — when the developer provides a Figma link

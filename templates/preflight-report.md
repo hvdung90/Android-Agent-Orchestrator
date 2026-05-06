@@ -80,4 +80,4 @@
 - Required human decisions:
 - Required installs/updates:
 - Required graph action:
-- Tokens to request from user (just-in-time, khi cần):
+- Tokens to request from user (just-in-time, when needed):

@@ -59,8 +59,8 @@
 ### Changed
 
 - All `refs/` version headers: 4.2.7 → 4.3.0.
-- `SKILL.md`: version → 4.3.0; directory layout thêm `.project-orchestration/memory/`; Stage -1 thêm cache check + `bash templates/tooling-preflight.sh` explicit call.
-- `README.md`: version → 4.3.0; file map thêm `QUICKSTART.md` + memory dir; What changed table thêm v4.3.0 row.
+- `SKILL.md`: version → 4.3.0; directory layout added `.project-orchestration/memory/`; Stage -1 added cache check + `bash templates/tooling-preflight.sh` explicit call.
+- `README.md`: version → 4.3.0; file map added `QUICKSTART.md` + memory dir; What changed table added v4.3.0 row.
 - `docs/FLOW.md`: Stage -1 block updated — auth init → cache HIT/MISS branch → session resume offer → provisioning mode → parallel checks → apply actions.
 
 ---
@@ -69,11 +69,11 @@
 
 ### Changed (doc-only, no behavior change)
 
-- `SKILL.md`: version → 4.2.7; description updated; TL;DR rewritten; "What changed" table đầy đủ v4.2.0–4.2.7; hard rule #14 (auth); Minimal operating algorithm 11 bước có auth; directory layout thêm `.agent-auth.yaml`.
-- `README.md`: version → 4.2.7; file map thêm `refs/auth-bootstrap.md` + `templates/agent-auth.example.yaml`; What changed → table format.
-- `templates/preflight-report.md`: thêm section `## Auth`.
-- `examples/preflight-report.example.md`: thêm section `## Auth` với dữ liệu mẫu thực tế; thêm "Tokens to request" vào Decisions.
-- `refs/contracts-and-artifacts.md`: version → 4.2.7; Gate -1 thêm auth init requirement; preflight schema thêm `## Auth`; context-pack thêm `auth_status` field.
+- `SKILL.md`: version → 4.2.7; description updated; TL;DR rewritten; "What changed" table complete for v4.2.0–4.2.7; hard rule #14 (auth); Minimal operating algorithm 11 steps with auth; directory layout added `.agent-auth.yaml`.
+- `README.md`: version → 4.2.7; file map added `refs/auth-bootstrap.md` + `templates/agent-auth.example.yaml`; What changed → table format.
+- `templates/preflight-report.md`: added section `## Auth`.
+- `examples/preflight-report.example.md`: added section `## Auth` with realistic sample data; added "Tokens to request" to Decisions.
+- `refs/contracts-and-artifacts.md`: version → 4.2.7; Gate -1 added auth init requirement; preflight schema added `## Auth`; context-pack added `auth_status` field.
 - `refs/sub-agents.md`, `refs/provisioning-preflight.md`, `refs/playbooks.md`, `refs/clarification-workflow.md`: version → 4.2.7.
 - `docs/FLOW.md`: version header → 4.2.7.
 
@@ -83,21 +83,21 @@
 
 ### Added
 
-- `refs/auth-bootstrap.md`: file ref mới — nguồn sự thật duy nhất cho auth management.
-  - Bước 1: khởi tạo file auth tại Stage -1 (auto-create nếu chưa có).
-  - Bước 2: just-in-time token check per tool (Jira, Confluence, Figma, GitHub) — hỏi user khi thiếu, lưu vào file.
-  - Bước 3: credential resolution (Level 1/2/3) theo project key prefix.
-  - Bước 4: lưu token an toàn, không log ra màn hình hay report.
-  - MCP mapping table: token nào dùng cho MCP tool nào.
+- `refs/auth-bootstrap.md`: new ref file — single source of truth for auth management.
+  - Step 1: initialize auth file at Stage -1 (auto-create if not present).
+  - Step 2: just-in-time token check per tool (Jira, Confluence, Figma, GitHub) — prompt user when missing, save to file.
+  - Step 3: credential resolution (Level 1/2/3) by project key prefix.
+  - Step 4: save token securely; do not log to screen or report.
+  - MCP mapping table: which token is used for which MCP tool.
 
 ### Changed
 
-- `templates/agent-auth.example.yaml`: thêm MCP provider comment cho từng tool; bỏ hướng dẫn copy thủ công (skill tự tạo file).
-- `refs/provisioning-preflight.md`: thay auth check section bằng reference sang `refs/auth-bootstrap.md`; just-in-time model rõ ràng.
-- `refs/sub-agents.md`: thêm `Required auth` cho Jira Reader, Confluence Reader, Figma Reader.
-- `refs/clarification-workflow.md`: thay credential resolution inline bằng reference sang `refs/auth-bootstrap.md`.
-- `SKILL.md`: thêm `refs/auth-bootstrap.md` vào metadata refs; Stage -1 load auth-bootstrap Bước 1 ngay đầu.
-- `docs/FLOW.md`: Stage -1 thêm Auth init block; Stage 0 cập nhật credential resolution just-in-time.
+- `templates/agent-auth.example.yaml`: added MCP provider comment for each tool; removed manual copy instructions (skill auto-creates the file).
+- `refs/provisioning-preflight.md`: replaced auth check section with reference to `refs/auth-bootstrap.md`; just-in-time model made explicit.
+- `refs/sub-agents.md`: added `Required auth` for Jira Reader, Confluence Reader, Figma Reader.
+- `refs/clarification-workflow.md`: replaced inline credential resolution with reference to `refs/auth-bootstrap.md`.
+- `SKILL.md`: added `refs/auth-bootstrap.md` to metadata refs; Stage -1 loads auth-bootstrap Step 1 at the start.
+- `docs/FLOW.md`: Stage -1 added Auth init block; Stage 0 updated credential resolution to just-in-time.
 
 ---
 
@@ -105,14 +105,14 @@
 
 ### Changed
 
-- `docs/FLOW.md`: rewrite hoàn toàn phản ánh v4.2.5.
-  - Section 2 (Stage -1): thêm check ⑥ auth vào parallel checks; tách nhánh [A-D] done vs [E-J] continue.
-  - Section 3 (Stage 0): thêm credential resolution step trước khi fetch link.
-  - Section 4 (Stage 1): fix diagram auto-follow; gộp Mode A + Mode B vào cùng parallel block.
-  - Section 7 (Auth): diagram mới thể hiện Level 1/2/3 + resolve flow.
-  - Section 8 (Playbooks): thêm auth check vào tất cả playbook flows.
-  - Section 9 (Worker matrix): thêm dòng `auto-follow` cho Jira Reader.
-  - Section 12 (Hard stops): tách 8 điểm stop rõ ràng, thêm WARN cho auth missing.
+- `docs/FLOW.md`: complete rewrite fully reflecting v4.2.5.
+  - Section 2 (Stage -1): added check ⑥ auth to parallel checks; separated branches [A-D] done vs [E-J] continue.
+  - Section 3 (Stage 0): added credential resolution step before fetching links.
+  - Section 4 (Stage 1): fixed diagram auto-follow; merged Mode A + Mode B into shared parallel block.
+  - Section 7 (Auth): new diagram showing Level 1/2/3 + resolve flow.
+  - Section 8 (Playbooks): added auth check to all playbook flows.
+  - Section 9 (Worker matrix): added `auto-follow` row for Jira Reader.
+  - Section 12 (Hard stops): separated 8 stop points clearly; added WARN for auth missing.
 
 ---
 
@@ -121,13 +121,13 @@
 ### Added
 
 - `.gitignore`: covers `.agent-auth.yaml`, `.DS_Store`, and agent runtime output dirs.
-- `templates/agent-auth.example.yaml`: auth config template với 3 cấp:
+- `templates/agent-auth.example.yaml`: auth config template with 3 levels:
   - **Level 1** workspace (default Jira project prefix)
   - **Level 2** tool credentials (Atlassian, Figma, GitHub)
-  - **Level 3** per-project overrides (nhiều Atlassian instance)
-- `refs/provisioning-preflight.md`: auth credentials check tại Stage -1 — detect `.agent-auth.yaml`, record trong preflight report, warn nếu thiếu khi có external links.
-- `refs/clarification-workflow.md`: credential resolution rule — match ticket key prefix với `projects[]` override trước khi dùng top-level credentials.
-- `docs/FLOW.md`: thêm check ⑥ `.agent-auth.yaml` vào Stage -1 parallel checks.
+  - **Level 3** per-project overrides (multiple Atlassian instances)
+- `refs/provisioning-preflight.md`: auth credentials check at Stage -1 — detect `.agent-auth.yaml`, record in preflight report, warn if missing when external links are present.
+- `refs/clarification-workflow.md`: credential resolution rule — match ticket key prefix with `projects[]` override before using top-level credentials.
+- `docs/FLOW.md`: added check ⑥ `.agent-auth.yaml` to Stage -1 parallel checks.
 
 ---
 

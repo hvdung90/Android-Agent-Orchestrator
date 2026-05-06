@@ -30,9 +30,9 @@ Jira and Figma are **link-driven** — the agent activates a source reader only 
 → **Load `refs/auth-bootstrap.md`** for full token check and credential resolution procedure.
 
 Before running any source reader:
-1. Resolve credentials (Bước 3 trong auth-bootstrap.md): match project key prefix → Level 3 override hoặc Level 2 top-level.
-2. Kiểm tra token của reader đó (Bước 2): nếu trống → hỏi user → lưu → tiếp tục.
-3. Nếu user từ chối cung cấp → skip reader, ghi nhận trong report.
+1. Resolve credentials (Step 3 in auth-bootstrap.md): match project key prefix → Level 3 override or Level 2 top-level.
+2. Check that reader's token (Step 2): if empty → ask user → save → continue.
+3. If the user refuses to provide it → skip reader, record it in the report.
 
 ### Jira
 

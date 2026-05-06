@@ -1,11 +1,11 @@
 # agent-auth.example.yaml
-# Template cho file auth của Android Agent Orchestrator.
+# Template for the Android Agent Orchestrator auth file.
 #
-# FILE NÀY:   templates/agent-auth.example.yaml  (committed, không có secret)
-# FILE THẬT:  .agent-auth.yaml                   (gitignored, tạo tự động khi skill chạy lần đầu)
+# THIS FILE:  templates/agent-auth.example.yaml  (committed, no secrets)
+# REAL FILE:  .agent-auth.yaml                   (gitignored, auto-created when the skill first runs)
 #
-# KHÔNG tự copy file này — skill sẽ tự tạo .agent-auth.yaml nếu chưa có.
-# Token sẽ được hỏi tại thời điểm cần dùng tool tương ứng.
+# Do not copy this file manually. The skill will create .agent-auth.yaml if it is missing.
+# Tokens are requested when the corresponding tool needs them.
 #
 # Ref: refs/auth-bootstrap.md
 # ─────────────────────────────────────────────────────────────────────────────
@@ -14,18 +14,18 @@
 # LEVEL 1 — Workspace
 # ══════════════════════════════════════════════════════════════
 workspace:
-  name: ""                   # Tên team / công ty (dùng để label trong reports)
-  default_jira_project: ""   # Prefix mặc định, vd: "ANDROID"
+  name: ""                   # Team / company name (used as a label in reports)
+  default_jira_project: ""   # Default prefix, e.g. "ANDROID"
 
 # ══════════════════════════════════════════════════════════════
-# LEVEL 2 — Tool credentials (mặc định, dùng khi không có project override)
+# LEVEL 2 — Tool credentials (default, used when there is no project override)
 # ══════════════════════════════════════════════════════════════
 
-# ── Atlassian — Jira + Confluence dùng chung 1 token ──────────
+# ── Atlassian — Jira + Confluence share one token ──────────
 # MCP: mcp__claude_ai_Atlassian__*
 atlassian:
-  domain: ""          # vd: mycompany.atlassian.net  (không có https://)
-  email: ""           # email đăng nhập Atlassian
+  domain: ""          # e.g. mycompany.atlassian.net  (without https://)
+  email: ""           # Atlassian login email
   api_token: ""       # https://id.atlassian.com/manage-profile/security/api-tokens
                       # → Create API token → Copy
 
@@ -34,34 +34,34 @@ atlassian:
 figma:
   personal_access_token: ""
   # Figma → Account Settings → Security → Personal access tokens
-  # → Generate new token → Quyền: File content (read-only) → Copy
+  # → Generate new token → Permissions: File content (read-only) → Copy
 
-# ── GitHub (tuỳ chọn) ──────────────────────────────────────────
+# ── GitHub (optional) ──────────────────────────────────────────
 # MCP: mcp__plugin_everything-claude-code_github__*
 github:
   personal_access_token: ""
   # GitHub → Settings → Developer settings → Personal access tokens → Fine-grained
-  # → Quyền: Contents (read-only), Metadata (read-only) → Generate → Copy
+  # → Permissions: Contents (read-only), Metadata (read-only) → Generate → Copy
 
 # ══════════════════════════════════════════════════════════════
-# LEVEL 3 — Per-project overrides (tuỳ chọn)
-# Dùng khi làm việc với nhiều Atlassian instance hoặc Figma account khác nhau.
-# Mỗi project override hoàn toàn LEVEL 2 cho prefix ticket tương ứng.
-# Field nào không khai báo → fallback về LEVEL 2.
+# LEVEL 3 — Per-project overrides (optional)
+# Use when working with multiple Atlassian instances or different Figma accounts.
+# Each project fully overrides LEVEL 2 for its matching ticket prefix.
+# Fields that are not declared fall back to LEVEL 2.
 # ══════════════════════════════════════════════════════════════
 projects: []
 
-# Ví dụ:
+# Example:
 #
 # projects:
 #   - name: "client-alpha"
-#     jira_project_key: "CA"        # agent match prefix "CA-42" → dùng block này
+#     jira_project_key: "CA"        # agent matches prefix "CA-42" → uses this block
 #     atlassian:
 #       domain: "client-alpha.atlassian.net"
 #       email: "contractor@client-alpha.com"
-#       api_token: ""               # để trống → agent sẽ hỏi khi cần
+#       api_token: ""               # leave empty → agent asks when needed
 #     figma:
-#       personal_access_token: ""   # để trống → agent sẽ hỏi khi cần
+#       personal_access_token: ""   # leave empty → agent asks when needed
 #
 #   - name: "internal-platform"
 #     jira_project_key: "PLAT"
@@ -69,4 +69,4 @@ projects: []
 #       domain: "mycompany.atlassian.net"
 #       email: "dev@mycompany.com"
 #       api_token: ""
-#     # figma không khai báo → dùng LEVEL 2
+#     # figma is not declared → use LEVEL 2

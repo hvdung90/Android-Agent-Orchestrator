@@ -36,10 +36,10 @@ Do not load this skill for non-Android projects or purely conversational questio
 
 ## TL;DR
 
-**Five-lane skeleton. Stage -1 Tooling Preflight + Auth Bootstrap. Single `.agent-auth.yaml` quản lý tất cả token.**
+**Five-lane skeleton. Stage -1 Tooling Preflight + Auth Bootstrap. Single `.agent-auth.yaml` manages all tokens.**
 
-- Stage -1 khởi tạo auth file, audit tool readiness, rồi mới vào Intake.
-- `.agent-auth.yaml` là nguồn sự thật duy nhất cho mọi token (Atlassian, Figma, GitHub). Token được hỏi just-in-time khi tool cần dùng.
+- Stage -1 initializes the auth file, audits tool readiness, then proceeds to Intake.
+- `.agent-auth.yaml` is the single source of truth for all tokens (Atlassian, Figma, GitHub). Tokens are requested just-in-time when a tool needs them.
 - AI DevKit remains the conductor and the only owner of requirements, synthesis, routing, and final go/no-go.
 - Android skills remain Android advisory specialists.
 - Android CLI remains runtime verification and official Android skill management.
@@ -47,7 +47,7 @@ Do not load this skill for non-Android projects or purely conversational questio
 - Karpathy remains the code-touching quality gate.
 - **Serena is the Code Analysis Worker** — symbol-level code retrieval, activated after Graphify identifies affected areas. Read-only in Discovery, advisory in Implementation. Never owns decisions or edits.
 - Sub-agents are internal workers used during Discovery and Clarification. They do not become independent lanes and they never own final decisions or product-code edits.
-- Jira Reader tự động theo dõi `linked_docs` và `linked_designs` (1 level deep).
+- Jira Reader automatically tracks `linked_docs` and `linked_designs` (1 level deep).
 
 > **Auth first. Audit tools. Read the map. Analyze code surface. Clarify before planning. Approve before coding.**
 
@@ -59,17 +59,17 @@ Do not load this skill for non-Android projects or purely conversational questio
 
 **v4.2.1** — README slim (human-facing only); SKILL.md explicit `→ Load refs/` per stage; Stage 1.5 binary trigger checklist; Mode C escape hatch; refs version headers; README_4.1.md archived.
 
-**v4.2.2** — Source integrations: Jira/Figma/Confluence link-driven (không cần setup trước); source mode derivation table (A/B/C).
+**v4.2.2** — Source integrations: Jira/Figma/Confluence link-driven (no upfront setup required); source mode derivation table (A/B/C).
 
 **v4.2.3** — `docs/FLOW.md`: complete ASCII flow diagram, all 10 use cases, worker matrix, Graphify map.
 
-**v4.2.4** — Jira Reader auto-follow: tự đọc `linked_docs` và `linked_designs` (Confluence, Figma, Doc, Jira child — 1 level).
+**v4.2.4** — Jira Reader auto-follow: automatically reads `linked_docs` and `linked_designs` (Confluence, Figma, Doc, Jira child — 1 level).
 
-**v4.2.5** — `.gitignore`; `templates/agent-auth.example.yaml` (Level 1/2/3); auth check tại Stage -1; credential resolution per project key prefix.
+**v4.2.5** — `.gitignore`; `templates/agent-auth.example.yaml` (Level 1/2/3); auth check at Stage -1; credential resolution per project key prefix.
 
-**v4.2.6** — `docs/FLOW.md` rewrite phản ánh đầy đủ v4.2.5.
+**v4.2.6** — `docs/FLOW.md` rewrite fully reflects v4.2.5.
 
-**v4.2.7** — `refs/auth-bootstrap.md`: auth management tập trung — Bước 1 (auto-create file), Bước 2 (just-in-time token check per tool), Bước 3 (Level 1/2/3 resolve), Bước 4 (lưu an toàn). MCP mapping table. Required auth per source reader.
+**v4.2.7** — `refs/auth-bootstrap.md`: centralized auth management — Step 1 (auto-create file), Step 2 (just-in-time token check per tool), Step 3 (Level 1/2/3 resolve), Step 4 (save securely). MCP mapping table. Required auth per source reader.
 
 ---
 
@@ -181,7 +181,7 @@ Sub-agents are internal workers activated by the parent orchestrator during Disc
 
 Run before Intake.
 
-→ **Load `refs/auth-bootstrap.md`** — chạy Bước 1 (khởi tạo file auth) ngay đầu Stage -1.
+→ **Load `refs/auth-bootstrap.md`** — run Step 1 (initialize auth file) at the start of Stage -1.
 → **Load `refs/provisioning-preflight.md`** for full decision tables, cache check, and safety rules.
 
 **Cache check first:** Read `.project-orchestration/memory/tooling-cache.json`. If `valid_until` is in the future AND `graph_commit` matches `git rev-parse HEAD` → skip tool checks, use cached result, go directly to Stage 0.
@@ -346,7 +346,7 @@ The parent orchestrator must wait:
 │   ├── preflight.md
 │   └── execution.md
 ├── memory/
-│   ├── tooling-cache.json  ← skip Stage -1 nếu valid
+│   ├── tooling-cache.json  ← skip Stage -1 if valid
 │   ├── session.json        ← resume interrupted task
 │   └── graph-stamp.json    ← graph freshness check
 └── evidence/
@@ -366,20 +366,20 @@ docs/ai/
 graphify-out/
 .skills/
 .ai-devkit.json
-.agent-auth.yaml        ← gitignored; tạo tự động; chứa tất cả token
+.agent-auth.yaml        ← gitignored; auto-created; contains all tokens
 ```
 
 ---
 
 ## Minimal operating algorithm
 
-1. **Auth init** — check `.agent-auth.yaml`; auto-create if missing (refs/auth-bootstrap.md Bước 1).
+1. **Auth init** — check `.agent-auth.yaml`; auto-create if missing (refs/auth-bootstrap.md Step 1).
 2. **Cache check** — read `tooling-cache.json`; if valid → skip to step 4. If `session.json` shows interrupted task → offer resume.
 3. **Tooling Preflight** — run `bash templates/tooling-preflight.sh`; write `preflight.md`; write `tooling-cache.json`.
 4. **Intake** — collect links; derive source mode (A/B/C); resolve credential set; write/update `session.json`.
 5. **Determine ref tier** — LIGHT / MEDIUM / HEAVY / FULL; load only needed refs.
 6. **Discovery** — read Graphify if present; activate source readers; auto-follow Jira attachments (1 level).
-7. **Token check** — just before each source reader, verify its token; hỏi user nếu thiếu.
+7. **Token check** — just before each source reader, verify its token; prompt user if missing.
 8. **Clarification** — if any trigger fires, run workers in parallel; parent synthesizes context-pack + brief (sparse format).
 9. **Requirements** — AI DevKit writes canonical doc; **stop for human approval**; update `session.json → requirements_approved: true`.
 10. **Design split** — AI DevKit + Android skills in parallel; select code owner; update `session.json`.

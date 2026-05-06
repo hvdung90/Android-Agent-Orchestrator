@@ -257,7 +257,7 @@ Do not block Stage 0 when:
 
 → **Load `refs/auth-bootstrap.md`** for full bootstrap procedure and just-in-time token check rules.
 
-At Stage -1, run Bước 1 (auth init):
+At Stage -1, run Step 1 (auth init):
 
 ```bash
 test -f .agent-auth.yaml && echo "present" || echo "missing"
@@ -266,7 +266,7 @@ test -f .agent-auth.yaml && echo "present" || echo "missing"
 - Present → load, note which tokens have values vs empty.
 - Missing → auto-create from template (all tokens empty); notify user.
 
-Token check cho từng tool xảy ra **just-in-time** tại thời điểm tool đó được gọi — không check trước toàn bộ tại Stage -1.
+Token checks for each tool happen **just-in-time** when that tool is called. Do not check everything up front at Stage -1.
 
 Record in preflight report:
 
