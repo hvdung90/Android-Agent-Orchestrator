@@ -1,9 +1,9 @@
 ---
 name: android-agent-orchestrator
-description: Meta-skill for Android projects coordinating auth bootstrap, provisioning preflight, AI DevKit, Android skills, Android CLI, Graphify, and Karpathy guardrails into one disciplined workflow. Single .agent-auth.yaml manages all tokens; just-in-time token check per tool.
+description: Meta-skill for Android projects coordinating auth bootstrap, provisioning preflight, AI DevKit, Android skills, Android CLI, Graphify, Karpathy, and Serena code analysis into one disciplined workflow. Single .agent-auth.yaml manages all tokens; just-in-time token check per tool.
 license: MIT
 metadata:
-  version: 4.3.0
+  version: 4.4.0
   category: orchestration
   lanes:
     - ai-devkit
@@ -11,6 +11,8 @@ metadata:
     - android-cli
     - graphify
     - karpathy
+  workers:
+    - serena-code-analysis
   refs:
     - refs/auth-bootstrap.md
     - refs/provisioning-preflight.md
@@ -20,7 +22,7 @@ metadata:
     - refs/playbooks.md
 ---
 
-# Android Agent Orchestrator v4.3.0
+# Android Agent Orchestrator v4.4.0
 
 ## Activation
 
@@ -43,10 +45,11 @@ Do not load this skill for non-Android projects or purely conversational questio
 - Android CLI remains runtime verification and official Android skill management.
 - Graphify remains the architecture map.
 - Karpathy remains the code-touching quality gate.
+- **Serena is the Code Analysis Worker** — symbol-level code retrieval, activated after Graphify identifies affected areas. Read-only in Discovery, advisory in Implementation. Never owns decisions or edits.
 - Sub-agents are internal workers used during Discovery and Clarification. They do not become independent lanes and they never own final decisions or product-code edits.
 - Jira Reader tự động theo dõi `linked_docs` và `linked_designs` (1 level deep).
 
-> **Auth first. Audit tools. Read the map. Clarify before planning. Approve before coding.**
+> **Auth first. Audit tools. Read the map. Analyze code surface. Clarify before planning. Approve before coding.**
 
 ---
 
@@ -120,6 +123,7 @@ Always load when writing artifacts: `refs/contracts-and-artifacts.md`.
 12. Karpathy applies to every code-touching step.
 13. If sources disagree, record the conflict.
 14. `.agent-auth.yaml` is the single source of truth for all tokens. Never log token values. Never commit the file.
+15. Serena is read-only and advisory. Never call Serena code-mutation tools (`rename_symbol`, `replace_symbol_body`, `insert_*`, `safe_delete_symbol`). Code owner owns all edits.
 
 ---
 
@@ -155,7 +159,19 @@ Sub-agents are internal workers activated by the parent orchestrator during Disc
 | Source readers | Jira Reader, Confluence Reader, Figma Reader, Doc Reader, Graph Impact Reader |
 | Analysis workers | Ambiguity Detector, Conflict Detector, Missing-info Detector, State Extractor, Dependency Impact Analyzer |
 | Advisory workers | Research Advisor, Android Advisor, QA Scenario Advisor, Rollout/Risk Advisor |
+| **Code Analysis** | **Code Analysis Worker (Serena)** — symbol-level queries; read-only; agent-decided activation |
 | Preflight | Tooling Preflight Auditor |
+
+**Serena activation matrix (summary):**
+
+| Stage | Condition | Serena tool | Decided by |
+|---|---|---|---|
+| 1 Discovery | graph_impact ≥ medium OR symbol named | `get_symbols_overview`, `find_symbol` | Agent |
+| 1.5 Clarification | Interface in change path / surprising connection | `find_implementations`, `find_referencing_symbols` | Agent |
+| 4 Implementation | Code owner needs usage context | `find_declaration` | Code owner request |
+| 5 Verify | graph_impact ≥ medium AND kotlin-ls stable | `get_diagnostics_for_file` | Agent |
+| 6 QA | Scope discipline check | `find_referencing_symbols` | Agent (optional) |
+| JetBrains backend | Android Studio running | all above tools | Dev opt-in |
 
 ---
 
@@ -298,6 +314,16 @@ If unsure, choose `audit`.
 - If missing in `audit`, record the gap.
 - If code is touched, apply the principles even if the plugin is not installed, and record how the gate was applied.
 - Do not overwrite existing `CLAUDE.md` unless explicitly requested.
+
+### Serena
+- Check `uv` presence and `uvx serena` availability in Stage -1 (non-blocking).
+- If missing: record `serena: not-configured`; never block Stage 0.
+- If ready: activate Code Analysis Worker automatically per stage conditions.
+- JetBrains backend is dev opt-in only — agent does not detect or start Android Studio.
+- Kotlin LS diagnostics are disabled until dev confirms `kotlin_ls_stable: true`.
+- Never call mutation tools: `rename_symbol`, `replace_symbol_body`, `insert_before_symbol`, `insert_after_symbol`, `safe_delete_symbol`, or any `jet_brains_*` refactoring tool.
+- Serena outputs feed `context-pack.json → dependencies`, `facts`, and may upgrade `graph_impact`.
+- Install command (bootstrap/update mode, if approved): `uv tool install oraios-serena`
 
 ---
 

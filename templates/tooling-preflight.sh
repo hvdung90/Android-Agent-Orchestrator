@@ -165,6 +165,26 @@ except: print('- session: unreadable')
   fi
 ) &
 
+# ⑧ Serena
+(
+  out="$TMPDIR_PREFIX/serena"
+  if command -v uv >/dev/null 2>&1; then
+    echo "- uv: present ($(command -v uv))" > "$out"
+    ver=$(uvx serena --version 2>/dev/null | head -1)
+    if [ -n "$ver" ]; then
+      echo "- serena: $ver" >> "$out"
+    else
+      echo "- serena: not installed (uvx serena unavailable)" >> "$out"
+      [ "$MODE" = "audit" ] && echo "- action: report only (audit mode); non-blocking" >> "$out"
+    fi
+  else
+    echo "- uv: missing" > "$out"
+    echo "- serena: unavailable (uv not installed); non-blocking" >> "$out"
+  fi
+  echo "- backend: lsp (default) — JetBrains is dev opt-in, not auto-detected" >> "$out"
+  echo "- kotlin-ls: pre-alpha — diagnostics disabled unless dev confirms stable" >> "$out"
+) &
+
 wait  # ← all parallel checks complete here
 
 # ── Print results in order ────────────────────────────────────────────────────
@@ -175,6 +195,7 @@ write_section "Android CLI" androidcli
 write_section "Android skills" skills
 write_section "Graphify"   graphify
 write_section "Karpathy"   karpathy
+write_section "Serena"     serena
 write_section "Memory cache" memory
 
 echo

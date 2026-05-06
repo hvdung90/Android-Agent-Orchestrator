@@ -1,5 +1,44 @@
 # Changelog
 
+## v4.4.0
+
+### Added
+
+- **Serena Code Analysis Worker** (`refs/sub-agents.md` — new "Code Analysis workers" category):
+  - Symbol-level LSP queries via `get_symbols_overview`, `find_symbol`, `find_implementations`, `find_referencing_symbols`, `find_declaration`, `get_diagnostics_for_file`.
+  - Activation is **agent-decided** based on per-stage conditions — no manual trigger needed.
+  - **Mandatory** check: Stage -1 preflight (always non-blocking).
+  - **Agent-decided** tools: `get_symbols_overview` (Discovery, graph_impact ≥ medium); `find_symbol` / `find_implementations` / `find_referencing_symbols` (Clarification, per trigger); `get_diagnostics_for_file` (Verify, kotlin-ls stable only).
+  - **Code-owner request only**: `find_declaration` (Stage 4 advisory).
+  - **Never called by agent**: `rename_symbol`, `replace_symbol_body`, `insert_*`, `safe_delete_symbol`, all `jet_brains_*` mutation tools.
+  - **Dev-decided**: JetBrains backend (Android Studio IDE engine, opt-in only; agent uses LSP default).
+  - Kotlin LS stability gate: diagnostics disabled until dev confirms `kotlin_ls_stable: true`.
+  - YAML output contract defined; feeds `context-pack.json → dependencies`, `facts`, may upgrade `graph_impact`.
+  - Install command (bootstrap/update if approved): `uv tool install oraios-serena`.
+
+- **`refs/provisioning-preflight.md`**: new `## Serena` section — decision table, backend note, Kotlin LS stability note, blocking rule (always non-blocking).
+
+- **`templates/tooling-preflight.sh`**: ⑧ Serena parallel check — `uv` presence + `uvx serena --version`; prints LSP default note + Kotlin LS pre-alpha caveat.
+
+- **`templates/preflight-report.md`**: new `## Serena` section template.
+
+- **`examples/preflight-report.example.md`**: filled Serena section with realistic data.
+
+- **`refs/clarification-workflow.md`**: Code Analysis Worker activation rules in Stage 1.5 — per-trigger table; Serena YAML outputs included in Gate C exit criteria.
+
+- **`refs/playbooks.md`**: all 7 playbooks updated with `[Serena: agent]` / `[Serena: code-owner request]` / `[Serena: optional]` annotations per stage.
+
+- **`refs/contracts-and-artifacts.md`**: `tooling_readiness.serena` field in context-pack schema; Gate -1 and Gate C updated; `## Serena` in preflight report required sections.
+
+- **`SKILL.md`**: version 4.4.0; Serena in TL;DR; hard rule #15 (no mutation tools); `serena-code-analysis` in metadata workers; Serena activation matrix table in Sub-agents section; `### Serena` in Tool action rules.
+
+### Changed
+
+- All `refs/` version headers: 4.3.0 → 4.4.0.
+- `README.md`: version → 4.4.0; changelog table updated with v4.4.0 row.
+
+---
+
 ## v4.3.0
 
 ### Added

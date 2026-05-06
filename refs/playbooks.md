@@ -1,6 +1,6 @@
 # Playbooks
 
-_Skill version: 4.3.0 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 4.4.0 — update this when SKILL.md bumps a minor or major version._
 
 Each playbook maps a task type to the correct provisioning mode, stage sequence, source mode, clarification workers, and Graphify queries.
 
@@ -66,15 +66,20 @@ Stage -1 — Tooling Preflight
 ## 1) New feature
 
 ```text
-Stage -1 — audit tools and graph state
+Stage -1 — audit tools and graph state; check Serena (non-blocking)
 Stage 0 — collect source list and consume preflight report
 Stage 1 — read graph if present; read docs/ai/inputs
+          [Serena: agent] get_symbols_overview on affected area if graph_impact ≥ medium
 Stage 1.5 — minimal clarification unless triggers fire
+            [Serena: agent] find_implementations / find_referencing_symbols if triggers fire
 Stage 2 — write requirements from clarification brief; STOP
 Stage 3 — design + Android memo
 Stage 4 — one code owner implements
+          [Serena: code-owner request] find_declaration / find_implementations advisory
 Stage 5 — Android CLI evidence + Graphify update
+          [Serena: agent] get_diagnostics_for_file if graph_impact ≥ medium AND kotlin-ls stable
 Stage 6 — Karpathy QA gate
+          [Serena: optional] find_referencing_symbols scope check
 ```
 
 ---
@@ -82,10 +87,12 @@ Stage 6 — Karpathy QA gate
 ## 2) Weak Jira + partial Figma
 
 ```text
-Stage -1 — audit or setup based on user intent
+Stage -1 — audit or setup based on user intent; check Serena (non-blocking)
 Stage 0 — collect Jira + Figma + linked docs
 Stage 1 — source readers in parallel
+          [Serena: agent] find_symbol for key components named in Jira ticket
 Stage 1.5 — Ambiguity + Conflict + Missing-info + State Extractor
+            [Serena: agent] find_implementations for any interface flagged by Missing-info
 Stage 2 — requirements from clarification brief; STOP
 Stages 3–6 — normal flow
 ```
@@ -95,12 +102,16 @@ Stages 3–6 — normal flow
 ## 3) Edit existing feature
 
 ```text
-Stage -1 — audit Graphify state
+Stage -1 — audit Graphify + Serena state
 Stage 1 — graphify query/path if graph exists
+          [Serena: agent] find_referencing_symbols on the symbol being edited
 Stage 1.5 — Ambiguity + Missing-info + Dependency Impact
-Stage 2 — include graph path and out-of-scope list; STOP
+            [Serena: agent] find_implementations if abstract/interface involved
+Stage 2 — include graph path, caller count from Serena, out-of-scope list; STOP
 Stage 4 — surgical changes only
+          [Serena: code-owner request] find_declaration for usage pattern
 Stage 5 — update graph and verify
+          [Serena: agent] get_diagnostics_for_file if kotlin-ls stable
 ```
 
 ---
@@ -108,13 +119,17 @@ Stage 5 — update graph and verify
 ## 4) Bug investigation
 
 ```text
-Stage -1 — audit Android CLI and Graphify
+Stage -1 — audit Android CLI and Graphify; check Serena (non-blocking)
 Stage 0 — collect repro, device, version, expected behavior
 Stage 1 — graph path + runtime evidence if available
+          [Serena: agent] find_symbol on crash site / reported component
+          [Serena: agent] find_referencing_symbols to trace callers
 Stage 1.5 — clarify only if repro unclear
-Stage 2 — minimal bug requirements
+Stage 2 — minimal bug requirements; include Serena call chain evidence
 Stage 4 — smallest safe patch
+          [Serena: code-owner request] find_declaration for context
 Stage 5 — runtime evidence + graph update if graph exists
+          [Serena: agent] get_diagnostics_for_file on patched file if kotlin-ls stable
 ```
 
 ---
@@ -122,10 +137,13 @@ Stage 5 — runtime evidence + graph update if graph exists
 ## 5) XML → Compose migration
 
 ```text
-Stage -1 — check Android CLI, Android skills, Graphify
+Stage -1 — check Android CLI, Android skills, Graphify, Serena
 Stage 1 — query "xml layout view fragment" if graph exists; android skills find "compose"
+          [Serena: agent] get_symbols_overview on XML-bound view layer
+          [Serena: agent] find_referencing_symbols on Fragment/Activity being migrated
 Stage 1.5 — Android Advisor + Dependency Impact + Rollout/Risk
-Stage 2 — migration plan; STOP
+            [Serena: agent] find_implementations of ViewBinding / Fragment interfaces
+Stage 2 — migration plan; include Serena symbol surface; STOP
 Stage 4 — per-batch single-owner implementation
 Stage 5 — visual evidence + graph update
 ```
@@ -135,12 +153,14 @@ Stage 5 — visual evidence + graph update
 ## 6) AGP / build modernization
 
 ```text
-Stage -1 — check AI DevKit, Android CLI, Android skills, Gradle wrapper, Graphify
+Stage -1 — check AI DevKit, Android CLI, Android skills, Gradle wrapper, Graphify, Serena
 Stage 1 — graphify query "gradle build agp"; android skills find "agp"
+          [Serena: agent] find_symbol for build-related symbols if Kotlin DSL in use
 Stage 1.5 — Dependency Impact + Rollout/Risk + Android Advisor
 Stage 2 — upgrade plan; STOP
 Stage 4 — controlled implementation
 Stage 5 — clean build + graph update
+          [Serena: agent] get_diagnostics_for_file on changed build files if kotlin-ls stable
 ```
 
 ---
@@ -148,11 +168,13 @@ Stage 5 — clean build + graph update
 ## 7) Unfamiliar codebase + raw task brief
 
 ```text
-Stage -1 — audit first; refresh graph only if approved
+Stage -1 — audit first; refresh graph only if approved; check Serena (non-blocking)
 Stage 0 — collect task brief
 Stage 1 — read GRAPH_REPORT.md if present; Doc Reader reads inputs
+          [Serena: agent] get_symbols_overview on codebase entry points (if Serena ready)
 Stage 1.5 — Ambiguity + Missing-info + Graph Impact + Dependency Impact
-Stage 2 — requirements after ready; STOP
+            [Serena: agent] find_symbol / find_implementations for key domain symbols
+Stage 2 — requirements after ready; include Serena codebase surface summary; STOP
 ```
 
 ---

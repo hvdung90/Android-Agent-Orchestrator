@@ -5,7 +5,7 @@
 
 `android-agent-orchestrator` is a behavioral orchestration skill for AI coding agents working on Android projects. It coordinates setup/provisioning, process control, Android domain guidance, runtime verification, architecture graphing, and code-quality guardrails into one disciplined workflow.
 
-Current skill version: **v4.3.0**
+Current skill version: **v4.4.0**
 
 ---
 
@@ -45,9 +45,9 @@ docs/
 
 ---
 
-## What changed in v4.2.x
+## What changed in v4.2.x → v4.4.0
 
-v4.1 formalized Clarification & Synthesis. v4.2.x builds the full orchestration infrastructure.
+v4.1 formalized Clarification & Synthesis. v4.2.x builds the full orchestration infrastructure. v4.3–4.4 add performance, memory, and code-analysis layers.
 
 | Version | Key addition |
 |---|---|
@@ -60,6 +60,7 @@ v4.1 formalized Clarification & Synthesis. v4.2.x builds the full orchestration 
 | **v4.2.6** | FLOW.md rewrite đầy đủ |
 | **v4.2.7** | `refs/auth-bootstrap.md`: auth init + just-in-time token check per tool; MCP mapping; hard rule #14 |
 | **v4.3.0** | Activation trigger; `QUICKSTART.md`; lazy-load ref tiers (LIGHT/MEDIUM/HEAVY/FULL); parallel `tooling-preflight.sh`; `graph_impact` field + Stage 5 skip; local memory layer (`tooling-cache.json`, `session.json`, `graph-stamp.json`); cache-first Stage -1; sparse context-pack rule |
+| **v4.4.0** | **Serena Code Analysis Worker**: symbol-level LSP queries (not a lane); agent-decided activation per stage; mandatory/optional/never tool classification; JetBrains backend dev opt-in; Kotlin LS stability gate; hard rule #15 |
 
 ---
 

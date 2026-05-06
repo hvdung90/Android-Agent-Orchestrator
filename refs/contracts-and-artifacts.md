@@ -1,6 +1,6 @@
 # Contracts, Artifacts, and Gates
 
-_Skill version: 4.3.0 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 4.4.0 — update this when SKILL.md bumps a minor or major version._
 
 ---
 
@@ -35,6 +35,7 @@ audit | bootstrap | update | refresh-graph | force-reinstall
 ## Android skills
 ## Graphify
 ## Karpathy
+## Serena
 ## Decisions
 - Tokens to request from user (just-in-time, khi cần):
 ```
@@ -79,7 +80,8 @@ Exception: always include `feature_id`, `clarity_score`, `outcome`, `blocked`, `
     "android_cli": "ready | missing | unknown",
     "android_skills": "ready | partial | missing | unknown",
     "graphify": "ready | graph-missing | cli-missing | stale | unknown",
-    "karpathy": "installed | manual | missing | unknown"
+    "karpathy": "installed | manual | missing | unknown",
+    "serena": "ready | missing | not-configured"
   },
   "auth_status": {
     "file": "present | created-empty | missing",
@@ -121,6 +123,7 @@ Required:
 - Graphify checked,
 - graph state recorded,
 - Karpathy state recorded,
+- Serena checked (uv present, MCP configured or not; always non-blocking),
 - action permissions recorded,
 - blockers recorded,
 - decision: proceed to Stage 0 yes/no.
@@ -146,6 +149,7 @@ Required:
 - `context-pack.json`,
 - `clarification-brief.md`,
 - clarity report or embedded clarity section,
+- Serena Code Analysis Worker outputs attached or summarized (if Serena ready and triggers fired),
 - parent outcome chosen.
 
 ### Gate D — Requirements complete

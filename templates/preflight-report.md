@@ -64,6 +64,16 @@
 - Action taken:
 - Notes:
 
+## Serena
+
+- uv present:
+- Serena runnable:
+- Backend: lsp | jetbrains | unknown
+- Kotlin LS stable: true | false | unknown
+- Action allowed:
+- Action taken:
+- Notes: (always non-blocking)
+
 ## Decisions
 
 - Proceed to Stage 0:

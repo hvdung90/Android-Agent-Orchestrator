@@ -1,6 +1,6 @@
 # Clarification & Synthesis Workflow
 
-_Skill version: 4.3.0 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 4.4.0 — update this when SKILL.md bumps a minor or major version._
 
 ## Purpose
 
@@ -18,6 +18,7 @@ Clarification should consume:
 - source list from Intake,
 - preflight report summary,
 - Graphify availability and graph path if present,
+- Serena availability (`serena: ready | missing`) from preflight,
 - docs/tickets/design inputs.
 
 ---
@@ -121,16 +122,39 @@ Skip or minimize Clarification when:
 
 ---
 
+## Code Analysis Worker (Serena) — activation in Clarification
+
+Serena is activated **after** source readers and Graphify Impact Reader produce their outputs. It does not replace them — it drills into specific symbols they surface.
+
+**Agent-decided activation rules for Stage 1.5:**
+
+| Trigger from prior worker | Serena tool |
+|---|---|
+| Graph Impact Reader: `affected_components` list populated | `find_symbol` for each component |
+| Graph Impact Reader: `surprising_connections` non-empty | `find_referencing_symbols` on the connecting symbol |
+| Dependency Impact Analyzer: interface/abstract class in `direct_changes` | `find_implementations` |
+| Missing-info Detector: unknown implementation pattern flagged | `find_referencing_symbols` |
+
+If Serena is `missing` or `not-configured` in preflight → skip silently; note in clarification-brief.
+
+**Output of Code Analysis Worker feeds into `context-pack.json` fields:**
+- `dependencies[]` — add concrete implementors / callers found
+- `facts[]` — add "N callers of X found" evidence
+- `graph_impact` — may be upgraded if Serena reveals wider call surface than Graphify showed
+
+---
+
 ## Sequence
 
 1. Identify source mode and collect raw bundle.
-2. Activate source readers.
-3. Activate analysis workers.
-4. Parent synthesizes:
+2. Activate source readers in parallel.
+3. Activate analysis workers in parallel.
+4. **If Serena ready:** activate Code Analysis Worker based on triggers above (runs after step 3 outputs available).
+5. Parent synthesizes:
    - `docs/ai/clarification/context-pack.json`
    - `docs/ai/clarification/clarification-brief.md`
    - `docs/ai/clarification/clarity-report.md` or embedded clarity section.
-5. Parent decides outcome:
+6. Parent decides outcome:
    - `ready`
    - `blocked`
    - `research-loop`
@@ -143,12 +167,14 @@ Mode A:
 1. `clarity-report.md`
 2. `context-pack.json`
 3. `clarification-brief.md`
-4. parent outcome selected
+4. Serena YAML outputs (if Serena ready) attached or summarized in brief
+5. parent outcome selected
 
 Mode B:
 1. `context-pack.json`
 2. `clarification-brief.md` with clarity section
-3. parent outcome selected
+3. Serena YAML outputs (if Serena ready and triggers fired) attached or summarized
+4. parent outcome selected
 
 ---
 

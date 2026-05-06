@@ -1,6 +1,6 @@
 # Provisioning Preflight
 
-_Skill version: 4.3.0 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 4.4.0 — update this when SKILL.md bumps a minor or major version._
 
 ## Purpose
 
@@ -178,6 +178,32 @@ Decision:
 | Missing | `bootstrap/update` | Install plugin or add project guidance if approved |
 | `CLAUDE.md` exists | Any | Do not overwrite silently |
 | Code-touching task | Any | Apply Karpathy principles manually even if install missing |
+
+---
+
+## Serena
+
+Check:
+
+```bash
+command -v uv >/dev/null 2>&1 && echo "uv: present" || echo "uv: missing"
+uvx serena --version 2>/dev/null | head -1 || echo "serena: not available"
+```
+
+Decision:
+
+| State | Mode | Action |
+|---|---|---|
+| uv missing | Any | Report missing; Serena unavailable; non-blocking |
+| uv present, Serena not runnable | `audit` | Report not-installed; non-blocking |
+| uv present, Serena not runnable | `bootstrap/update` | Install: `uv tool install oraios-serena` if approved |
+| Serena runnable | Any | Record ready; no further action in audit |
+
+**Backend note:** Default backend is LSP (no IDE required). JetBrains backend (Android Studio IDE engine) is opt-in by dev — agent does not start the IDE. Record backend as `unknown` unless dev specifies.
+
+**Kotlin LS stability note:** Kotlin Language Server is pre-alpha. Record `kotlin_ls_stable: unknown` unless dev confirms. Agent skips `get_diagnostics_*` calls when stability is unknown.
+
+**Blocking rule:** Serena missing is **never a blocker**. Always record as non-blocking gap.
 
 ---
 

@@ -67,6 +67,16 @@
 - Action taken: none
 - Notes: principles will be applied manually at Stage 6 QA gate
 
+## Serena
+
+- uv present: yes
+- Serena runnable: yes (`oraios-serena 0.3.1`)
+- Backend: lsp (default); JetBrains opt-in not configured
+- Kotlin LS stable: unknown (dev has not confirmed; pre-alpha)
+- Action allowed: no install in audit mode
+- Action taken: none
+- Notes: ready for symbol-level queries; `get_diagnostics_*` disabled until Kotlin LS stability confirmed; non-blocking
+
 ## Decisions
 
 - Proceed to Stage 0: yes for read-only task analysis

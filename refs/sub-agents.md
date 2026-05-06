@@ -1,6 +1,6 @@
 # Sub-agent Catalog and Dependency Rules
 
-_Skill version: 4.3.0 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 4.4.0 — update this when SKILL.md bumps a minor or major version._
 
 ## Design principle
 
@@ -235,6 +235,72 @@ release_notes_draft: <short>
 
 ---
 
+## Code Analysis workers
+
+### Code Analysis Worker (Serena)
+
+Read-only and advisory. Never calls code-touching tools. Activated by parent orchestrator.
+
+**Prerequisite:** Serena MCP configured (`serena: ready` in preflight report). Non-blocking if missing — silently skip and note in report.
+
+**Activation is agent-decided**, based on conditions below. No manual trigger required.
+
+#### When agent activates (auto-decided)
+
+| Condition | Stage | Tool called |
+|---|---|---|
+| Graphify identified affected components | 1 Discovery | `get_symbols_overview` |
+| Specific symbol named in Graphify output or task | 1 Discovery | `find_symbol` |
+| Abstract class / interface in change path | 1.5 Clarification | `find_implementations` |
+| Surprising connection found by Graph Impact Reader | 1.5 Clarification | `find_referencing_symbols` |
+| Missing-info flags unknown implementation pattern | 1.5 Clarification | `find_referencing_symbols` |
+| Code owner needs usage pattern before editing | 4 Implementation (advisory) | `find_declaration` |
+| graph_impact ≥ medium AND Kotlin LS confirmed stable | 5 Verify | `get_diagnostics_for_file` |
+| Scope discipline check at QA gate | 6 QA (optional) | `find_referencing_symbols` |
+
+#### Backend selection (dev-decided, not agent-decided)
+
+| Backend | Condition | Accuracy |
+|---|---|---|
+| LSP default | `uv` + serena installed; no IDE required | Good |
+| JetBrains plugin | Android Studio running; dev opts in | Full IDE accuracy |
+
+Default is LSP. Agent does not start Android Studio. Dev configures JetBrains backend separately.
+
+#### Kotlin LS stability gate
+
+Kotlin Language Server is pre-alpha. Before calling `get_diagnostics_for_file` or `get_diagnostics_for_symbol`:
+- If dev confirms Kotlin LS stable → proceed.
+- If stability unknown → skip diagnostics; note in report: `"serena diagnostics skipped: kotlin-ls pre-alpha"`.
+
+#### Tools NEVER called by agent (code owner only)
+
+`rename_symbol` · `replace_symbol_body` · `insert_before_symbol` · `insert_after_symbol` · `safe_delete_symbol` · `jet_brains_move` · `jet_brains_inline_symbol` · all other mutation tools.
+
+#### YAML output contract
+
+```yaml
+source_type: serena-analysis
+stage: discovery | clarification | implementation-advisory | verify | qa
+query_type: symbol-overview | find-symbol | find-implementations | find-referencing | find-declaration | diagnostics
+symbol_queried: <name or "area overview">
+component_layer: ui | domain | data | infra | unknown
+android_pattern: ViewModel | Repository | UseCase | Navigator | DI-module | none
+results:
+  - symbol: <qualified name>
+    kind: class | interface | function | property | object
+    file: <relative path>
+    line: <n>
+    summary: <one-line>
+callers_count: <n>
+implementors_count: <n>
+diagnostics: []            # only when get_diagnostics_* called
+kotlin_ls_stable: true | false | unknown
+recommendation: <one-line impact note for parent orchestrator>
+```
+
+---
+
 ## Tooling Preflight Auditor
 
 ```yaml
@@ -261,6 +327,12 @@ graphify:
 karpathy:
   guidance_present: true | false | unknown
   action_recommended: none | install-plugin | append-guidance
+serena:
+  uv_present: true | false
+  mcp_configured: true | false
+  backend: lsp | jetbrains | unknown
+  kotlin_ls_stable: true | false | unknown
+  action_recommended: none | install | configure
 blockers: []
 warnings: []
 proceed_to_stage_0: true | false
