@@ -57,7 +57,7 @@ Do not load this skill for non-Android projects or purely conversational questio
 
 **v4.2.0** — Stage -1 Tooling Preflight, provisioning modes (`audit`/`bootstrap`/`update`/`refresh-graph`/`force-reinstall`), Graphify freshness policy.
 
-**v4.2.1** — README slim (human-facing only); SKILL.md explicit `→ Load refs/` per stage; Stage 1.5 binary trigger checklist; Mode C escape hatch; refs version headers; README_4.1.md archived.
+**v4.2.1** — README slim (human-facing only); SKILL.md explicit `→ Load refs/` per stage; Stage 1.5 binary trigger checklist; Mode C escape hatch; refs version headers.
 
 **v4.2.2** — Source integrations: Jira/Figma/Confluence link-driven (no upfront setup required); source mode derivation table (A/B/C).
 

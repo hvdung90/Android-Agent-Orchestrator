@@ -34,9 +34,7 @@ templates/
 examples/
 └── preflight-report.example.md   ← filled example with auth section
 docs/
-├── FLOW.md                       ← complete flow diagram, all use cases
-└── archive/
-    └── README_4.1.md             ← previous version docs
+└── FLOW.md                       ← complete flow diagram, all use cases
 .project-orchestration/memory/    ← runtime cache (gitignored)
     ├── tooling-cache.json        ← skip Stage -1 if valid (24h TTL)
     ├── session.json              ← resume interrupted task

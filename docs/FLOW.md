@@ -27,7 +27,7 @@ Developer provides task
 
 All task types start with Stage -1.
 [A][B][C][D] end after Stage -1.
-[E]–[J] go through the full Stage 0–6 flow.
+[E]–[J] go through Stage 0–6. Some stages may be minimal, but each gate is considered.
 ```
 
 ---
@@ -521,6 +521,7 @@ Stage -1 (refresh-graph)
 → 1 (graphify path query if graph exists + source readers)
 → 1.5 (Ambiguity + Missing-info + Dependency Impact)
 → 2 (requirements: graph path + out-of-scope list) → STOP
+→ 3 (design delta + Android memo if Android-specific)
 → 4 (surgical changes only — Karpathy)
 → 5 (update graph + verify)
 → 6 (QA gate)
@@ -533,6 +534,7 @@ Stage -1 (refresh-graph)
 → 1 (graph path + runtime evidence if available)
 → 1.5 (clarify only when repro is unclear)
 → 2 (minimal bug requirements) → STOP
+→ 3 (fix plan + verification design)
 → 4 (smallest safe patch)
 → 5 (runtime evidence + graph update if graph exists)
 → 6 (QA gate)
@@ -541,10 +543,12 @@ Stage -1 (refresh-graph)
 ### [H] XML → Compose migration
 ```
 -1 (check Android CLI + Android skills + Graphify + auth)
+→ 0 (collect migration target, sources, constraints)
 → 1 (graphify query "xml layout view fragment"
       android skills find "compose")
 → 1.5 (Android Advisor + Dependency Impact + Rollout/Risk)
 → 2 (migration plan) → STOP
+→ 3 (batch plan + Android migration memo)
 → 4 (per-batch, single owner for each batch)
 → 5 (visual evidence + graph update)
 → 6 (QA gate)
@@ -554,10 +558,12 @@ Stage -1 (refresh-graph)
 ```
 -1 (check AI DevKit + Android CLI + Android skills
      + Gradle wrapper + Graphify + auth)
+→ 0 (collect upgrade target, constraints, source docs)
 → 1 (graphify query "gradle build agp"
       android skills find "agp")
 → 1.5 (Dependency Impact + Rollout/Risk + Android Advisor)
 → 2 (upgrade plan) → STOP
+→ 3 (implementation plan + compatibility memo)
 → 4 (controlled implementation)
 → 5 (clean build + graph update)
 → 6 (QA gate)
@@ -571,7 +577,10 @@ Stage -1 (refresh-graph)
 → 1.5 (Ambiguity + Missing-info + Graph Impact
          + Dependency Impact — full clarification)
 → 2 (requirements after outcome=ready) → STOP
-→ 3–6 (normal flow)
+→ 3 (design + implementation plan)
+→ 4 (one owner implements)
+→ 5 (runtime evidence + graph update)
+→ 6 (QA gate)
 ```
 
 ---

@@ -182,7 +182,6 @@
 - SKILL.md: Stage 1.5 trigger replaced with binary checklist (6 measurable conditions).
 - SKILL.md: Mode C now has an escape hatch for clearly bounded single-file tasks (treat as Mode B).
 - All `refs/*.md` files now carry a `Skill version` line for drift detection.
-- `README_4.1.md` archived to `docs/archive/README_4.1.md`.
 
 ---
 
