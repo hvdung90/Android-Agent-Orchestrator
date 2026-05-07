@@ -3,7 +3,7 @@ name: android-agent-orchestrator
 description: Meta-skill for Android projects coordinating auth bootstrap, provisioning preflight, AI DevKit, Android skills, Android CLI, Graphify, Karpathy, and Serena code analysis into one disciplined workflow. Single .agent-auth.yaml manages all tokens; just-in-time token check per tool.
 license: MIT
 metadata:
-  version: 4.4.0
+  version: 4.6.0
   category: orchestration
   lanes:
     - ai-devkit
@@ -13,16 +13,19 @@ metadata:
     - karpathy
   workers:
     - serena-code-analysis
+    - gradle-module-impact-analyzer
   refs:
     - refs/auth-bootstrap.md
     - refs/provisioning-preflight.md
     - refs/clarification-workflow.md
     - refs/sub-agents.md
     - refs/contracts-and-artifacts.md
+    - refs/stage-contracts.md
+    - refs/compliance-policy.md
     - refs/playbooks.md
 ---
 
-# Android Agent Orchestrator v4.4.0
+# Android Agent Orchestrator v4.6.0
 
 ## Activation
 
@@ -46,10 +49,30 @@ Do not load this skill for non-Android projects or purely conversational questio
 - Graphify remains the architecture map.
 - Karpathy remains the code-touching quality gate.
 - **Serena is the Code Analysis Worker** — symbol-level code retrieval, activated after Graphify identifies affected areas. Read-only in Discovery, advisory in Implementation. Never owns decisions or edits.
+- **Gradle Module Impact Analyzer** derives `module_impact_chain` when `graph_impact ≥ medium` — maps architecture components to Gradle modules, produces `build_order` and `test_scope_modules` for Android CLI in Stage 5.
 - Sub-agents are internal workers used during Discovery and Clarification. They do not become independent lanes and they never own final decisions or product-code edits.
 - Jira Reader automatically tracks `linked_docs` and `linked_designs` (1 level deep).
+- `change_type` is derived at Stage 1 and finalized at Stage 1.5 — Android CLI uses it to select required evidence from the Evidence Gate Matrix at Stage 5.
 
 > **Auth first. Audit tools. Read the map. Analyze code surface. Clarify before planning. Approve before coding.**
+
+---
+
+## What changed in v4.5.0
+
+**v4.6.0** — Compliance Policy + Task-scoped Storage.
+
+**Compliance Policy (`refs/compliance-policy.md`):** Three-tier stage compliance matrix (MANDATORY / AUTO-SKIP / CONFIRM-SKIP). Explicit confirmation protocol before any skip. Permanent list of never-bypassable rules. Audit trail via `skip-log.json` at every auto-skip and confirm-skip. Stage order violation detection with immediate stop.
+
+**Task-scoped Storage:** All per-task artifacts moved under `.project-orchestration/tasks/{task_id}/` and `docs/ai/tasks/{task_id}/`. Global artifacts (tooling-cache, preflight) remain at root level. Prevents cross-task artifact collision; enables parallel task tracking.
+
+---
+
+**Pattern 1 — Module Impact Chain:** New `Gradle Module Impact Analyzer` worker in `refs/sub-agents.md`. Activated at Stage 1 when `graph_impact ≥ medium`. Maps architecture components → Gradle module boundaries, derives `build_order`, `test_scope_modules`, `api_surface_broken`. Output feeds `context-pack.json → module_impact_chain`. Android CLI uses `build_order` to scope build commands in Stage 5.
+
+**Pattern 2 — Evidence Gate Matrix:** New matrix in `refs/contracts-and-artifacts.md`. `context-pack.json` gains `change_type` field (`ui_change | database_change | network_change | dependency_change | architecture_change | logic_change | test_change | config_change | multi`). Android CLI derives required and optional evidence from matrix at Stage 5. Gate F now enforces matrix compliance.
+
+**Pattern 3 — Stage Output Contracts:** New `refs/stage-contracts.md`. Every stage now has typed `input_requires`, `output_produces`, `state_on_complete`, `state_on_interrupt`, and `resume_entry_point`. `session.json` schema extended with `change_type`, `module_impact_chain_scope`, `evidence_collected`, and `partial_outputs`.
 
 ---
 
@@ -103,7 +126,10 @@ Load refs on demand — **do not load all refs upfront**. Match tier to task com
 | **FULL** | Migration · AGP · unfamiliar codebase · god nodes in path | + `refs/playbooks.md` + all refs |
 
 Always load at Stage -1: `refs/auth-bootstrap.md`, `refs/provisioning-preflight.md`.  
-Always load when writing artifacts: `refs/contracts-and-artifacts.md`.
+Always load when writing artifacts: `refs/contracts-and-artifacts.md`.  
+Always load when resuming an interrupted task: `refs/stage-contracts.md`.  
+Always load when any stage skip or bypass is considered: `refs/compliance-policy.md`.  
+Load when `graph_impact ≥ medium` or multi-module change detected: `refs/sub-agents.md` (Gradle Module Impact Analyzer).
 
 ---
 
@@ -124,6 +150,10 @@ Always load when writing artifacts: `refs/contracts-and-artifacts.md`.
 13. If sources disagree, record the conflict.
 14. `.agent-auth.yaml` is the single source of truth for all tokens. Never log token values. Never commit the file.
 15. Serena is read-only and advisory. Never call Serena code-mutation tools (`rename_symbol`, `replace_symbol_body`, `insert_*`, `safe_delete_symbol`). Code owner owns all edits.
+16. **Compliance first.** Before skipping any stage or step, load `refs/compliance-policy.md` and apply the compliance matrix. MANDATORY steps cannot be skipped. AUTO-SKIP requires the stated condition to be true and must be written to `skip-log.json`. CONFIRM-SKIP requires explicit human confirmation — implicit agreement is not enough.
+17. **Every skip is logged.** Write to `.project-orchestration/tasks/{task_id}/skip-log.json` on every auto-skip and confirm-skip. This log is never deleted.
+18. **Task isolation.** Write all task artifacts under `.project-orchestration/tasks/{task_id}/` and `docs/ai/tasks/{task_id}/`. Never read or overwrite another task's directory.
+19. **Stage order is law.** Stages run -1 → 0 → 1 → [1.5] → 2 → 3 → 4 → 5 → 6. Any re-ordering or parallel shortcut not defined in this skill is a violation — stop and report to human.
 
 ---
 
@@ -157,6 +187,7 @@ Sub-agents are internal workers activated by the parent orchestrator during Disc
 | Category | Workers |
 |---|---|
 | Source readers | Jira Reader, Confluence Reader, Figma Reader, Doc Reader, Graph Impact Reader |
+| **Module analysis** | **Gradle Module Impact Analyzer** — Gradle module boundary mapping; read-only; activated when `graph_impact ≥ medium` |
 | Analysis workers | Ambiguity Detector, Conflict Detector, Missing-info Detector, State Extractor, Dependency Impact Analyzer |
 | Advisory workers | Research Advisor, Android Advisor, QA Scenario Advisor, Rollout/Risk Advisor |
 | **Code Analysis** | **Code Analysis Worker (Serena)** — symbol-level queries; read-only; agent-decided activation |
@@ -220,6 +251,12 @@ Intake must record:
 
 Read `.project-orchestration/reports/preflight.md`, `graphify-out/GRAPH_REPORT.md` if present, docs in `docs/ai/inputs/` if present, and source material.
 
+Derive `change_type` (initial estimate) from source material and Graphify output — record in `context-pack.json`.
+
+If `graph_impact ≥ medium`: activate **Gradle Module Impact Analyzer** in parallel with other source readers. Output populates `context-pack.json → module_impact_chain`. Write `module_impact_chain_scope` to `session.json`.
+
+→ **Load `refs/stage-contracts.md` § Stage 1** for typed input/output contract and interrupt state.
+
 ### Stage 1.5 — Clarification & Synthesis
 
 → **Load `refs/clarification-workflow.md`** for sequence, exit criteria, and clarity scoring.
@@ -261,7 +298,13 @@ Exactly one code owner edits code.
 
 Android CLI gathers runtime evidence. Graphify runs update after implementation if graph exists.
 
+**Evidence Gate Matrix:** Read `context-pack.json → change_type`. Look up required and optional evidence from the matrix in `refs/contracts-and-artifacts.md § Evidence Gate Matrix`. Run all required items. Gate F is not satisfied until all required items are present.
+
+**Module-scoped builds:** If `module_impact_chain` is present, scope build commands to `module_impact_chain.build_order` rather than full project build.
+
 **Graphify skip condition:** If `context-pack.json → graph_impact` is `low`, skip `/graphify . --update`. Record skip reason in execution report. Run update only when `graph_impact` is `medium` or `high`.
+
+→ **Load `refs/stage-contracts.md` § Stage 5** for typed input/output contract and interrupt state.
 
 ### Stage 6 — QA gate
 
@@ -341,51 +384,60 @@ The parent orchestrator must wait:
 ## Directory layout
 
 ```text
-.project-orchestration/
-├── reports/
-│   ├── preflight.md
-│   └── execution.md
+.project-orchestration/                       ← gitignored
 ├── memory/
-│   ├── tooling-cache.json  ← skip Stage -1 if valid
-│   ├── session.json        ← resume interrupted task
-│   └── graph-stamp.json    ← graph freshness check
-└── evidence/
-    ├── logs/
-    └── screenshots/
+│   └── tooling-cache.json                    ← GLOBAL: Stage -1 cache
+├── reports/
+│   └── preflight.md                          ← GLOBAL: Stage -1 result
+└── tasks/
+    └── {task_id}/                            ← e.g. ANDROID-42 | add-login-flow
+        ├── session.json                      ← task state + stage compliance log
+        ├── skip-log.json                     ← append-only audit of every skip/bypass
+        ├── memory/
+        │   └── graph-stamp.json              ← graph freshness for this task
+        ├── reports/
+        │   └── execution.md                  ← Stage 5-6 evidence manifest + Gate log
+        └── evidence/
+            ├── logs/
+            └── screenshots/
 
 docs/ai/
-├── inputs/
-├── discovery/
-├── clarification/
-├── requirements/
-├── design/
-├── planning/
-├── testing/
-└── android-memo/
+├── inputs/                                   ← GLOBAL: human-provided, never overwritten
+└── tasks/
+    └── {task_id}/
+        ├── discovery/
+        ├── clarification/
+        │   ├── context-pack.json
+        │   └── clarification-brief.md
+        ├── requirements/
+        ├── design/
+        ├── planning/
+        ├── testing/
+        └── android-memo/
 
 graphify-out/
 .skills/
 .ai-devkit.json
-.agent-auth.yaml        ← gitignored; auto-created; contains all tokens
+.agent-auth.yaml                              ← gitignored; auto-created; contains all tokens
 ```
 
 ---
 
 ## Minimal operating algorithm
 
-1. **Auth init** — check `.agent-auth.yaml`; auto-create if missing (refs/auth-bootstrap.md Step 1).
-2. **Cache check** — read `tooling-cache.json`; if valid → skip to step 4. If `session.json` shows interrupted task → offer resume.
-3. **Tooling Preflight** — run `bash templates/tooling-preflight.sh`; write `preflight.md`; write `tooling-cache.json`.
-4. **Intake** — collect links; derive source mode (A/B/C); resolve credential set; write/update `session.json`.
-5. **Determine ref tier** — LIGHT / MEDIUM / HEAVY / FULL; load only needed refs.
-6. **Discovery** — read Graphify if present; activate source readers; auto-follow Jira attachments (1 level).
+1. **Auth init** — check `.agent-auth.yaml`; auto-create if missing (refs/auth-bootstrap.md Step 1). Cannot be skipped.
+2. **Cache + resume check** — read `.project-orchestration/memory/tooling-cache.json`; if valid → AUTO-SKIP Stage -1 (write skip-log). Scan `.project-orchestration/tasks/` for any `session.json` with `stage_status: in_progress` → offer resume using `refs/stage-contracts.md → resume_entry_point`. Load `refs/compliance-policy.md` before any skip decision.
+3. **Tooling Preflight** — run `bash templates/tooling-preflight.sh`; write `preflight.md` (global); write `tooling-cache.json` (global); init `tasks/{task_id}/session.json` and `tasks/{task_id}/skip-log.json`.
+4. **Intake** — collect links; derive source mode (A/B/C); resolve credential set; derive `task_id` (Jira key → slug → date-hash); write/update `tasks/{task_id}/session.json` with `task_id`, `source_mode`.
+5. **Determine ref tier** — LIGHT / MEDIUM / HEAVY / FULL; load only needed refs. Load `refs/stage-contracts.md` if resuming.
+6. **Discovery** — read Graphify if present; activate source readers in parallel; auto-follow Jira attachments (1 level). Derive `change_type` (initial). Activate Gradle Module Impact Analyzer if `graph_impact ≥ medium`. Write `module_impact_chain` and `change_type` to context-pack.
 7. **Token check** — just before each source reader, verify its token; prompt user if missing.
-8. **Clarification** — if any trigger fires, run workers in parallel; parent synthesizes context-pack + brief (sparse format).
+8. **Clarification** — if any trigger fires, run workers in parallel; finalize `change_type` and `module_impact_chain`; parent synthesizes context-pack + brief (sparse format).
 9. **Requirements** — AI DevKit writes canonical doc; **stop for human approval**; update `session.json → requirements_approved: true`.
-10. **Design split** — AI DevKit + Android skills in parallel; select code owner; update `session.json`.
-11. **Implementation** — one owner edits code; all other lanes advisory only.
-12. **Verify** — Android CLI gathers evidence; Graphify updates graph only if `graph_impact` is medium/high.
-13. **QA gate** — AI DevKit + Karpathy review diff; write execution report; mark `session.json → stage_status: complete`.
+10. **Design split** — AI DevKit + Android skills in parallel; select code owner; update `session.json → code_owner`.
+11. **Implementation** — one owner edits code; capture `screenshot_before` if `change_type` includes `ui_change`; all other lanes advisory only.
+12. **Verify** — derive required evidence from Evidence Gate Matrix using `change_type`; Android CLI runs required commands scoped to `module_impact_chain.build_order` if present; Graphify updates graph only if `graph_impact ≥ medium`. Write `evidence_collected` to `session.json`.
+13. **QA gate** — AI DevKit + Karpathy review diff; verify Gate F (all required evidence present); write execution report; mark `session.json → stage_status: complete`.
 
 ---
 

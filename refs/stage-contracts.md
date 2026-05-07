@@ -1,0 +1,388 @@
+# Stage Output Contracts
+
+_Skill version: 4.6.0 — update this when SKILL.md bumps a minor or major version._
+
+Each stage defines a typed contract: what it requires as input, what it must produce as output, and what state it writes to `session.json` on completion or interrupt.
+
+**Resume rule:** At Stage -1, read `session.json`. If `stage_status = in_progress`, the previous run was interrupted at `stage_reached`. Offer to resume from `resume_entry_point`. If user declines, overwrite session and start fresh.
+
+**Interrupt safety:** On any unrecoverable error or user interruption, write the current stage's interrupt state to `session.json` before stopping. Never leave `session.json` in an inconsistent state.
+
+---
+
+## Stage -1 — Tooling Preflight
+
+```yaml
+stage: "-1_tooling_preflight"
+
+input_requires:
+  - git working directory accessible
+  - .agent-auth.yaml (auto-created if missing)
+
+guard_conditions:
+  - Cache check: if tooling-cache.json valid_until > now AND graph_commit matches HEAD
+      → skip bash script, load cached values, state_on_complete immediately
+
+output_produces:
+  - .project-orchestration/reports/preflight.md                    ← GLOBAL
+  - .project-orchestration/memory/tooling-cache.json               ← GLOBAL
+  - .project-orchestration/tasks/{task_id}/session.json (stage_reached: -1)
+  - .project-orchestration/tasks/{task_id}/skip-log.json (initialized empty)
+  - context fields: tooling_readiness, auth_status, provisioning_mode, blockers
+
+state_on_complete:
+  stage_reached: -1
+  stage_status: complete
+  blocker: null
+
+state_on_interrupt:
+  stage_reached: -1
+  stage_status: in_progress
+  blocker: "<which preflight check failed or timed out>"
+
+resume_entry_point: "re-run bash templates/tooling-preflight.sh from scratch (idempotent)"
+```
+
+---
+
+## Stage 0 — Intake
+
+```yaml
+stage: "0_intake"
+
+input_requires:
+  - .project-orchestration/reports/preflight.md (stage -1 complete)
+  - user task description (Jira URL / Figma URL / plain text)
+
+guard_conditions:
+  - preflight.md must have proceed_to_stage_0: true
+  - if preflight has blocking gaps → show gaps, ask user to resolve before continuing
+
+output_produces:
+  - .project-orchestration/tasks/{task_id}/session.json (task_id, source_mode, started_at)
+  - link list recorded (Jira, Figma, Confluence URLs if provided)
+  - ref tier determined (LIGHT / MEDIUM / HEAVY / FULL)
+
+state_on_complete:
+  stage_reached: 0
+  stage_status: complete
+  source_mode: "A | B | C"
+  blocker: null
+
+state_on_interrupt:
+  stage_reached: 0
+  stage_status: in_progress
+  blocker: "awaiting user to provide task description or source links"
+
+resume_entry_point: "re-ask user for missing source links; source_mode already derived if links were given"
+```
+
+---
+
+## Stage 1 — Discovery
+
+```yaml
+stage: "1_discovery"
+
+input_requires:
+  - session.json stage_reached >= 0
+  - .project-orchestration/reports/preflight.md
+  - source links or docs/ai/inputs/ (per source_mode)
+
+guard_conditions:
+  - graphify-out/GRAPH_REPORT.md read if graph exists
+  - source readers run per source_mode (A: Jira+Confluence+Figma; B: Doc Reader; C: user message only)
+
+output_produces:
+  - docs/ai/tasks/{task_id}/discovery/<task>.md  (raw discovery notes)
+  - docs/ai/tasks/{task_id}/clarification/context-pack.json (partial — sources, graph_path, graph_impact, change_type)
+  - module_impact_chain populated if graph_impact >= medium (Gradle Module Impact Analyzer)
+  - .project-orchestration/tasks/{task_id}/skip-log.json appended if Gradle Module Impact Analyzer auto-skipped
+
+state_on_complete:
+  stage_reached: 1
+  stage_status: complete
+  blocker: null
+
+state_on_interrupt:
+  stage_reached: 1
+  stage_status: in_progress
+  blocker: "<which source reader failed or which auth token was missing>"
+  partial_outputs:
+    - "docs/ai/tasks/{task_id}/discovery/<task>.md (partial — safe to re-read)"
+
+resume_entry_point: "re-run failed source reader; previously successful readers are already in discovery notes"
+```
+
+---
+
+## Stage 1.5 — Clarification & Synthesis
+
+```yaml
+stage: "1.5_clarification"
+
+input_requires:
+  - docs/ai/discovery/<task>.md (stage 1 complete)
+  - context-pack.json (partial — graph_impact, sources populated)
+
+guard_conditions:
+  - skip if ALL: docs detailed, acceptance criteria testable, no conflicts, isolated change surface
+  - run if ANY trigger from SKILL.md § Stage 1.5 checklist fires
+
+output_produces:
+  - docs/ai/tasks/{task_id}/clarification/context-pack.json (complete)
+  - docs/ai/tasks/{task_id}/clarification/clarification-brief.md
+  - clarity_score written to context-pack.json
+  - Serena outputs attached if triggered
+  - module_impact_chain finalized (Gradle Module Impact Analyzer may refine graph_impact here)
+  - change_type finalized
+  - .project-orchestration/tasks/{task_id}/skip-log.json appended if Stage 1.5 was auto-skipped or confirm-skipped
+
+state_on_complete:
+  stage_reached: 1
+  stage_status: complete        # note: stage_reached stays 1; 1.5 is a sub-stage
+  clarity_score: <0-10>
+  blocker: null                 # null = clarity sufficient to proceed
+
+state_on_interrupt:
+  stage_reached: 1
+  stage_status: in_progress
+  blocker: "clarification blocked: <missing info item or unresolved conflict description>"
+  partial_outputs:
+    - "docs/ai/tasks/{task_id}/clarification/context-pack.json (partial)"
+
+resume_entry_point: "re-run blocked analysis worker; other workers' outputs already in context-pack"
+```
+
+---
+
+## Stage 2 — Requirements
+
+```yaml
+stage: "2_requirements"
+
+input_requires:
+  - docs/ai/clarification/context-pack.json (clarity_score sufficient, outcome: ready)
+  - clarification-brief.md
+
+guard_conditions:
+  - outcome must be "ready" (not "blocked" or "research-loop")
+  - if outcome = blocked → escalate to user before proceeding
+
+output_produces:
+  - docs/ai/tasks/{task_id}/requirements/<task>.md (canonical requirements doc)
+  - .project-orchestration/tasks/{task_id}/session.json: requirements_approved → false (pending)
+
+approval_gate:
+  - STOP after producing requirements doc
+  - Do not proceed to Stage 3 until human sets approval
+  - session.json: requirements_approved: true written only after explicit human approval
+
+state_on_complete:
+  stage_reached: 2
+  stage_status: complete
+  requirements_approved: true
+  blocker: null
+
+state_on_interrupt:
+  stage_reached: 2
+  stage_status: in_progress
+  blocker: "waiting for human approval of requirements/<task>.md"
+
+resume_entry_point: "requirements doc already exists; re-present to user and await approval"
+```
+
+---
+
+## Stage 3 — Design Split
+
+```yaml
+stage: "3_design"
+
+input_requires:
+  - docs/ai/requirements/<task>.md (requirements_approved: true)
+  - context-pack.json (module_impact_chain, change_type available)
+
+guard_conditions:
+  - requirements_approved must be true in session.json
+  - no product-code changes allowed in this stage
+
+output_produces:
+  - docs/ai/tasks/{task_id}/design/<task>.md (AI DevKit design doc)
+  - docs/ai/tasks/{task_id}/planning/<task>.md (AI DevKit planning doc)
+  - docs/ai/tasks/{task_id}/android-memo/<task>.md (Android skills memo, if Android-specific — auto-skip written to skip-log if omitted)
+  - .project-orchestration/tasks/{task_id}/session.json: code_owner set
+
+state_on_complete:
+  stage_reached: 3
+  stage_status: complete
+  code_owner: "<agent-name>"
+  blocker: null
+
+state_on_interrupt:
+  stage_reached: 3
+  stage_status: in_progress
+  blocker: "<design doc incomplete or code_owner not yet selected>"
+  partial_outputs:
+    - "docs/ai/tasks/{task_id}/design/<task>.md (partial)"
+
+resume_entry_point: "resume writing incomplete design doc; if code_owner missing, derive from design scope"
+```
+
+---
+
+## Stage 4 — Implementation Lock
+
+```yaml
+stage: "4_implementation"
+
+input_requires:
+  - docs/ai/design/<task>.md (stage 3 complete)
+  - docs/ai/planning/<task>.md
+  - session.json: code_owner set, requirements_approved: true
+  - context-pack.json: module_impact_chain (for build scope awareness)
+
+guard_conditions:
+  - exactly one code owner — all other lanes advisory only
+  - Karpathy guidelines applied to every code change
+  - Serena advisory only (no mutation tools)
+  - screenshot_before captured BEFORE first code change (if change_type includes ui_change)
+
+output_produces:
+  - product code changes (owned by code_owner)
+  - evidence/screen_before.png (if change_type: ui_change — captured before first edit)
+
+state_on_complete:
+  stage_reached: 4
+  stage_status: complete
+  blocker: null
+
+state_on_interrupt:
+  stage_reached: 4
+  stage_status: in_progress
+  blocker: "<build error | test failure | blocked on advisory clarification>"
+  partial_outputs:
+    - "product code partial — do not consider shipped"
+
+resume_entry_point: "read partial code state; continue from last successful compile point; re-run Karpathy gate"
+```
+
+---
+
+## Stage 5 — Verify
+
+```yaml
+stage: "5_verify"
+
+input_requires:
+  - stage 4 complete (code_owner signals done)
+  - context-pack.json: change_type, module_impact_chain
+  - Android CLI available
+
+guard_conditions:
+  - derive required evidence from Evidence Gate Matrix using change_type
+  - if module_impact_chain present: scope build commands to build_order modules
+  - if graph_impact >= medium: run /graphify . --update
+  - if graph_impact = low: skip graphify update (record skip reason in execution.md)
+
+output_produces:
+  - .project-orchestration/tasks/{task_id}/evidence/* (all required evidence files)
+  - .project-orchestration/tasks/{task_id}/reports/execution.md (evidence manifest with Gate log)
+  - graphify-out/ updated (if graph_impact >= medium; skip written to skip-log if graph_impact = low)
+  - .project-orchestration/tasks/{task_id}/session.json: stage_reached: 5, evidence_collected: [...]
+
+state_on_complete:
+  stage_reached: 5
+  stage_status: complete
+  blocker: null
+
+state_on_interrupt:
+  stage_reached: 5
+  stage_status: in_progress
+  blocker: "<which required evidence item failed>"
+  partial_outputs:
+    - ".project-orchestration/tasks/{task_id}/evidence/ (partial)"
+
+resume_entry_point: "re-run only failed evidence commands; already-collected evidence is preserved"
+```
+
+---
+
+## Stage 6 — QA Gate
+
+```yaml
+stage: "6_qa_gate"
+
+input_requires:
+  - stage 5 complete (all required evidence collected)
+  - .project-orchestration/reports/execution.md
+  - context-pack.json: change_type, acceptance_criteria
+
+guard_conditions:
+  - all required evidence items from Evidence Gate Matrix must be present (Gate F)
+  - no new code changes allowed; QA gate is review only
+
+output_produces:
+  - .project-orchestration/tasks/{task_id}/reports/execution.md updated with QA review + Gate log
+  - Karpathy diff review recorded
+  - .project-orchestration/tasks/{task_id}/session.json: stage_status: complete
+
+approval_gate:
+  - if Karpathy flags CRITICAL or HIGH issues → block and report to human
+  - if acceptance criteria not fully covered → block and report to human
+
+state_on_complete:
+  stage_reached: 6
+  stage_status: complete
+  blocker: null
+
+state_on_interrupt:
+  stage_reached: 6
+  stage_status: in_progress
+  blocker: "<unresolved QA issue or missing acceptance coverage>"
+
+resume_entry_point: "QA review findings already written in execution.md; re-check blocking issues only"
+```
+
+---
+
+## Session state transitions (summary)
+
+```
+Stage -1 complete → stage_reached: -1, stage_status: complete
+Stage 0  complete → stage_reached:  0, stage_status: complete, source_mode set
+Stage 1  complete → stage_reached:  1, stage_status: complete
+Stage 2  complete → stage_reached:  2, stage_status: complete, requirements_approved: true
+Stage 3  complete → stage_reached:  3, stage_status: complete, code_owner set
+Stage 4  complete → stage_reached:  4, stage_status: complete
+Stage 5  complete → stage_reached:  5, stage_status: complete
+Stage 6  complete → stage_reached:  6, stage_status: complete  ← task done
+
+Any interrupt → stage_status: in_progress, blocker: "<reason>"
+```
+
+---
+
+## Updated `session.json` schema
+
+**Path:** `.project-orchestration/tasks/{task_id}/session.json`
+
+```json
+{
+  "task_id": "ANDROID-42 | task-slug",
+  "started_at": "2026-05-07T09:00:00Z",
+  "updated_at": "2026-05-07T11:30:00Z",
+  "stage_reached": -1,
+  "stage_status": "complete | in_progress | blocked",
+  "source_mode": "A | B | C",
+  "code_owner": "agent-name | null",
+  "requirements_approved": false,
+  "change_type": "ui_change | database_change | network_change | dependency_change | architecture_change | logic_change | test_change | config_change | multi | null",
+  "module_impact_chain_scope": "single | local-chain | full-project | null",
+  "evidence_collected": [],
+  "blocker": "null | <human-readable reason>",
+  "partial_outputs": []
+}
+```
+
+`partial_outputs` lists artifact paths written before an interrupt — safe to re-read on resume. Agent must NOT re-run work that produced these outputs unless explicitly asked.

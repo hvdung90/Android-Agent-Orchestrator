@@ -100,6 +100,39 @@ undocumented_dependencies: []
 graph_freshness_note: <fresh | stale | unknown | graph missing>
 ```
 
+### Gradle Module Impact Analyzer
+
+Activated at Stage 1 Discovery when `graph_impact ≥ medium` OR when affected components span more than one Gradle module. Read-only. Never edits build files.
+
+**Inputs:** `graphify-out/GRAPH_REPORT.md` affected components list + `settings.gradle[.kts]` module declarations.
+
+**Purpose:** Map architecture-level components to their Gradle module boundaries, derive the full build/test scope, and detect API surface changes that ripple across module boundaries.
+
+```yaml
+source_type: gradle-module-impact
+trigger: graph_impact >= medium OR cross_module_change detected
+modules_scanned:
+  - path: <:feature:auth>
+    type: feature | core | data | app | lib
+    api_surface: true | false      # exposes api() dependencies
+modules_affected:
+  - module: <:feature:auth>
+    reason: <direct change | transitive dependency | api surface consumer>
+    change_type: add | modify | delete
+    build_required: true | false
+    test_scope: unit | integration | instrumented | none
+build_order:
+  - <:core:network>              # ordered leaf → root
+  - <:feature:auth>
+  - <:app>
+api_surface_broken: true | false  # true = breaking change in api() module
+test_scope_modules: []            # modules that must run tests
+estimated_build_scope: single | local-chain | full-project
+recommendation: <one-line note for code owner and Android CLI>
+```
+
+**Output feeds into:** `context-pack.json → module_impact_chain`; Stage 5 Android CLI build command scope.
+
 ---
 
 ## Analysis workers
@@ -357,7 +390,7 @@ Only the parent orchestrator may:
 
 Allowed in parallel:
 - tooling read-only checks,
-- source readers,
+- source readers (including Gradle Module Impact Analyzer),
 - analysis workers,
 - advisory workers.
 
