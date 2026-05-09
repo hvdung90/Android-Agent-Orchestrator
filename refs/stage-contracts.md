@@ -1,6 +1,6 @@
 # Stage Output Contracts
 
-_Skill version: 4.6.0 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 4.7.0 — update this when SKILL.md bumps a minor or major version._
 
 Each stage defines a typed contract: what it requires as input, what it must produce as output, and what state it writes to `session.json` on completion or interrupt.
 
@@ -57,24 +57,36 @@ input_requires:
 guard_conditions:
   - preflight.md must have proceed_to_stage_0: true
   - if preflight has blocking gaps → show gaps, ask user to resolve before continuing
+  - Task History Relevance Gate runs before source mode is finalized:
+      default full-history behavior: skipped
+      metadata scan only when continuation signals or possible overlap exist
+      full history read only when task_continuity=continuation OR overlap_score>=medium OR user explicitly references old task docs/ADR
 
 output_produces:
   - .project-orchestration/tasks/{task_id}/session.json (task_id, source_mode, started_at)
   - link list recorded (Jira, Figma, Confluence URLs if provided)
+  - task_continuity: "new | continuation | unknown"
+  - history_scan:
+      performed: true | false
+      mode: "skipped | metadata-only | full"
+      matched_tasks: []
+      overlap_score: "none | low | medium | high"
+      decision: "skip | read_full | ask_human"
   - ref tier determined (LIGHT / MEDIUM / HEAVY / FULL)
 
 state_on_complete:
   stage_reached: 0
   stage_status: complete
   source_mode: "A | B | C"
+  task_continuity: "new | continuation | unknown"
   blocker: null
 
 state_on_interrupt:
   stage_reached: 0
   stage_status: in_progress
-  blocker: "awaiting user to provide task description or source links"
+  blocker: "awaiting user to provide task description, source links, or task-history clarification"
 
-resume_entry_point: "re-ask user for missing source links; source_mode already derived if links were given"
+resume_entry_point: "re-ask user for missing source links or task-history clarification; source_mode/history_scan already derived if available"
 ```
 
 ---
@@ -88,14 +100,17 @@ input_requires:
   - session.json stage_reached >= 0
   - .project-orchestration/reports/preflight.md
   - source links or docs/ai/inputs/ (per source_mode)
+  - matched task history docs only when session.json history_scan.decision = read_full
 
 guard_conditions:
   - graphify-out/GRAPH_REPORT.md read if graph exists
   - source readers run per source_mode (A: Jira+Confluence+Figma; B: Doc Reader; C: user message only)
+  - if history_scan.decision = read_full: read matched task requirements, ADRs, design, and execution report before synthesis
+  - if history_scan.decision = ask_human: block before Discovery until user confirms continuation vs independent task
 
 output_produces:
   - docs/ai/tasks/{task_id}/discovery/<task>.md  (raw discovery notes)
-  - docs/ai/tasks/{task_id}/clarification/context-pack.json (partial — sources, graph_path, graph_impact, change_type)
+  - docs/ai/tasks/{task_id}/clarification/context-pack.json (partial — sources, graph_path, graph_impact, change_type, history_context if read)
   - module_impact_chain populated if graph_impact >= medium (Gradle Module Impact Analyzer)
   - .project-orchestration/tasks/{task_id}/skip-log.json appended if Gradle Module Impact Analyzer auto-skipped
 
@@ -122,7 +137,7 @@ resume_entry_point: "re-run failed source reader; previously successful readers 
 stage: "1.5_clarification"
 
 input_requires:
-  - docs/ai/discovery/<task>.md (stage 1 complete)
+  - docs/ai/tasks/{task_id}/discovery/<task>.md (stage 1 complete)
   - context-pack.json (partial — graph_impact, sources populated)
 
 guard_conditions:
@@ -162,7 +177,7 @@ resume_entry_point: "re-run blocked analysis worker; other workers' outputs alre
 stage: "2_requirements"
 
 input_requires:
-  - docs/ai/clarification/context-pack.json (clarity_score sufficient, outcome: ready)
+  - docs/ai/tasks/{task_id}/clarification/context-pack.json (clarity_score sufficient, outcome: ready)
   - clarification-brief.md
 
 guard_conditions:
@@ -171,6 +186,7 @@ guard_conditions:
 
 output_produces:
   - docs/ai/tasks/{task_id}/requirements/<task>.md (canonical requirements doc)
+  - requirements artifact header, Affected Areas checklist, Decision Triggers section
   - .project-orchestration/tasks/{task_id}/session.json: requirements_approved → false (pending)
 
 approval_gate:
@@ -194,17 +210,68 @@ resume_entry_point: "requirements doc already exists; re-present to user and awa
 
 ---
 
+## Stage 2.5 — Decision Gate / ADR-lite
+
+```yaml
+stage: "2.5_decision_gate"
+
+input_requires:
+  - docs/ai/tasks/{task_id}/requirements/<task>.md (requirements_approved: true)
+  - docs/ai/tasks/{task_id}/clarification/context-pack.json
+  - refs/contracts-and-artifacts.md: ADR trigger list + Decision Ownership matrix
+
+guard_conditions:
+  - evaluate ADR triggers: module boundary, navigation graph, public API/internal contract,
+    persistence schema, DI graph, Gradle/AGP/Kotlin version, Compose/View migration,
+    state ownership, background work, permissions, billing, auth, notifications,
+    broad test strategy
+  - if any trigger fires: create Proposed ADR-lite and stop for human approval
+  - if no trigger fires: record adr_required: false and reason
+
+output_produces:
+  - docs/ai/tasks/{task_id}/decisions/ADR-NNNN-<slug>.md (if required)
+  - .project-orchestration/tasks/{task_id}/session.json:
+      adr_required: true | false
+      adr_status: "proposed | accepted | deferred | superseded | not_required"
+      decision_record: "<path or null>"
+  - .project-orchestration/tasks/{task_id}/skip-log.json appended if ADR-lite not required
+
+approval_gate:
+  - STOP when ADR status is Proposed
+  - Do not proceed to Stage 3 until human approves or explicitly defers the ADR
+
+state_on_complete:
+  stage_reached: 2.5
+  stage_status: complete
+  adr_required: true | false
+  adr_status: "accepted | deferred | not_required"
+  blocker: null
+
+state_on_interrupt:
+  stage_reached: 2.5
+  stage_status: in_progress
+  blocker: "waiting for human approval/deferral of ADR-lite"
+  partial_outputs:
+    - "docs/ai/tasks/{task_id}/decisions/ADR-NNNN-<slug>.md (Proposed)"
+
+resume_entry_point: "ADR decision already exists; re-present Proposed ADR and await approval/deferral"
+```
+
+---
+
 ## Stage 3 — Design Split
 
 ```yaml
 stage: "3_design"
 
 input_requires:
-  - docs/ai/requirements/<task>.md (requirements_approved: true)
+  - docs/ai/tasks/{task_id}/requirements/<task>.md (requirements_approved: true)
   - context-pack.json (module_impact_chain, change_type available)
+  - session.json: adr_status is accepted | deferred | not_required
 
 guard_conditions:
   - requirements_approved must be true in session.json
+  - decision gate must be complete
   - no product-code changes allowed in this stage
 
 output_produces:
@@ -237,9 +304,10 @@ resume_entry_point: "resume writing incomplete design doc; if code_owner missing
 stage: "4_implementation"
 
 input_requires:
-  - docs/ai/design/<task>.md (stage 3 complete)
-  - docs/ai/planning/<task>.md
+  - docs/ai/tasks/{task_id}/design/<task>.md (stage 3 complete)
+  - docs/ai/tasks/{task_id}/planning/<task>.md
   - session.json: code_owner set, requirements_approved: true
+  - session.json: adr_status is accepted | deferred | not_required
   - context-pack.json: module_impact_chain (for build scope awareness)
 
 guard_conditions:
@@ -315,7 +383,7 @@ stage: "6_qa_gate"
 
 input_requires:
   - stage 5 complete (all required evidence collected)
-  - .project-orchestration/reports/execution.md
+  - .project-orchestration/tasks/{task_id}/reports/execution.md
   - context-pack.json: change_type, acceptance_criteria
 
 guard_conditions:
@@ -325,7 +393,7 @@ guard_conditions:
 output_produces:
   - .project-orchestration/tasks/{task_id}/reports/execution.md updated with QA review + Gate log
   - Karpathy diff review recorded
-  - .project-orchestration/tasks/{task_id}/session.json: stage_status: complete
+  - .project-orchestration/tasks/{task_id}/session.json: stage_reached: 6
 
 approval_gate:
   - if Karpathy flags CRITICAL or HIGH issues → block and report to human
@@ -346,6 +414,43 @@ resume_entry_point: "QA review findings already written in execution.md; re-chec
 
 ---
 
+## Stage 7 — Docs / Decision Finalization
+
+```yaml
+stage: "7_docs_decision_finalization"
+
+input_requires:
+  - stage 6 complete
+  - .project-orchestration/tasks/{task_id}/reports/execution.md
+  - decision_record path if ADR-lite was required
+
+guard_conditions:
+  - no product-code changes allowed
+  - if ADR exists: status must become Accepted, Deferred, or Superseded
+  - Task Changelog must summarize behavior changes, not just file diffs
+  - Drift Check must pass or list blockers
+
+output_produces:
+  - docs/ai/tasks/{task_id}/decisions/ADR-NNNN-<slug>.md updated with final status (if present)
+  - .project-orchestration/tasks/{task_id}/reports/execution.md updated with Task Changelog
+  - .project-orchestration/tasks/{task_id}/reports/execution.md updated with Drift Check
+  - .project-orchestration/tasks/{task_id}/session.json: stage_status: complete
+
+state_on_complete:
+  stage_reached: 7
+  stage_status: complete
+  blocker: null
+
+state_on_interrupt:
+  stage_reached: 7
+  stage_status: in_progress
+  blocker: "<ADR final status missing | task changelog incomplete | drift check failed>"
+
+resume_entry_point: "finish execution.md Task Changelog / Drift Check and finalize ADR status"
+```
+
+---
+
 ## Session state transitions (summary)
 
 ```
@@ -353,10 +458,12 @@ Stage -1 complete → stage_reached: -1, stage_status: complete
 Stage 0  complete → stage_reached:  0, stage_status: complete, source_mode set
 Stage 1  complete → stage_reached:  1, stage_status: complete
 Stage 2  complete → stage_reached:  2, stage_status: complete, requirements_approved: true
+Stage 2.5 complete → stage_reached: 2.5, stage_status: complete, adr_status set
 Stage 3  complete → stage_reached:  3, stage_status: complete, code_owner set
 Stage 4  complete → stage_reached:  4, stage_status: complete
 Stage 5  complete → stage_reached:  5, stage_status: complete
-Stage 6  complete → stage_reached:  6, stage_status: complete  ← task done
+Stage 6  complete → stage_reached:  6, stage_status: complete
+Stage 7  complete → stage_reached:  7, stage_status: complete  ← task done
 
 Any interrupt → stage_status: in_progress, blocker: "<reason>"
 ```
@@ -377,6 +484,9 @@ Any interrupt → stage_status: in_progress, blocker: "<reason>"
   "source_mode": "A | B | C",
   "code_owner": "agent-name | null",
   "requirements_approved": false,
+  "adr_required": false,
+  "adr_status": "proposed | accepted | deferred | superseded | not_required | null",
+  "decision_record": "docs/ai/tasks/{task_id}/decisions/ADR-NNNN-slug.md | null",
   "change_type": "ui_change | database_change | network_change | dependency_change | architecture_change | logic_change | test_change | config_change | multi | null",
   "module_impact_chain_scope": "single | local-chain | full-project | null",
   "evidence_collected": [],

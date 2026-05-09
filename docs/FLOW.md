@@ -1,6 +1,6 @@
 # Android Agent Orchestrator — Complete Flow
 
-_Reflects skill v4.3.0. Update when SKILL.md changes._
+_Reflects skill v4.7.0. Update when SKILL.md changes._
 
 ---
 
@@ -27,7 +27,7 @@ Developer provides task
 
 All task types start with Stage -1.
 [A][B][C][D] end after Stage -1.
-[E]–[J] go through Stage 0–6. Some stages may be minimal, but each gate is considered.
+[E]–[J] go through Stage 0–7. Some stages may be minimal, but each gate is considered.
 ```
 
 ---
@@ -198,6 +198,29 @@ All task types start with Stage -1.
                             │
                             ▼
     Record: source mode (A/B/C), links, credential source
+                            │
+                            ▼
+    ┌───────────────────────────────────────────────────────┐
+    │  Task History Relevance Gate                          │
+    │                                                       │
+    │  Default: do NOT read full task history.              │
+    │                                                       │
+    │  continuation signals?                               │
+    │  - user says continue/resume/previous task            │
+    │  - task_id / ADR / requirements path provided         │
+    │  - current branch/PR or in-progress session matches   │
+    │                                                       │
+    │  possible overlap?                                    │
+    │  - same module + same screen/flow                     │
+    │  - same public/internal contract                      │
+    │                                                       │
+    │  none → history_scan=skipped                          │
+    │  signals/overlap → metadata-only scan                 │
+    │  overlap >= medium or explicit continuation           │
+    │      → read full matched task history                 │
+    │  ambiguous and strategy may change                    │
+    │      → ask human one concise question                 │
+    └───────────────────────────────────────────────────────┘
     → Stage 1
 ```
 
@@ -239,7 +262,7 @@ All task types start with Stage -1.
         └───────────────────┬─────┘
                             │
                             ▼
-                  Store → docs/ai/discovery/
+                  Store → docs/ai/tasks/{task_id}/discovery/
 ```
 
 ---
@@ -301,7 +324,7 @@ All task types start with Stage -1.
                             ▼
     Parent synthesizes (serial — 1 owner):
     ┌───────────────────────────────────────────────────┐
-    │  docs/ai/clarification/                           │
+    │  docs/ai/tasks/{task_id}/clarification/           │
     │  ├── context-pack.json                            │
     │  ├── clarification-brief.md                       │
     │  └── clarity-report.md  (Mode A) /                │
@@ -327,7 +350,7 @@ All task types start with Stage -1.
 
 ---
 
-## 6. Stage 2–6 — Requirements → Close
+## 6. Stage 2–7 — Requirements → Close
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -336,7 +359,8 @@ All task types start with Stage -1.
 └─────────────────────────────────────────────────────────────────┘
         │
         ▼
-  AI DevKit writes docs/ai/requirements/<task>.md
+  AI DevKit writes docs/ai/tasks/{task_id}/requirements/<task>.md
+  with artifact header + Affected Areas + Decision Triggers
         │
         ▼
   ██████████████████████████████████████████████
@@ -347,6 +371,31 @@ All task types start with Stage -1.
         │  Human approves
         ▼
 ┌─────────────────────────────────────────────────────────────────┐
+│  STAGE 2.5: DECISION GATE / ADR-LITE                            │
+│  Ref: refs/contracts-and-artifacts.md                           │
+└─────────────────────────────────────────────────────────────────┘
+        │
+        ▼
+  Does task touch module boundary, navigation, public/internal
+  contract, persistence, DI, build versions, migration, state
+  ownership, permissions/background/billing/auth/notifications,
+  or broad test strategy?
+        │
+   ┌────┴────┐
+  Yes        No
+   │          │
+   ▼          ▼
+  Create     Record adr_required=false
+  Proposed   + reason in session.json
+  ADR-lite
+   │
+   ▼
+  ██████████████████████████████████████████████
+  █  MANDATORY STOP — Human approve/defer ADR  █
+  ██████████████████████████████████████████████
+        │
+        ▼
+┌─────────────────────────────────────────────────────────────────┐
 │  STAGE 3: DESIGN SPLIT                                          │
 │  Ref: refs/playbooks.md                                         │
 └─────────────────────────────────────────────────────────────────┘
@@ -355,8 +404,8 @@ All task types start with Stage -1.
   Parallel (no code changes):
   ┌────────────────────────┬──────────────────────────────┐
   │  AI DevKit             │  Android skills              │
-  │  docs/ai/design/       │  docs/ai/android-memo/       │
-  │  docs/ai/planning/     │  <task>.md                   │
+  │  docs/ai/tasks/...     │  docs/ai/tasks/...           │
+  │  design/ + planning/   │  android-memo/<task>.md      │
   └────────────────────────┴──────────────────────────────┘
         │
         ▼
@@ -401,7 +450,16 @@ All task types start with Stage -1.
   └──────────────────────────┴───────────────────────────────┘
         │
         ▼
-  Write: .project-orchestration/reports/execution.md
+  Write QA review into .project-orchestration/tasks/{task_id}/reports/execution.md
+        │
+        ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  STAGE 7: DOCS / DECISION FINALIZATION                          │
+└─────────────────────────────────────────────────────────────────┘
+        │
+        ▼
+  Finalize ADR status, Task Changelog, Gate log, Drift Check.
+  No product-code changes.
         │
         ▼
   ✅ DONE — Task closed
@@ -469,7 +527,7 @@ Resolve flow when the agent receives a link:
 ### [A] Analyze repo
 ```
 Stage -1 (audit) → report gaps → DONE
-Do not run Stage 0–6 unless task docs are also analyzed
+Do not run Stage 0–7 unless task docs are also analyzed
 ```
 
 ### [B] Bootstrap repo
@@ -507,7 +565,7 @@ Stage -1 (refresh-graph)
 → 0 (collect links → Mode A/B/C → resolve credentials)
 → 1 (read graph + source readers + auto-follow Jira attachments)
 → 1.5 (minimal clarification, only run if a trigger fires)
-→ 2 (requirements) → STOP human approval
+→ 2 (requirements) → 2.5 decision gate → STOP if ADR approval needed human approval
 → 3 (design + Android memo)
 → 4 (one owner implements)
 → 5 (CLI evidence + graph update)
@@ -620,6 +678,7 @@ Stage 3    → use graph rationale for design decisions
 Stage 4    → DO NOT query graph while coding
 Stage 5    → /graphify . --update (if graph exists)
 Stage 6    → optional before/after compare; check god nodes
+Stage 7    → finalize ADR status + task changelog + drift check
 ```
 
 ---
@@ -635,10 +694,12 @@ Source readers (Stage 1 / 1.5)       2 workers edit the same code file
 Auto-follow readers (Stage 1)        Credential resolution (per link)
 Analysis workers (Stage 1.5)         Parent synthesis
 Advisory workers (Stage 1.5)         Requirements → human approval
+Decision review (Stage 2.5)          ADR approval when trigger fires
 Lane reads in Discovery              Code ownership (1 owner only)
 Design split (AI DevKit + Android)   Stage gates (wait for gate pass)
 Verify (Android CLI + Graphify)
 QA review (AI DevKit + Karpathy)
+Docs finalization (Stage 7)
 ```
 
 ---
@@ -651,8 +712,10 @@ QA review (AI DevKit + Karpathy)
                            (does not block, but source readers will skip)
 ③  Stage 0  (Mode C)   :  Task unclear → require developer to provide a brief
 ④  Stage 1.5 outcome   :  blocked → ask human, do not fabricate requirements
-⑤  Stage 2 → Stage 3   :  MANDATORY human approval requirements
-⑥  Stage 3 → Stage 4   :  Missing design doc + single code owner
-⑦  Stage 5 → Stage 6   :  Missing runtime evidence + graph update
-⑧  Stage 6 → Close     :  Karpathy review has not passed
+⑤  Stage 2 → 2.5       :  MANDATORY human approval requirements
+⑥  Stage 2.5 → Stage 3 :  Decision trigger fired but ADR-lite not approved/deferred
+⑦  Stage 3 → Stage 4   :  Missing design doc + single code owner
+⑧  Stage 5 → Stage 6   :  Missing runtime evidence + graph update
+⑨  Stage 6 → Stage 7   :  Karpathy review has not passed
+⑩  Stage 7 → Close     :  Missing ADR final status, Task Changelog, or Drift Check
 ```

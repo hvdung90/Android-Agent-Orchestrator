@@ -3,7 +3,7 @@ name: android-agent-orchestrator
 description: Meta-skill for Android projects coordinating auth bootstrap, provisioning preflight, AI DevKit, Android skills, Android CLI, Graphify, Karpathy, and Serena code analysis into one disciplined workflow. Single .agent-auth.yaml manages all tokens; just-in-time token check per tool.
 license: MIT
 metadata:
-  version: 4.6.0
+  version: 4.7.0
   category: orchestration
   lanes:
     - ai-devkit
@@ -25,7 +25,7 @@ metadata:
     - refs/playbooks.md
 ---
 
-# Android Agent Orchestrator v4.6.0
+# Android Agent Orchestrator v4.7.0
 
 ## Activation
 
@@ -53,12 +53,20 @@ Do not load this skill for non-Android projects or purely conversational questio
 - Sub-agents are internal workers used during Discovery and Clarification. They do not become independent lanes and they never own final decisions or product-code edits.
 - Jira Reader automatically tracks `linked_docs` and `linked_designs` (1 level deep).
 - `change_type` is derived at Stage 1 and finalized at Stage 1.5 — Android CLI uses it to select required evidence from the Evidence Gate Matrix at Stage 5.
+- Stage 2.5 Decision Gate decides whether an ADR-lite is required before design or implementation.
+- Stage 7 finalizes decision records and task changelog after verification.
 
 > **Auth first. Audit tools. Read the map. Analyze code surface. Clarify before planning. Approve before coding.**
 
 ---
 
-## What changed in v4.5.0
+## What changed in v4.7.0
+
+**v4.7.0** — Decision governance layer for Android tasks.
+
+Adds Stage 2.5 Decision Gate / ADR-lite before design, Stage 7 Docs/decision finalization after QA, `docs/ai/decisions/0000-template.md`, artifact version headers, affected-area checklist, decision ownership matrix, task changelog, drift checks, and AI-authored artifact rules.
+
+## What changed in v4.5.0–v4.6.0
 
 **v4.6.0** — Compliance Policy + Task-scoped Storage.
 
@@ -107,10 +115,12 @@ Do not load this skill for non-Android projects or purely conversational questio
 | Discovery | Graphify read + source readers + Android domain tagging | No code touched |
 | Clarification | Multiple sub-agents analyze in parallel | Parent synthesis waits for required outputs |
 | Requirements | AI DevKit writes one canonical requirements doc | Single owner |
+| Decision Gate | AI DevKit decides ADR requirement; human approves Proposed ADR when required | Stop before Design if required |
 | Design split | AI DevKit writes plan; Android skills writes memo | Neither edits product code |
 | Implementation | One code owner only | All other lanes advisory only |
 | Verify | Android CLI runs build/device/capture; Graphify updates | Code frozen |
-| QA gate | AI DevKit + Karpathy review diff | No new changes |
+| QA gate | AI DevKit + Karpathy review diff | No new code changes |
+| Docs finalization | AI DevKit updates ADR status and task changelog | No product changes |
 
 ---
 
@@ -144,7 +154,7 @@ Load when `graph_impact ≥ medium` or multi-module change detected: `refs/sub-a
 7. Do not skip Clarification when source material is weak.
 8. No success without evidence.
 9. Read Graphify before touching code when `graphify-out/` exists.
-10. Stop after requirements.
+10. Stop after requirements, then stop again for ADR-lite approval when Stage 2.5 requires one.
 11. No invented commands.
 12. Karpathy applies to every code-touching step.
 13. If sources disagree, record the conflict.
@@ -153,7 +163,8 @@ Load when `graph_impact ≥ medium` or multi-module change detected: `refs/sub-a
 16. **Compliance first.** Before skipping any stage or step, load `refs/compliance-policy.md` and apply the compliance matrix. MANDATORY steps cannot be skipped. AUTO-SKIP requires the stated condition to be true and must be written to `skip-log.json`. CONFIRM-SKIP requires explicit human confirmation — implicit agreement is not enough.
 17. **Every skip is logged.** Write to `.project-orchestration/tasks/{task_id}/skip-log.json` on every auto-skip and confirm-skip. This log is never deleted.
 18. **Task isolation.** Write all task artifacts under `.project-orchestration/tasks/{task_id}/` and `docs/ai/tasks/{task_id}/`. Never read or overwrite another task's directory.
-19. **Stage order is law.** Stages run -1 → 0 → 1 → [1.5] → 2 → 3 → 4 → 5 → 6. Any re-ordering or parallel shortcut not defined in this skill is a violation — stop and report to human.
+19. **Decision changes need ADR-lite.** If a task touches a required decision trigger, create a Proposed ADR in Stage 2.5 and stop for human approval before Stage 3.
+20. **Stage order is law.** Stages run -1 → 0 → 1 → [1.5] → 2 → 2.5 → 3 → 4 → 5 → 6 → 7. Any re-ordering or parallel shortcut not defined in this skill is a violation — stop and report to human.
 
 ---
 
@@ -243,13 +254,29 @@ Open the task, confirm source availability, determine whether external task/desi
 
 → **Load `refs/clarification-workflow.md` § Source integrations** for source mode derivation.
 
+Run the **Task History Relevance Gate**:
+- Default to **no full history read** for a new unrelated task.
+- Set `task_continuity` to `continuation` when the user references previous work, an existing `task_id`, ADR, requirements/design/execution path, current branch/PR, or an in-progress session.
+- Set `task_continuity` to `new` when the task is clearly independent and has no old-task reference.
+- Set `task_continuity` to `unknown` when files/modules/screens overlap previous task metadata but the relationship is unclear.
+- For `continuation` or `unknown`, scan metadata only first: `session.json`, requirements front matter, ADR front matter, and task titles. Do not read full old requirements/design/execution unless overlap is `medium` or `high`, or the user explicitly asks to continue/review old context.
+- If overlap is ambiguous and may affect strategy or requirements, ask one concise clarification before reading full history.
+
 Intake must record:
 - Jira / Figma / Confluence links provided by developer, if any
 - Source mode (A / B / C) derived from what was provided
+- `task_continuity` (`new | continuation | unknown`)
+- `history_scan` decision (`skipped | metadata-only | full | ask_human`)
 
 ### Stage 1 — Discovery
 
 Read `.project-orchestration/reports/preflight.md`, `graphify-out/GRAPH_REPORT.md` if present, docs in `docs/ai/inputs/` if present, and source material.
+
+If Task History Relevance Gate decided `full`, also read the matched task history before synthesis:
+- `docs/ai/tasks/{matched_task_id}/requirements/*.md`
+- `docs/ai/tasks/{matched_task_id}/decisions/ADR-*.md`
+- `docs/ai/tasks/{matched_task_id}/design/*.md`
+- `.project-orchestration/tasks/{matched_task_id}/reports/execution.md`
 
 Derive `change_type` (initial estimate) from source material and Graphify output — record in `context-pack.json`.
 
@@ -284,6 +311,39 @@ AI DevKit writes canonical requirements from synthesized context. Stop for human
 
 → **Load `refs/contracts-and-artifacts.md`** for `requirements/<task>.md` schema and Gate D criteria.
 
+Requirements must include:
+- artifact version header,
+- Affected Areas checklist,
+- facts and assumptions separated,
+- decision triggers observed,
+- acceptance criteria and required evidence.
+
+### Stage 2.5 — Decision Gate / ADR-lite
+
+AI DevKit decides whether an ADR-lite is required before design.
+
+Create an ADR-lite when the task touches any of:
+- module boundary,
+- navigation graph,
+- public API or internal contract,
+- persistence schema,
+- DI graph,
+- Gradle / AGP / Kotlin version,
+- Compose / View migration,
+- state ownership,
+- background work, permissions, billing, auth, or notifications,
+- test strategy with broad impact.
+
+If ADR-lite is required:
+- create `docs/ai/tasks/{task_id}/decisions/ADR-NNNN-<slug>.md` from `docs/ai/decisions/0000-template.md`,
+- set status to `Proposed`,
+- record owner, task, alternatives, consequences, validation evidence plan, and related files/modules,
+- stop for human approval before Stage 3.
+
+If ADR-lite is not required, record `adr_required: false` and the reason in `session.json` and `execution.md`.
+
+→ **Load `refs/contracts-and-artifacts.md`** for the ADR-lite schema and Decision Ownership matrix.
+
 ### Stage 3 — Design split
 
 AI DevKit writes design/planning docs. Android skills write Android memo. No product-code changes.
@@ -309,6 +369,14 @@ Android CLI gathers runtime evidence. Graphify runs update after implementation 
 ### Stage 6 — QA gate
 
 AI DevKit + Karpathy review diff, evidence, graph update, acceptance coverage, and scope discipline.
+
+### Stage 7 — Docs / Decision Finalization
+
+AI DevKit finalizes governance artifacts after QA:
+- update ADR-lite from `Proposed` to `Accepted`, `Deferred`, or `Superseded`,
+- update `.project-orchestration/tasks/{task_id}/reports/execution.md` with Task Changelog,
+- run drift checks for skill refs/templates/version consistency,
+- record any missing evidence as a blocker instead of marking success.
 
 ---
 
@@ -376,8 +444,9 @@ The parent orchestrator must wait:
 1. Before Stage 0: wait for Stage -1 result.
 2. Before Requirements: wait for required Clarification outputs if any trigger fires.
 3. Before Design: wait for human approval of requirements.
-4. Before Implementation: wait for approved requirements, design doc, Android memo if Android-specific, and chosen single code owner.
-5. Before Close: wait for runtime evidence, graph update if graph exists, Karpathy diff review, and acceptance coverage check.
+4. Before Design: wait for approved or explicitly deferred ADR-lite when Stage 2.5 requires one.
+5. Before Implementation: wait for approved requirements, decision gate result, design doc, Android memo if Android-specific, and chosen single code owner.
+6. Before Close: wait for runtime evidence, graph update if graph exists, Karpathy diff review, acceptance coverage check, and Stage 7 documentation finalization.
 
 ---
 
@@ -403,6 +472,8 @@ The parent orchestrator must wait:
 
 docs/ai/
 ├── inputs/                                   ← GLOBAL: human-provided, never overwritten
+├── decisions/
+│   └── 0000-template.md                      ← GLOBAL ADR-lite template
 └── tasks/
     └── {task_id}/
         ├── discovery/
@@ -410,6 +481,7 @@ docs/ai/
         │   ├── context-pack.json
         │   └── clarification-brief.md
         ├── requirements/
+        ├── decisions/
         ├── design/
         ├── planning/
         ├── testing/
@@ -433,11 +505,13 @@ graphify-out/
 6. **Discovery** — read Graphify if present; activate source readers in parallel; auto-follow Jira attachments (1 level). Derive `change_type` (initial). Activate Gradle Module Impact Analyzer if `graph_impact ≥ medium`. Write `module_impact_chain` and `change_type` to context-pack.
 7. **Token check** — just before each source reader, verify its token; prompt user if missing.
 8. **Clarification** — if any trigger fires, run workers in parallel; finalize `change_type` and `module_impact_chain`; parent synthesizes context-pack + brief (sparse format).
-9. **Requirements** — AI DevKit writes canonical doc; **stop for human approval**; update `session.json → requirements_approved: true`.
-10. **Design split** — AI DevKit + Android skills in parallel; select code owner; update `session.json → code_owner`.
-11. **Implementation** — one owner edits code; capture `screenshot_before` if `change_type` includes `ui_change`; all other lanes advisory only.
-12. **Verify** — derive required evidence from Evidence Gate Matrix using `change_type`; Android CLI runs required commands scoped to `module_impact_chain.build_order` if present; Graphify updates graph only if `graph_impact ≥ medium`. Write `evidence_collected` to `session.json`.
-13. **QA gate** — AI DevKit + Karpathy review diff; verify Gate F (all required evidence present); write execution report; mark `session.json → stage_status: complete`.
+9. **Requirements** — AI DevKit writes canonical doc with version header + Affected Areas; **stop for human approval**; update `session.json → requirements_approved: true`.
+10. **Decision Gate** — decide whether ADR-lite is required; create Proposed ADR and stop for approval if required; write `adr_required`, `adr_status`, and `decision_record` to `session.json`.
+11. **Design split** — AI DevKit + Android skills in parallel; select code owner; update `session.json → code_owner`.
+12. **Implementation** — one owner edits code; capture `screenshot_before` if `change_type` includes `ui_change`; all other lanes advisory only.
+13. **Verify** — derive required evidence from Evidence Gate Matrix using `change_type`; Android CLI runs required commands scoped to `module_impact_chain.build_order` if present; Graphify updates graph only if `graph_impact ≥ medium`. Write `evidence_collected` to `session.json`.
+14. **QA gate** — AI DevKit + Karpathy review diff; verify Gate F (all required evidence present); keep code frozen.
+15. **Docs / decision finalization** — update ADR status, Task Changelog, gate log, and drift check result; mark `session.json → stage_status: complete`.
 
 ---
 

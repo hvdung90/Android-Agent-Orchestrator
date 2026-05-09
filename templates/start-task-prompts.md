@@ -6,6 +6,7 @@ Rule of thumb:
 - Pick exactly one task type `[A]` through `[J]` from `docs/FLOW.md`.
 - Keep the first prompt focused on source discovery, requirements, and the intended stop point.
 - Ask the agent to stop after Stage 2 unless implementation is already explicitly approved.
+- After requirements approval, expect Stage 2.5 to decide whether ADR-lite approval is required before design.
 - Put long notes in `docs/ai/inputs/<task>.md` and link that file in the prompt.
 - Use `none` or `unknown` explicitly when a source is unavailable.
 

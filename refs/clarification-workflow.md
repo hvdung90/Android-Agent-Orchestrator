@@ -1,6 +1,6 @@
 # Clarification & Synthesis Workflow
 
-_Skill version: 4.4.0 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 4.7.0 — update this when SKILL.md bumps a minor or major version._
 
 ## Purpose
 
@@ -151,9 +151,9 @@ If Serena is `missing` or `not-configured` in preflight → skip silently; note 
 3. Activate analysis workers in parallel.
 4. **If Serena ready:** activate Code Analysis Worker based on triggers above (runs after step 3 outputs available).
 5. Parent synthesizes:
-   - `docs/ai/clarification/context-pack.json`
-   - `docs/ai/clarification/clarification-brief.md`
-   - `docs/ai/clarification/clarity-report.md` or embedded clarity section.
+   - `docs/ai/tasks/{task_id}/clarification/context-pack.json`
+   - `docs/ai/tasks/{task_id}/clarification/clarification-brief.md`
+   - `docs/ai/tasks/{task_id}/clarification/clarity-report.md` or embedded clarity section.
 6. Parent decides outcome:
    - `ready`
    - `blocked`

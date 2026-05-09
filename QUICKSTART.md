@@ -44,13 +44,14 @@ Optionally include links — the agent fetches them automatically:
 
 ## Step 3 — Review and approve
 
-The agent stops at **Stage 2** and shows you the requirements doc.
+The agent stops at **Stage 2** and shows you the requirements doc. After approval, Stage 2.5 decides whether an ADR-lite needs a second approval before design.
 
 ```
-docs/ai/requirements/<task>.md   ← review this
+docs/ai/tasks/{task_id}/requirements/<task>.md   ← review this
+docs/ai/tasks/{task_id}/decisions/ADR-*.md       ← review if Stage 2.5 requires ADR-lite
 ```
 
-Reply `approve` to continue to design + implementation.  
+Reply `approve` to continue to the decision gate, then design + implementation when no ADR is required or the ADR is approved/deferred.
 Reply with corrections to adjust requirements before coding starts.
 
 ---

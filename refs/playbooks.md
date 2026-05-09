@@ -1,6 +1,6 @@
 # Playbooks
 
-_Skill version: 4.4.0 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 4.7.0 — update this when SKILL.md bumps a minor or major version._
 
 Each playbook maps a task type to the correct provisioning mode, stage sequence, source mode, clarification workers, and Graphify queries.
 
@@ -73,6 +73,7 @@ Stage 1 — read graph if present; read docs/ai/inputs
 Stage 1.5 — minimal clarification unless triggers fire
             [Serena: agent] find_implementations / find_referencing_symbols if triggers fire
 Stage 2 — write requirements from clarification brief; STOP
+Stage 2.5 — evaluate ADR-lite triggers; STOP again if ADR approval/deferral required
 Stage 3 — design + Android memo
 Stage 4 — one code owner implements
           [Serena: code-owner request] find_declaration / find_implementations advisory
@@ -80,6 +81,7 @@ Stage 5 — Android CLI evidence + Graphify update
           [Serena: agent] get_diagnostics_for_file if graph_impact ≥ medium AND kotlin-ls stable
 Stage 6 — Karpathy QA gate
           [Serena: optional] find_referencing_symbols scope check
+Stage 7 — finalize ADR status + Task Changelog + Drift Check
 ```
 
 ---
@@ -94,7 +96,8 @@ Stage 1 — source readers in parallel
 Stage 1.5 — Ambiguity + Conflict + Missing-info + State Extractor
             [Serena: agent] find_implementations for any interface flagged by Missing-info
 Stage 2 — requirements from clarification brief; STOP
-Stages 3–6 — normal flow
+Stage 2.5 — evaluate ADR-lite triggers; STOP again if ADR approval/deferral required
+Stages 3–7 — normal flow
 ```
 
 ---
@@ -108,10 +111,12 @@ Stage 1 — graphify query/path if graph exists
 Stage 1.5 — Ambiguity + Missing-info + Dependency Impact
             [Serena: agent] find_implementations if abstract/interface involved
 Stage 2 — include graph path, caller count from Serena, out-of-scope list; STOP
+Stage 2.5 — evaluate ADR-lite triggers; STOP again if ADR approval/deferral required
 Stage 4 — surgical changes only
           [Serena: code-owner request] find_declaration for usage pattern
 Stage 5 — update graph and verify
           [Serena: agent] get_diagnostics_for_file if kotlin-ls stable
+Stage 7 — finalize ADR status + Task Changelog + Drift Check
 ```
 
 ---
@@ -126,10 +131,12 @@ Stage 1 — graph path + runtime evidence if available
           [Serena: agent] find_referencing_symbols to trace callers
 Stage 1.5 — clarify only if repro unclear
 Stage 2 — minimal bug requirements; include Serena call chain evidence
+Stage 2.5 — evaluate ADR-lite triggers; usually not_required unless contract/state/schema changes
 Stage 4 — smallest safe patch
           [Serena: code-owner request] find_declaration for context
 Stage 5 — runtime evidence + graph update if graph exists
           [Serena: agent] get_diagnostics_for_file on patched file if kotlin-ls stable
+Stage 7 — finalize Task Changelog + Drift Check
 ```
 
 ---
@@ -144,8 +151,10 @@ Stage 1 — query "xml layout view fragment" if graph exists; android skills fin
 Stage 1.5 — Android Advisor + Dependency Impact + Rollout/Risk
             [Serena: agent] find_implementations of ViewBinding / Fragment interfaces
 Stage 2 — migration plan; include Serena symbol surface; STOP
+Stage 2.5 — ADR-lite required for Compose/View migration strategy unless explicitly deferred
 Stage 4 — per-batch single-owner implementation
 Stage 5 — visual evidence + graph update
+Stage 7 — accept/defer ADR + Task Changelog + Drift Check
 ```
 
 ---
@@ -158,9 +167,11 @@ Stage 1 — graphify query "gradle build agp"; android skills find "agp"
           [Serena: agent] find_symbol for build-related symbols if Kotlin DSL in use
 Stage 1.5 — Dependency Impact + Rollout/Risk + Android Advisor
 Stage 2 — upgrade plan; STOP
+Stage 2.5 — ADR-lite required for AGP/Gradle/Kotlin version decision
 Stage 4 — controlled implementation
 Stage 5 — clean build + graph update
           [Serena: agent] get_diagnostics_for_file on changed build files if kotlin-ls stable
+Stage 7 — accept/defer ADR + Task Changelog + Drift Check
 ```
 
 ---
@@ -175,6 +186,7 @@ Stage 1 — read GRAPH_REPORT.md if present; Doc Reader reads inputs
 Stage 1.5 — Ambiguity + Missing-info + Graph Impact + Dependency Impact
             [Serena: agent] find_symbol / find_implementations for key domain symbols
 Stage 2 — requirements after ready; include Serena codebase surface summary; STOP
+Stage 2.5 — evaluate ADR-lite triggers; STOP again if ADR approval/deferral required
 ```
 
 ---

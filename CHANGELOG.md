@@ -1,5 +1,39 @@
 # Changelog
 
+## v4.7.0
+
+### Added
+
+- **Stage 2.5 Decision Gate / ADR-lite** in `SKILL.md`, `refs/stage-contracts.md`, `refs/compliance-policy.md`, and `refs/contracts-and-artifacts.md`.
+- **Stage 7 Docs/decision finalization** for ADR status updates, Task Changelog, and drift checks before close.
+- **Task History Relevance Gate** at Stage 0: default skip for unrelated new tasks, metadata-only scan for continuation signals, and full history read only for explicit continuation or medium/high overlap.
+- **`docs/ai/decisions/0000-template.md`**: global ADR-lite template for Android decisions.
+- **Artifact version headers** for preflight, context-pack, requirements, Android memo, design, ADR-lite, and execution artifacts.
+- **Affected Areas checklist** for requirements and design.
+- **Decision Ownership matrix** mapping Android concern areas to owner lanes and required evidence.
+- **AI-authored artifact rules**: human approval for requirements, facts vs assumptions, conflict preservation, ADR creation, and evidence-required success.
+
+### Changed
+
+- `SKILL.md`: version → 4.7.0; stage order now `-1 → 0 → 1 → [1.5] → 2 → 2.5 → 3 → 4 → 5 → 6 → 7`.
+- `README.md`: version → 4.7.0; file map and change table synced with task-scoped storage and ADR-lite governance.
+- `docs/FLOW.md` and all `refs/*.md` version headers synced to 4.7.0.
+
+## v4.6.0
+
+### Added
+
+- **Compliance Policy** (`refs/compliance-policy.md`): stage compliance matrix, confirmation protocol, never-bypassable rules, skip-log audit trail, stage order enforcement, and task isolation rules.
+- **Task-scoped storage** under `.project-orchestration/tasks/{task_id}/` and `docs/ai/tasks/{task_id}/`.
+
+## v4.5.0
+
+### Added
+
+- **Gradle Module Impact Analyzer** worker.
+- **Evidence Gate Matrix** keyed by `context-pack.json → change_type`.
+- **Stage Output Contracts** (`refs/stage-contracts.md`) for typed inputs, outputs, interrupt state, and resume entry points.
+
 ## v4.4.0
 
 ### Added

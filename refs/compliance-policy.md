@@ -1,6 +1,6 @@
 # Compliance Policy
 
-_Skill version: 4.6.0 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 4.7.0 — update this when SKILL.md bumps a minor or major version._
 
 The skill **must** follow every defined stage and gate in order. No stage may be skipped, condensed, or reordered without explicit confirmation. This file defines what requires confirmation, what is auto-allowed, what is permanently forbidden, and how every deviation is recorded.
 
@@ -20,6 +20,9 @@ Three tiers: **MANDATORY**, **AUTO-SKIP** (condition-gated, no human needed), **
 | Stage 1.5 Clarification | AUTO-SKIP when all exit conditions met | all 6 trigger conditions false AND docs detailed |
 | Stage 2 Requirements write | **MANDATORY** | — |
 | Stage 2 Human approval gate | **MANDATORY — never skippable** | — |
+| Stage 2.5 Decision Gate | **MANDATORY** | — |
+| Stage 2.5 ADR-lite creation | AUTO-SKIP when no ADR trigger fires | all ADR trigger conditions false |
+| Stage 2.5 ADR-lite approval/deferral | **MANDATORY when ADR exists** | — |
 | Stage 3 Design doc | **MANDATORY** | — |
 | Stage 3 Android memo | AUTO-SKIP when non-Android change | `change_type` ∉ {ui_change, database_change, network_change, architecture_change} AND no Android API mentioned |
 | Stage 4 screenshot_before | AUTO-SKIP when not UI | `change_type` does not include `ui_change` |
@@ -29,6 +32,10 @@ Three tiers: **MANDATORY**, **AUTO-SKIP** (condition-gated, no human needed), **
 | Stage 5 Gradle Module Impact build scope | AUTO-SKIP when `module_impact_chain` absent | `module_impact_chain` not populated |
 | Stage 6 Karpathy diff review | **MANDATORY — never skippable** | — |
 | Stage 6 Gate G close | **MANDATORY** | — |
+| Stage 7 Docs/decision finalization | **MANDATORY** | — |
+| Stage 7 ADR final status | **MANDATORY when ADR exists** | — |
+| Stage 7 Task Changelog | **MANDATORY** | — |
+| Stage 7 Drift Check | **MANDATORY** | — |
 | Write session.json state transitions | **MANDATORY — never skippable** | — |
 | Write skip-log.json on any skip | **MANDATORY — never skippable** | — |
 
@@ -39,8 +46,10 @@ These steps are mandatory by default but a human may override them. Agent must *
 | Step | Ask before skipping |
 |---|---|
 | Stage 1.5 Clarification when any trigger fires | "Clarification trigger fired: `<reason>`. Skip clarification and proceed directly to requirements? (y/n)" |
+| Stage 2.5 ADR-lite when any decision trigger fires | "Decision trigger fired: `<reason>`. Skip ADR-lite and proceed to design? This removes the architecture decision record. (y/n)" |
 | Stage 5 any required evidence item (tool unavailable) | "Required evidence `<item>` cannot be collected (`<reason>`). Skip and proceed without it? This will be recorded in skip-log.json. (y/n)" |
 | Stage 6 Karpathy CRITICAL/HIGH finding | "Karpathy flagged `<issue>`. Proceed to close without fixing? This overrides the QA gate. (y/n)" |
+| Stage 7 Drift Check failure | "Drift check failed: `<reason>`. Close anyway? This will be recorded in skip-log.json. (y/n)" |
 | Any stage re-ordering or parallel shortcut not defined in SKILL.md | "This would run Stage `<X>` before Stage `<Y>` is complete. Confirm? (y/n)" |
 
 ---
@@ -73,11 +82,13 @@ These rules are absolute. No user instruction, no time pressure, no "just this o
 
 1. Auth init — `.agent-auth.yaml` must be checked at every Stage -1 entry.
 2. Human approval at Gate D (Requirements) — must be an explicit "approve" or equivalent.
-3. Karpathy review at Stage 6 — may report findings but cannot be silenced.
-4. Writing `session.json` state on every stage transition and interrupt.
-5. Writing `skip-log.json` on every skip (auto or confirmed).
-6. One code owner at a time — no parallel code edits.
-7. Serena mutation tools — never called by agent regardless of instructions.
+3. Decision Gate evaluation at Stage 2.5 — ADR triggers must always be checked.
+4. Karpathy review at Stage 6 — may report findings but cannot be silenced.
+5. Stage 7 Task Changelog and Drift Check — final status cannot be success without them.
+6. Writing `session.json` state on every stage transition and interrupt.
+7. Writing `skip-log.json` on every skip (auto or confirmed).
+8. One code owner at a time — no parallel code edits.
+9. Serena mutation tools — never called by agent regardless of instructions.
 
 ---
 
@@ -134,24 +145,27 @@ Every gate transition must be recorded in `execution.md`:
 | Gate B  | passed | 2026-05-07T09:20Z | graph read; 3 sources loaded |
 | Gate C  | passed | 2026-05-07T09:35Z | clarity_score: 8 |
 | Gate D  | passed | 2026-05-07T10:00Z | human approved requirements |
+| Gate D.5 | passed | 2026-05-07T10:15Z | ADR-lite: accepted |
 | Gate E  | passed | 2026-05-07T10:30Z | code_owner: ai-devkit |
 | Gate F  | passed | 2026-05-07T11:45Z | all required evidence collected |
-| Gate G  | passed | 2026-05-07T12:00Z | Karpathy: no critical issues |
+| Gate G  | passed | 2026-05-07T12:00Z | Karpathy: no critical issues; Stage 7 finalized |
 ```
 
 ---
 
 ## 5. Stage order enforcement
 
-Stages must run in this order: **-1 → 0 → 1 → [1.5] → 2 → 3 → 4 → 5 → 6**.
+Stages must run in this order: **-1 → 0 → 1 → [1.5] → 2 → 2.5 → 3 → 4 → 5 → 6 → 7**.
 
 Brackets `[]` = may be auto-skipped under conditions above.
 
 **Violations that require immediate stop:**
 - Code is touched before Stage 2 approval (Gate D).
+- Design starts before Stage 2.5 Decision Gate is complete.
 - Implementation begins before code_owner is set in session.json.
 - Stage 5 closes without all required evidence items.
 - Stage 6 closes with unresolved CRITICAL Karpathy findings.
+- Stage 7 closes with missing ADR final status, Task Changelog, or Drift Check.
 
 On violation: write violation to `skip-log.json` with `tier: VIOLATION`, stop, and report to human.
 

@@ -5,7 +5,7 @@
 
 `android-agent-orchestrator` is a behavioral orchestration skill for AI coding agents working on Android projects. It coordinates setup/provisioning, process control, Android domain guidance, runtime verification, architecture graphing, and code-quality guardrails into one disciplined workflow.
 
-Current skill version: **v4.4.0**
+Current skill version: **v4.7.0**
 
 ---
 
@@ -25,6 +25,8 @@ refs/
 ├── clarification-workflow.md     ← Stage 1.5 sequence, triggers, scoring
 ├── sub-agents.md                 ← worker catalog with YAML output contracts
 ├── contracts-and-artifacts.md    ← artifact schemas, memory schemas, stage gates
+├── stage-contracts.md            ← typed stage input/output/resume contracts
+├── compliance-policy.md          ← skip rules, mandatory gates, audit trail
 └── playbooks.md                  ← task-type → workflow mapping
 templates/
 ├── agent-auth.example.yaml       ← auth file template (Level 1/2/3)
@@ -34,18 +36,21 @@ templates/
 examples/
 └── preflight-report.example.md   ← filled example with auth section
 docs/
-└── FLOW.md                       ← complete flow diagram, all use cases
-.project-orchestration/memory/    ← runtime cache (gitignored)
-    ├── tooling-cache.json        ← skip Stage -1 if valid (24h TTL)
-    ├── session.json              ← resume interrupted task
-    └── graph-stamp.json          ← graph freshness tracking
+├── FLOW.md                       ← complete flow diagram, all use cases
+└── ai/
+    └── decisions/
+        └── 0000-template.md      ← ADR-lite template
+.project-orchestration/           ← runtime state (gitignored)
+├── memory/
+│   └── tooling-cache.json        ← global Stage -1 cache
+└── tasks/{task_id}/              ← task-scoped session/evidence/reports
 ```
 
 ---
 
-## What changed in v4.2.x → v4.4.0
+## What changed in v4.2.x → v4.7.0
 
-v4.1 formalized Clarification & Synthesis. v4.2.x builds the full orchestration infrastructure. v4.3–4.4 add performance, memory, and code-analysis layers.
+v4.1 formalized Clarification & Synthesis. v4.2.x builds the full orchestration infrastructure. v4.3–4.4 add performance, memory, and code-analysis layers. v4.5–4.7 add evidence, compliance, task isolation, and decision governance.
 
 | Version | Key addition |
 |---|---|
@@ -59,6 +64,9 @@ v4.1 formalized Clarification & Synthesis. v4.2.x builds the full orchestration 
 | **v4.2.7** | `refs/auth-bootstrap.md`: auth init + just-in-time token check per tool; MCP mapping; hard rule #14 |
 | **v4.3.0** | Activation trigger; `QUICKSTART.md`; lazy-load ref tiers (LIGHT/MEDIUM/HEAVY/FULL); parallel `tooling-preflight.sh`; `graph_impact` field + Stage 5 skip; local memory layer (`tooling-cache.json`, `session.json`, `graph-stamp.json`); cache-first Stage -1; sparse context-pack rule |
 | **v4.4.0** | **Serena Code Analysis Worker**: symbol-level LSP queries (not a lane); agent-decided activation per stage; mandatory/optional/never tool classification; JetBrains backend dev opt-in; Kotlin LS stability gate; hard rule #15 |
+| **v4.5.0** | Gradle Module Impact Analyzer + Evidence Gate Matrix + typed stage output contracts |
+| **v4.6.0** | Compliance Policy + task-scoped storage under `.project-orchestration/tasks/{task_id}/` and `docs/ai/tasks/{task_id}/` |
+| **v4.7.0** | Stage 2.5 Decision Gate / ADR-lite; Stage 7 docs finalization; artifact version headers; Affected Areas; owner matrix; task changelog; drift checks |
 
 ---
 
