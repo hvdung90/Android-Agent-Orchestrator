@@ -1,0 +1,40 @@
+changeSet: RC-1234
+summary: Enable paywall variant for 10 percent rollout
+owner:
+  dev: mobile
+  qa: qa
+issue: RC-1234
+createdAt: "2026-05-09"
+scope:
+  allowParamPrefixes: []
+  parameters:
+    - paywall_config
+  conditions:
+    ensureOnStg:
+      - name: rollout_10_percent
+        expression: "percent <= 10"
+    mapForProd: {}
+conditionOps:
+  - id: ADD-rollout_10_percent
+    state: draft
+    op: ADD_CONDITION
+    name: rollout_10_percent
+    expression: "percent <= 10"
+changes:
+  - id: R-1
+    state: draft
+    param: paywall_config
+    type: json
+    rules:
+      - when: rollout_10_percent
+        value: '{"enabled":true,"variant":"A"}'
+        state: draft
+    safeguards:
+      forbidDefaultMutation: true
+meta:
+  appIdRewrite:
+    mode: auto
+    stgDetected: []
+    prodDetected: []
+    stgUsed:
+    prodUsed:

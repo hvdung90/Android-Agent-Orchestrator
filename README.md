@@ -19,6 +19,8 @@ The agent entry point is `SKILL.md`. The refs, templates, and examples support i
 QUICKSTART.md                     ← start here (3 steps)
 SKILL.md                          ← agent entry point
 .agent-auth.yaml                  ← gitignored; auto-created; all tokens
+firebase-remote-config-release-skill/
+└── SKILL.md                      ← companion skill for Firebase RC design/review/release
 refs/
 ├── auth-bootstrap.md             ← auth init + just-in-time token check
 ├── provisioning-preflight.md     ← Stage -1: cache check, decision tables

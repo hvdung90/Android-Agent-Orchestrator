@@ -191,6 +191,28 @@ Stage 2.5 — evaluate ADR-lite triggers; STOP again if ADR approval/deferral re
 
 ---
 
+## 8) Firebase Remote Config release / rollback
+
+Use the companion `firebase-remote-config-release-skill` for RC domain work. Android Agent Orchestrator stays the coordinator.
+
+```text
+Stage -1 — audit tools and repo context
+Stage 0 — classify change_type=config_change; load firebase-remote-config-release-skill
+Stage 1 — RC skill reads requirements, ticket/design docs, code/Graphify if needed, current RC state or provided manifest/log/PR
+Stage 1.5 — RC skill clarifies target env, project id, changeset, desired behavior, authority level, and safety evidence
+Stage 2 — requirements include RC parameter/condition intent, target env, validation evidence, rollback requirement; STOP
+Stage 2.5 — ADR-lite only if config changes alter broad behavior, rollout strategy, app id mapping, or production safety model
+Stage 3 — RC skill writes RC design and manifest plan
+Stage 4 — RC skill prepares manifest draft only; no production mutation
+Stage 5 — RC skill performs manifest review and validate-only plan/evidence
+Stage 6 — QA gate checks RC safety gates, manifest review, validate-only result, backup/version, rollback plan
+Stage 7 — finalize release checklist and decision/evidence records
+```
+
+Production publish, rollback, and PROD→STG sync require explicit human approval and the RC skill's `level_3_mutation` confirmations.
+
+---
+
 ## Quick decision table
 
 | Situation | Provisioning mode | Source mode | Clarification |

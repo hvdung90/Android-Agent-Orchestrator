@@ -55,6 +55,7 @@ Do not load this skill for non-Android projects or purely conversational questio
 - `change_type` is derived at Stage 1 and finalized at Stage 1.5 — Android CLI uses it to select required evidence from the Evidence Gate Matrix at Stage 5.
 - Stage 2.5 Decision Gate decides whether an ADR-lite is required before design or implementation.
 - Stage 7 finalizes decision records and task changelog after verification.
+- Firebase Remote Config tasks are routed to the companion `firebase-remote-config-release-skill`; this orchestrator remains the coordinator.
 
 > **Auth first. Audit tools. Read the map. Analyze code surface. Clarify before planning. Approve before coding.**
 
@@ -146,6 +147,7 @@ Always load when writing artifacts: `refs/contracts-and-artifacts.md`.
 Always load when resuming an interrupted task: `refs/stage-contracts.md`.  
 Always load when any stage skip or bypass is considered: `refs/compliance-policy.md`.  
 Load when `graph_impact ≥ medium` or multi-module change detected: `refs/sub-agents.md` (Gradle Module Impact Analyzer).
+Load companion skill when task mentions Firebase Remote Config, RC manifest, STG/PROD config diff, config rollout, publish, rollback, LIST_VERSIONS, SYNC_STG, Jenkins RC pipeline, or Remote Config PR review: `firebase-remote-config-release-skill`.
 
 ---
 
@@ -281,6 +283,13 @@ Intake must record:
 - `task_continuity` (`new | continuation | unknown`)
 - `history_scan.mode` (`skipped | metadata-only | full`)
 - `history_scan.decision` (`skip | read_full | ask_human`)
+
+Firebase Remote Config routing:
+- classify `change_type = config_change`,
+- load `firebase-remote-config-release-skill`,
+- let RC skill own RC design, manifest review, safety gates, publish/rollback plan, and Jenkins/Firebase log explanation,
+- require explicit human approval before staging/prod mutation,
+- require evidence: manifest review, validate-only result, backup path or version, rollback plan.
 
 ### Stage 1 — Discovery
 

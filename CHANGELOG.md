@@ -7,6 +7,7 @@
 - **Stage 2.5 Decision Gate / ADR-lite** in `SKILL.md`, `refs/stage-contracts.md`, `refs/compliance-policy.md`, and `refs/contracts-and-artifacts.md`.
 - **Stage 7 Docs/decision finalization** for ADR status updates, Task Changelog, and drift checks before close.
 - **Task History Relevance Gate** at Stage 0: default skip for unrelated new tasks, metadata-only scan for continuation signals, and full history read only for explicit continuation or medium/high overlap.
+- **Firebase Remote Config companion skill routing**: RC tasks are classified as `config_change` and delegated to `firebase-remote-config-release-skill` for domain safety gates, manifest review, and publish/rollback planning.
 - **`docs/ai/decisions/0000-template.md`**: global ADR-lite template for Android decisions.
 - **Artifact version headers** for preflight, context-pack, requirements, Android memo, design, ADR-lite, and execution artifacts.
 - **Affected Areas checklist** for requirements and design.

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Firebase Remote Config Release"
+  short_description: "Design, review, and release Firebase Remote Config safely."
+  default_prompt: "Analyze this Firebase Remote Config task from requirements to RC design, manifest review, and safe staging or production apply plan."
