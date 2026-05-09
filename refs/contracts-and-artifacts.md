@@ -1,6 +1,6 @@
 # Contracts, Artifacts, and Gates
 
-_Skill version: 4.7.0 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 4.8.0 — update this when SKILL.md bumps a minor or major version._
 
 ---
 
@@ -24,6 +24,7 @@ Contract headers are required for:
 - `design/<task>.md`
 - `decisions/ADR-*.md`
 - `execution.md`
+- `handoff.md`
 
 ### 0) `.project-orchestration/reports/preflight.md`
 
@@ -321,7 +322,99 @@ Required Drift Check section:
 - [ ] no stale stage names
 - [ ] no invented command names
 - [ ] public repo version sync checked against installed/local skill when applicable
+- [ ] .project-orchestration/status.json exists and task entry is current
+- [ ] docs/ai/tasks/{task_id}/handoff.md exists and status matches session.json stage_status
 ```
+
+### 6) `docs/ai/tasks/{task_id}/handoff.md`
+
+Purpose: one-page snapshot for developer handoff. Auto-generated when `code_owner` is set (Stage 3) and regenerated whenever `assignee`, `branch`, `pr_url`, or `stage_reached` changes. Any developer can read this file alone to understand current task state without opening `session.json` or artifact folders.
+
+Required front matter:
+
+```yaml
+artifact: android-handoff
+version: 1.0
+owner: ai-devkit
+status: active | complete | blocked
+task: <task_id>
+```
+
+Required sections:
+
+```markdown
+# Handoff — <task title>
+
+## Task
+- **ID:** <task_id>
+- **Branch:** <branch name | unset>
+- **PR:** <url | not created>
+- **Assignee:** <current assignee>
+- **Handoff to:** <next assignee | unset>
+
+## Current state
+- **Stage reached:** <stage number and name>
+- **Status:** complete | in_progress | blocked
+- **Blocker:** <blocker description | none>
+
+## What was done
+<2-5 bullet points summarizing completed work so far>
+
+## Next action
+<single clear instruction for the incoming developer — what to do first>
+
+## Files modified
+<list of files/modules touched so far; empty if Stage 3>
+
+## Key decisions
+<ADR links or inline one-liners for any architectural decisions already made>
+
+## Evidence collected
+<list of evidence paths already gathered; empty if before Stage 5>
+
+## Notes for incoming dev
+<any gotchas, WIP warnings, or context not obvious from other artifacts>
+```
+
+**Generation rules:**
+- First generated at Stage 3 when `code_owner` is confirmed.
+- Updated (not replaced) at every stage transition and every interrupt.
+- `status: complete` only when `session.json → stage_status: complete`.
+- Owner is always `ai-devkit`; incoming developer adds human notes under "Notes for incoming dev" manually if needed — agent does not overwrite that section after initial write.
+
+---
+
+### 7) `.project-orchestration/status.json`
+
+Purpose: project-level index of all tasks. Readable by any developer or agent in one file without scanning individual task directories. Updated on every stage transition.
+
+**Path:** `.project-orchestration/status.json`  
+**Owner:** Parent orchestrator (Stage -1 initializes; every stage transition updates).  
+**Scope:** GLOBAL — shared across all tasks in the project.
+
+```json
+{
+  "project": "<repo name or slug>",
+  "updated_at": "2026-05-09T10:00:00Z",
+  "tasks": [
+    {
+      "task_id": "ANDROID-42",
+      "title": "<short task title>",
+      "stage_reached": 4,
+      "stage_status": "in_progress",
+      "assignee": "dev-a",
+      "handoff_to": "dev-b",
+      "branch": "feature/ANDROID-42-login",
+      "pr_url": null,
+      "blocker": null,
+      "updated_at": "2026-05-09T09:45:00Z",
+      "handoff_doc": "docs/ai/tasks/ANDROID-42/handoff.md"
+    }
+  ]
+}
+```
+
+**Update rule:** On every stage transition, find the task's entry by `task_id` and update `stage_reached`, `stage_status`, `assignee`, `blocker`, and `updated_at`. Add a new entry if this `task_id` is not yet listed. Never remove entries (use `stage_status: complete` to mark done tasks).
 
 ---
 
@@ -521,6 +614,10 @@ In-progress task state — allows resume after an interruption.
     "decision": "skip | read_full | ask_human"
   },
   "code_owner": "agent-name | null",
+  "assignee": "dev-name | agent-name | unassigned",
+  "handoff_to": "dev-name | null",
+  "branch": "feature/ANDROID-42-login | null",
+  "pr_url": "https://github.com/org/repo/pull/123 | null",
   "requirements_approved": false,
   "adr_required": false,
   "adr_status": "proposed | accepted | deferred | superseded | not_required | null",
@@ -577,11 +674,16 @@ Metadata about the most recent Graphify run.
   "commit_sha": "abc1234",
   "graph_report": "graphify-out/GRAPH_REPORT.md",
   "god_nodes": ["AppModule", "NetworkClient"],
-  "component_count": 42
+  "component_count": 42,
+  "stale_after_days": 7
 }
 ```
 
-**Freshness rule:** If `commit_sha` == `git rev-parse HEAD` → graph is fresh; skip rebuild check. If commits have landed since `built_at` → flag graph as potentially stale in preflight.
+**Freshness rule (two independent checks — both must pass for graph to be considered fresh):**
+1. **Commit check:** `commit_sha` == `git rev-parse HEAD` → no untracked changes since last build.
+2. **Time check:** `built_at` + `stale_after_days` (default 7) > now → graph is not time-expired.
+
+If either check fails → flag graph as stale in `preflight.md`. Commit-mismatch stale is recorded as `graphify: stale-commit`. Time-expired stale is recorded as `graphify: stale-time`. Both are non-blocking (does not prevent Stage 0) but are surfaced as non-blocking gaps and the human is informed.
 
 ---
 
@@ -606,6 +708,7 @@ Metadata about the most recent Graphify run.
 |---|---|---|---|
 | `preflight.md` | `.project-orchestration/reports/preflight.md` | Parent orchestrator | provide raw audit output |
 | `tooling-cache.json` | `.project-orchestration/memory/tooling-cache.json` | Stage -1 only | read only |
+| `status.json` | `.project-orchestration/status.json` | Parent orchestrator | read only |
 | `session.json` | `.project-orchestration/tasks/{task_id}/session.json` | Parent orchestrator | read only |
 | `skip-log.json` | `.project-orchestration/tasks/{task_id}/skip-log.json` | Parent orchestrator | read only |
 | `context-pack.json` | `docs/ai/tasks/{task_id}/clarification/context-pack.json` | Parent orchestrator / AI DevKit | propose raw fields |
@@ -614,6 +717,7 @@ Metadata about the most recent Graphify run.
 | `decisions/ADR-*.md` | `docs/ai/tasks/{task_id}/decisions/` | Parent orchestrator / AI DevKit | advise; human approves |
 | `design/<task>.md` | `docs/ai/tasks/{task_id}/design/` | Parent orchestrator / AI DevKit | review only |
 | `android-memo/<task>.md` | `docs/ai/tasks/{task_id}/android-memo/` | Android skills | supply advice only |
+| `handoff.md` | `docs/ai/tasks/{task_id}/handoff.md` | Parent orchestrator / AI DevKit | human may append notes manually |
 | runtime evidence | `.project-orchestration/tasks/{task_id}/evidence/` | Android CLI | request commands |
 | `execution.md` | `.project-orchestration/tasks/{task_id}/reports/execution.md` | Parent orchestrator | append evidence paths |
 | `graphify-out/**` | `graphify-out/` | Graphify | consume/query only |

@@ -1,6 +1,6 @@
 # Stage Output Contracts
 
-_Skill version: 4.7.0 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 4.8.0 — update this when SKILL.md bumps a minor or major version._
 
 Each stage defines a typed contract: what it requires as input, what it must produce as output, and what state it writes to `session.json` on completion or interrupt.
 
@@ -26,9 +26,10 @@ guard_conditions:
 output_produces:
   - .project-orchestration/reports/preflight.md                    ← GLOBAL
   - .project-orchestration/memory/tooling-cache.json               ← GLOBAL
+  - .project-orchestration/status.json (initialized if missing)    ← GLOBAL
   - .project-orchestration/tasks/{task_id}/session.json (stage_reached: -1)
   - .project-orchestration/tasks/{task_id}/skip-log.json (initialized empty)
-  - context fields: tooling_readiness, auth_status, provisioning_mode, blockers
+  - context fields: tooling_readiness, auth_status, provisioning_mode, blockers, graphify_staleness
 
 state_on_complete:
   stage_reached: -1
@@ -81,6 +82,7 @@ state_on_complete:
   source_mode: "A | B | C"
   task_continuity: "new | continuation | unknown"
   blocker: null
+  # status.json updated: entry added or refreshed for this task_id
 
 state_on_interrupt:
   stage_reached: 0
@@ -279,12 +281,16 @@ output_produces:
   - docs/ai/tasks/{task_id}/design/<task>.md (AI DevKit design doc)
   - docs/ai/tasks/{task_id}/planning/<task>.md (AI DevKit planning doc)
   - docs/ai/tasks/{task_id}/android-memo/<task>.md (Android skills memo, if Android-specific — auto-skip written to skip-log if omitted)
-  - .project-orchestration/tasks/{task_id}/session.json: code_owner set
+  - docs/ai/tasks/{task_id}/handoff.md (generated when code_owner is confirmed; MANDATORY)
+  - .project-orchestration/tasks/{task_id}/session.json: code_owner, assignee, branch set
+  - .project-orchestration/status.json: entry updated (stage_reached: 3, assignee, branch)
 
 state_on_complete:
   stage_reached: 3
   stage_status: complete
   code_owner: "<agent-name>"
+  assignee: "<dev-name | agent-name>"
+  branch: "<branch name>"
   blocker: null
 
 state_on_interrupt:
@@ -294,7 +300,7 @@ state_on_interrupt:
   partial_outputs:
     - "docs/ai/tasks/{task_id}/design/<task>.md (partial)"
 
-resume_entry_point: "resume writing incomplete design doc; if code_owner missing, derive from design scope"
+resume_entry_point: "resume writing incomplete design doc; if code_owner missing, derive from design scope; regenerate handoff.md after code_owner is confirmed"
 ```
 
 ---
@@ -320,6 +326,7 @@ guard_conditions:
 output_produces:
   - product code changes (owned by code_owner)
   - evidence/screen_before.png (if change_type: ui_change — captured before first edit)
+  - .project-orchestration/status.json: entry updated (stage_reached: 4)
 
 state_on_complete:
   stage_reached: 4
@@ -332,8 +339,11 @@ state_on_interrupt:
   blocker: "<build error | test failure | blocked on advisory clarification>"
   partial_outputs:
     - "product code partial — do not consider shipped"
+  # MANDATORY on interrupt: update docs/ai/tasks/{task_id}/handoff.md with current state,
+  # files modified so far, and next action before stopping.
+  # MANDATORY on interrupt: update .project-orchestration/status.json entry with blocker.
 
-resume_entry_point: "read partial code state; continue from last successful compile point; re-run Karpathy gate"
+resume_entry_point: "read partial code state; read handoff.md for context; continue from last successful compile point; re-run Karpathy gate"
 ```
 
 ---
@@ -359,6 +369,7 @@ output_produces:
   - .project-orchestration/tasks/{task_id}/reports/execution.md (evidence manifest with Gate log)
   - graphify-out/ updated (if graph_impact >= medium; skip written to skip-log if graph_impact = low)
   - .project-orchestration/tasks/{task_id}/session.json: stage_reached: 5, evidence_collected: [...]
+  - .project-orchestration/status.json: entry updated (stage_reached: 5)
 
 state_on_complete:
   stage_reached: 5
@@ -395,6 +406,7 @@ output_produces:
   - .project-orchestration/tasks/{task_id}/reports/execution.md updated with QA review + Gate log
   - Karpathy diff review recorded
   - .project-orchestration/tasks/{task_id}/session.json: stage_reached: 6
+  - .project-orchestration/status.json: entry updated (stage_reached: 6)
 
 approval_gate:
   - if Karpathy flags CRITICAL or HIGH issues → block and report to human
@@ -436,6 +448,8 @@ output_produces:
   - .project-orchestration/tasks/{task_id}/reports/execution.md updated with Task Changelog
   - .project-orchestration/tasks/{task_id}/reports/execution.md updated with Drift Check
   - .project-orchestration/tasks/{task_id}/session.json: stage_status: complete
+  - docs/ai/tasks/{task_id}/handoff.md: status set to complete; final summary written
+  - .project-orchestration/status.json: entry updated (stage_reached: 7, stage_status: complete, pr_url if known)
 
 state_on_complete:
   stage_reached: 7
@@ -484,6 +498,10 @@ Any interrupt → stage_status: in_progress, blocker: "<reason>"
   "stage_status": "complete | in_progress | blocked",
   "source_mode": "A | B | C",
   "code_owner": "agent-name | null",
+  "assignee": "dev-name | agent-name | unassigned",
+  "handoff_to": "dev-name | null",
+  "branch": "feature/ANDROID-42-login | null",
+  "pr_url": "https://github.com/org/repo/pull/123 | null",
   "requirements_approved": false,
   "adr_required": false,
   "adr_status": "proposed | accepted | deferred | superseded | not_required | null",

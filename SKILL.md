@@ -3,7 +3,7 @@ name: android-agent-orchestrator
 description: Meta-skill for Android projects coordinating auth bootstrap, provisioning preflight, AI DevKit, Android skills, Android CLI, Graphify, Karpathy, and Serena code analysis into one disciplined workflow. Single .agent-auth.yaml manages all tokens; just-in-time token check per tool.
 license: MIT
 metadata:
-  version: 4.7.0
+  version: 4.8.0
   category: orchestration
   lanes:
     - ai-devkit
@@ -25,7 +25,7 @@ metadata:
     - refs/playbooks.md
 ---
 
-# Android Agent Orchestrator v4.7.0
+# Android Agent Orchestrator v4.8.0
 
 ## Activation
 
@@ -59,6 +59,12 @@ Do not load this skill for non-Android projects or purely conversational questio
 > **Auth first. Audit tools. Read the map. Analyze code surface. Clarify before planning. Approve before coding.**
 
 ---
+
+## What changed in v4.8.0
+
+**v4.8.0** — Handoff & multi-task visibility layer.
+
+Adds per-task `handoff.md` artifact (auto-generated at Stage 3 when `code_owner` is set and updated on Stage 4 interrupt), `assignee` / `handoff_to` / `branch` / `pr_url` fields to `session.json`, project-level `status.json` index (updated on every stage transition), and time-based Graphify staleness check at Stage -1 (flags graph stale when `built_at` + 7 days < now regardless of commit hash).
 
 ## What changed in v4.7.0
 
@@ -165,6 +171,9 @@ Load when `graph_impact ≥ medium` or multi-module change detected: `refs/sub-a
 18. **Task isolation.** Write all task artifacts under `.project-orchestration/tasks/{task_id}/` and `docs/ai/tasks/{task_id}/`. Never read or overwrite another task's directory.
 19. **Decision changes need ADR-lite.** If a task touches a required decision trigger, create a Proposed ADR in Stage 2.5 and stop for human approval before Stage 3.
 20. **Stage order is law.** Stages run -1 → 0 → 1 → [1.5] → 2 → 2.5 → 3 → 4 → 5 → 6 → 7. Any re-ordering or parallel shortcut not defined in this skill is a violation — stop and report to human.
+21. **`status.json` is always current.** Update `.project-orchestration/status.json` on every stage transition. Never leave it more than one stage behind. This is the project-level view — any developer can read it without opening individual task files.
+22. **`handoff.md` when code owner changes.** Generate `docs/ai/tasks/{task_id}/handoff.md` whenever `code_owner` is set (Stage 3) or when Stage 4 is interrupted. Regenerate whenever `assignee`, `branch`, or `pr_url` changes.
+23. **`branch` and `assignee` must be set before Implementation.** `session.json → branch` and `session.json → assignee` must be populated before Stage 4 begins. If unknown, ask the human before proceeding.
 
 ---
 
@@ -242,6 +251,10 @@ Determine:
 - whether Karpathy guidelines exist as plugin, skill, or project instruction,
 - what actions are allowed,
 - what blockers prevent Stage 0.
+
+**Graphify time-based staleness check:** After the commit-hash check, also read `graph-stamp.json → built_at`. If `built_at` + 7 days < now → flag graph as `stale (time-based)` in `preflight.md`, regardless of whether commit hash matches. This catches projects where many small commits have landed without triggering a graph update. Record `graphify: stale-time` in `tooling-cache.json`; do not block Stage 0, but surface as a non-blocking gap.
+
+**Project status index:** Read `.project-orchestration/status.json`. If missing, create it with an empty `tasks: []` array. Check for any task entries with `stage_status: in_progress` and surface them alongside the resume check at Stage 0.
 
 Default mode is `audit`.
 
@@ -351,6 +364,8 @@ AI DevKit writes design/planning docs. Android skills write Android memo. No pro
 
 → **Load `refs/playbooks.md`** to select the correct workflow for the task type.
 
+When `code_owner` is confirmed, automatically generate `docs/ai/tasks/{task_id}/handoff.md` — a concise snapshot summarizing task state, stage, branch, next action, and assignee so any developer can pick up the task without reading multiple files. Update `assignee` in `session.json` to match `code_owner`. Update `.project-orchestration/status.json` entry for this task.
+
 ### Stage 4 — Implementation lock
 
 Exactly one code owner edits code.
@@ -455,6 +470,7 @@ The parent orchestrator must wait:
 
 ```text
 .project-orchestration/                       ← gitignored
+├── status.json                               ← GLOBAL: project-level task index (all tasks)
 ├── memory/
 │   └── tooling-cache.json                    ← GLOBAL: Stage -1 cache
 ├── reports/
@@ -486,7 +502,8 @@ docs/ai/
         ├── design/
         ├── planning/
         ├── testing/
-        └── android-memo/
+        ├── android-memo/
+        └── handoff.md                        ← generated at Stage 3; updated on interrupt
 
 graphify-out/
 .skills/
@@ -499,7 +516,7 @@ graphify-out/
 ## Minimal operating algorithm
 
 1. **Auth init** — check `.agent-auth.yaml`; auto-create if missing (refs/auth-bootstrap.md Step 1). Cannot be skipped.
-2. **Cache + resume check** — read `.project-orchestration/memory/tooling-cache.json`; if valid → AUTO-SKIP Stage -1 (write skip-log). Scan `.project-orchestration/tasks/` for any `session.json` with `stage_status: in_progress` → offer resume using `refs/stage-contracts.md → resume_entry_point`. Load `refs/compliance-policy.md` before any skip decision.
+2. **Cache + resume check** — read `.project-orchestration/memory/tooling-cache.json`; if valid → AUTO-SKIP Stage -1 (write skip-log). Scan `.project-orchestration/tasks/` for any `session.json` with `stage_status: in_progress` → offer resume using `refs/stage-contracts.md → resume_entry_point`. Read `.project-orchestration/status.json` and surface any blocked or in-progress tasks to the human at intake. Load `refs/compliance-policy.md` before any skip decision.
 3. **Tooling Preflight** — run `bash templates/tooling-preflight.sh`; write `preflight.md` (global); write `tooling-cache.json` (global); init `tasks/{task_id}/session.json` and `tasks/{task_id}/skip-log.json`.
 4. **Intake** — collect links; derive source mode (A/B/C); resolve credential set; derive `task_id` (Jira key → slug → date-hash); write/update `tasks/{task_id}/session.json` with `task_id`, `source_mode`.
 5. **Determine ref tier** — LIGHT / MEDIUM / HEAVY / FULL; load only needed refs. Load `refs/stage-contracts.md` if resuming.
@@ -508,11 +525,11 @@ graphify-out/
 8. **Clarification** — if any trigger fires, run workers in parallel; finalize `change_type` and `module_impact_chain`; parent synthesizes context-pack + brief (sparse format).
 9. **Requirements** — AI DevKit writes canonical doc with version header + Affected Areas; **stop for human approval**; update `session.json → requirements_approved: true`.
 10. **Decision Gate** — decide whether ADR-lite is required; create Proposed ADR and stop for approval if required; write `adr_required`, `adr_status`, and `decision_record` to `session.json`.
-11. **Design split** — AI DevKit + Android skills in parallel; select code owner; update `session.json → code_owner`.
-12. **Implementation** — one owner edits code; capture `screenshot_before` if `change_type` includes `ui_change`; all other lanes advisory only.
+11. **Design split** — AI DevKit + Android skills in parallel; select code owner; update `session.json → code_owner`, `session.json → assignee`; ask for `branch` if not yet set; generate `docs/ai/tasks/{task_id}/handoff.md`; update `.project-orchestration/status.json`.
+12. **Implementation** — one owner edits code; capture `screenshot_before` if `change_type` includes `ui_change`; all other lanes advisory only. On interrupt: update `handoff.md` and `status.json` before stopping.
 13. **Verify** — derive required evidence from Evidence Gate Matrix using `change_type`; Android CLI runs required commands scoped to `module_impact_chain.build_order` if present; Graphify updates graph only if `graph_impact ≥ medium`. Write `evidence_collected` to `session.json`.
 14. **QA gate** — AI DevKit + Karpathy review diff; verify Gate F (all required evidence present); keep code frozen.
-15. **Docs / decision finalization** — update ADR status, Task Changelog, gate log, and drift check result; mark `session.json → stage_status: complete`.
+15. **Docs / decision finalization** — update ADR status, Task Changelog, gate log, and drift check result; mark `session.json → stage_status: complete`; update `docs/ai/tasks/{task_id}/handoff.md` with final status; update `.project-orchestration/status.json` entry to `stage_status: complete`.
 
 ---
 

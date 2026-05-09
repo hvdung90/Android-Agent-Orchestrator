@@ -1,6 +1,6 @@
 # Android Agent Orchestrator — Complete Flow
 
-_Reflects skill v4.7.0. Update when SKILL.md changes._
+_Reflects skill v4.8.0. Update when SKILL.md changes._
 
 ---
 
@@ -48,6 +48,14 @@ All task types start with Stage -1.
                             │
                             ▼
     ┌───────────────────────────────────────────────────────┐
+    │  status.json init:                                    │
+    │  .project-orchestration/status.json present?          │
+    │    Yes → read; surface blocked/in-progress tasks      │
+    │    No  → create with tasks: []                        │
+    └───────────────────────────────────────────────────────┘
+                            │
+                            ▼
+    ┌───────────────────────────────────────────────────────┐
     │  Cache check (tooling-cache.json):                    │
     │                                                       │
     │  valid_until in future                                │
@@ -62,9 +70,21 @@ All task types start with Stage -1.
     │    checks     → write/update session.json            │
     └───────────────────────────────────────────────────────┘
                             │
+                            ▼
+    ┌───────────────────────────────────────────────────────┐
+    │  Graphify time-based staleness check:                 │
+    │  (independent of cache + commit check)                │
+    │                                                       │
+    │  graph-stamp.json → built_at + stale_after_days > now?│
+    │    Yes → graph is fresh (time)                        │
+    │    No  → flag graphify: stale-time (non-blocking)    │
+    │          surface as warning in preflight.md           │
+    └───────────────────────────────────────────────────────┘
+                            │
     ┌───────────────────────┴───────────────────────────────┐
     │  session.json: interrupted task present?              │
     │    Yes → offer user: "Resume <task_id> from Stage N?" │
+    │          surface handoff.md if present               │
     │    No  → continue                                     │
     └───────────────────────────────────────────────────────┘
                             │
@@ -423,7 +443,18 @@ All task types start with Stage -1.
   └────────────────────────┴──────────────────────────────┘
         │
         ▼
-  Single code owner selected + recorded
+  Single code owner selected + recorded in session.json
+  Ask developer: branch name? assignee?
+  session.json → code_owner, assignee, branch set
+        │
+        ▼
+  ┌───────────────────────────────────────────────────────┐
+  │  HANDOFF ARTIFACT GENERATED (MANDATORY)               │
+  │                                                       │
+  │  docs/ai/tasks/{task_id}/handoff.md → CREATED        │
+  │  .project-orchestration/status.json → UPDATED        │
+  │  (stage_reached: 3, assignee, branch recorded)       │
+  └───────────────────────────────────────────────────────┘
         │
         ▼
 ┌─────────────────────────────────────────────────────────────────┐
@@ -433,6 +464,24 @@ All task types start with Stage -1.
         ▼
   Exactly ONE code owner edits code
   All other lanes: advisory only, no edits
+        │
+        │ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┐
+        │           INTERRUPT / HANDOFF PATH
+        │ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┤
+        │  Developer stops and wants to hand off:          │
+        │                                                  │
+        │  ① Update handoff.md (MANDATORY before stop):   │
+        │    - What was done                               │
+        │    - Files modified so far                       │
+        │    - Next action for incoming dev                │
+        │    - Notes / WIP warnings                        │
+        │                                                  │
+        │  ② Update status.json → blocker + handoff_to    │
+        │  ③ Write session.json interrupt state            │
+        │                                                  │
+        │  Incoming dev runs: "resume task ANDROID-XX"     │
+        │  Skill reads handoff.md → continues Stage 4     │
+        │ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┘
         │
         ▼
 ┌─────────────────────────────────────────────────────────────────┐
@@ -474,6 +523,15 @@ All task types start with Stage -1.
         ▼
   Finalize ADR status, Task Changelog, Gate log, Drift Check.
   No product-code changes.
+        │
+        ▼
+  ┌───────────────────────────────────────────────────────┐
+  │  Handoff + Status finalization (MANDATORY):           │
+  │                                                       │
+  │  handoff.md → status: complete, final summary added  │
+  │  status.json → stage_reached: 7, stage_status:       │
+  │                complete, pr_url if created           │
+  └───────────────────────────────────────────────────────┘
         │
         ▼
   ✅ DONE — Task closed
@@ -575,84 +633,102 @@ Stage -1 (refresh-graph)
 
 ### [E] New feature
 ```
--1 (audit + auth check)
+-1 (audit + auth check + status.json init)
 → 0 (collect links → Mode A/B/C → resolve credentials)
 → 1 (read graph + source readers + auto-follow Jira attachments)
 → 1.5 (minimal clarification, only run if a trigger fires)
 → 2 (requirements) → 2.5 decision gate → STOP if ADR approval needed human approval
 → 3 (design + Android memo)
+   → handoff.md CREATED; status.json updated (stage: 3, assignee, branch)
 → 4 (one owner implements)
+   → handoff.md UPDATED on any interrupt
 → 5 (CLI evidence + graph update)
 → 6 (Karpathy QA)
+→ 7 (handoff.md FINALIZED; status.json stage_status: complete)
 ```
 
 ### [F] Edit existing feature
 ```
--1 (audit + auth check)
+-1 (audit + auth check + status.json init)
 → 0 (collect links)
 → 1 (graphify path query if graph exists + source readers)
 → 1.5 (Ambiguity + Missing-info + Dependency Impact)
 → 2 (requirements: graph path + out-of-scope list) → STOP
 → 3 (design delta + Android memo if Android-specific)
+   → handoff.md CREATED; status.json updated
 → 4 (surgical changes only — Karpathy)
+   → handoff.md UPDATED on interrupt
 → 5 (update graph + verify)
 → 6 (QA gate)
+→ 7 (handoff.md FINALIZED)
 ```
 
 ### [G] Bug fix
 ```
--1 (audit Android CLI + Graphify + auth check)
+-1 (audit Android CLI + Graphify + auth check + status.json init)
 → 0 (collect: repro steps, device, version, expected behavior)
 → 1 (graph path + runtime evidence if available)
 → 1.5 (clarify only when repro is unclear)
 → 2 (minimal bug requirements) → STOP
 → 3 (fix plan + verification design)
+   → handoff.md CREATED; status.json updated
 → 4 (smallest safe patch)
+   → handoff.md UPDATED on interrupt
 → 5 (runtime evidence + graph update if graph exists)
 → 6 (QA gate)
+→ 7 (handoff.md FINALIZED)
 ```
 
 ### [H] XML → Compose migration
 ```
--1 (check Android CLI + Android skills + Graphify + auth)
+-1 (check Android CLI + Android skills + Graphify + auth + status.json init)
 → 0 (collect migration target, sources, constraints)
 → 1 (graphify query "xml layout view fragment"
       android skills find "compose")
 → 1.5 (Android Advisor + Dependency Impact + Rollout/Risk)
 → 2 (migration plan) → STOP
 → 3 (batch plan + Android migration memo)
+   → handoff.md CREATED per-batch; status.json updated
 → 4 (per-batch, single owner for each batch)
+   → handoff.md UPDATED between batches and on interrupt
 → 5 (visual evidence + graph update)
 → 6 (QA gate)
+→ 7 (handoff.md FINALIZED)
 ```
 
 ### [I] AGP / Build modernization
 ```
 -1 (check AI DevKit + Android CLI + Android skills
-     + Gradle wrapper + Graphify + auth)
+     + Gradle wrapper + Graphify + auth + status.json init)
 → 0 (collect upgrade target, constraints, source docs)
 → 1 (graphify query "gradle build agp"
       android skills find "agp")
 → 1.5 (Dependency Impact + Rollout/Risk + Android Advisor)
 → 2 (upgrade plan) → STOP
 → 3 (implementation plan + compatibility memo)
+   → handoff.md CREATED; status.json updated
 → 4 (controlled implementation)
+   → handoff.md UPDATED on interrupt
 → 5 (clean build + graph update)
 → 6 (QA gate)
+→ 7 (handoff.md FINALIZED)
 ```
 
 ### [J] Unfamiliar codebase + raw brief
 ```
--1 (audit + auth check; refresh-graph only if approved)
+-1 (audit + auth check + status.json init; refresh-graph only if approved)
 → 0 (collect task brief)
 → 1 (read GRAPH_REPORT.md + Doc Reader reads docs/ai/inputs/)
 → 1.5 (Ambiguity + Missing-info + Graph Impact
          + Dependency Impact — full clarification)
 → 2 (requirements after outcome=ready) → STOP
 → 3 (design + implementation plan)
+   → handoff.md CREATED; status.json updated
 → 4 (one owner implements)
+   → handoff.md UPDATED on interrupt
 → 5 (runtime evidence + graph update)
 → 6 (QA gate)
+→ 7 (handoff.md FINALIZED)
 ```
 
 ---
@@ -684,13 +760,17 @@ Rollout/Risk Adv.       on demand        on demand        –
 ## 10. Graphify trigger map
 
 ```
-Stage -1   → check CLI + graph files + freshness
-Stage 0    → note graph present / absent
+Stage -1   → check CLI + graph files + freshness (2 checks):
+              ① commit check: graph_commit == git rev-parse HEAD?
+              ② time check:   built_at + stale_after_days (7) > now?
+              Either fails → flag stale (non-blocking, surface in preflight.md)
+Stage 0    → note graph present / absent + staleness flag from -1
 Stage 1    → READ GRAPH_REPORT.md (if present)
 Stage 1.5  → Graph Impact Reader feeds context-pack
 Stage 3    → use graph rationale for design decisions
 Stage 4    → DO NOT query graph while coding
-Stage 5    → /graphify . --update (if graph exists)
+Stage 5    → /graphify . --update (if graph_impact >= medium)
+              skip if graph_impact = low (write to skip-log)
 Stage 6    → optional before/after compare; check god nodes
 Stage 7    → finalize ADR status + task changelog + drift check
 ```
@@ -729,7 +809,121 @@ Docs finalization (Stage 7)
 ⑤  Stage 2 → 2.5       :  MANDATORY human approval requirements
 ⑥  Stage 2.5 → Stage 3 :  Decision trigger fired but ADR-lite not approved/deferred
 ⑦  Stage 3 → Stage 4   :  Missing design doc + single code owner
-⑧  Stage 5 → Stage 6   :  Missing runtime evidence + graph update
-⑨  Stage 6 → Stage 7   :  Karpathy review has not passed
-⑩  Stage 7 → Close     :  Missing ADR final status, Task Changelog, or Drift Check
+                           Missing branch name or assignee (must be set before coding)
+⑧  Stage 4 interrupt   :  handoff.md not updated before stopping (MANDATORY)
+⑨  Stage 5 → Stage 6   :  Missing runtime evidence + graph update
+⑩  Stage 6 → Stage 7   :  Karpathy review has not passed
+⑪  Stage 7 → Close     :  Missing ADR final status, Task Changelog, or Drift Check
+                           handoff.md not finalized to status: complete
+```
+
+---
+
+## 13. Handoff workflow
+
+```
+Dev A owns task (Stage 3–4)          Skill                 Dev B picks up
+         │                              │                        │
+         │  "dừng, bàn giao dev-b"     │                        │
+         │─────────────────────────────►│                        │
+         │                    ① Update handoff.md:              │
+         │                      - stage_reached: 4              │
+         │                      - files modified                │
+         │                      - next action                   │
+         │                      - WIP warnings                  │
+         │                    ② Update status.json:             │
+         │                      - assignee: dev-b              │
+         │                      - handoff_to: dev-b            │
+         │                      - blocker: null                 │
+         │                    ③ Write session.json interrupt    │
+         │◄─────────────────────────────│                        │
+         │  "Handoff complete"          │                        │
+         │                              │                        │
+         ·                              ·                        │
+         ·  (Dev A done)                ·    "resume ANDROID-42"│
+                                        │◄───────────────────────│
+                                 Read status.json (1 file):     │
+                                 → task: ANDROID-42             │
+                                 → stage: 4, assignee: dev-b   │
+                                 → branch: feature/ANDROID-42  │
+                                 → blocker: null               │
+                                        │                        │
+                                 Read handoff.md (1 file):      │
+                                 → What was done                │
+                                 → Next action                  │
+                                 → Files modified               │
+                                 → Key decisions                │
+                                        │                        │
+                                 Resume Stage 4 from            │
+                                 last successful compile point  │
+                                        │────────────────────────►
+                                        │  "Continue from LoginScreen"
+```
+
+### Artifacts involved in handoff
+
+```
+READ by incoming dev (by priority):
+
+1.  .project-orchestration/status.json          ← project dashboard
+    → all tasks: stage, assignee, blocker, branch, PR
+
+2.  docs/ai/tasks/{task_id}/handoff.md          ← task snapshot
+    → what was done, next action, files, decisions
+
+3.  .project-orchestration/tasks/{task_id}/
+    └── session.json                            ← full state if needed
+
+4.  docs/ai/tasks/{task_id}/
+    ├── requirements/<task>.md                  ← what to build
+    ├── design/<task>.md                        ← how to build it
+    ├── decisions/ADR-*.md                      ← why decisions were made
+    └── clarification/context-pack.json         ← full context
+```
+
+### status.json — project dashboard
+
+```json
+{
+  "tasks": [
+    {
+      "task_id": "ANDROID-42",
+      "title": "Login Flow",
+      "stage_reached": 4,
+      "stage_status": "in_progress",
+      "assignee": "dev-b",
+      "handoff_to": null,
+      "branch": "feature/ANDROID-42-login",
+      "pr_url": null,
+      "blocker": null,
+      "handoff_doc": "docs/ai/tasks/ANDROID-42/handoff.md"
+    },
+    {
+      "task_id": "ANDROID-51",
+      "title": "Profile Screen",
+      "stage_reached": 2,
+      "stage_status": "blocked",
+      "assignee": "dev-c",
+      "blocker": "waiting for human approval of requirements"
+    },
+    {
+      "task_id": "ANDROID-55",
+      "title": "Push Notifications",
+      "stage_reached": 7,
+      "stage_status": "complete",
+      "assignee": "dev-a",
+      "pr_url": "https://github.com/org/repo/pull/89"
+    }
+  ]
+}
+```
+
+### handoff.md update triggers
+
+```
+Stage 3  → code_owner confirmed   → CREATE (initial)
+Stage 4  → interrupt / stop       → UPDATE (files modified, next action)
+Stage 4  → pr_url created         → UPDATE (add PR link)
+Stage 5  → evidence collected     → UPDATE (evidence paths)
+Stage 7  → task closed            → FINALIZE (status: complete)
 ```

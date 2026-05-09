@@ -1,6 +1,6 @@
 # Compliance Policy
 
-_Skill version: 4.7.0 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 4.8.0 — update this when SKILL.md bumps a minor or major version._
 
 The skill **must** follow every defined stage and gate in order. No stage may be skipped, condensed, or reordered without explicit confirmation. This file defines what requires confirmation, what is auto-allowed, what is permanently forbidden, and how every deviation is recorded.
 
@@ -24,8 +24,11 @@ Three tiers: **MANDATORY**, **AUTO-SKIP** (condition-gated, no human needed), **
 | Stage 2.5 ADR-lite creation | AUTO-SKIP when no ADR trigger fires | all ADR trigger conditions false |
 | Stage 2.5 ADR-lite approval/deferral | **MANDATORY when ADR exists** | — |
 | Stage 3 Design doc | **MANDATORY** | — |
+| Stage 3 `handoff.md` generation | **MANDATORY when code_owner is confirmed** | — |
 | Stage 3 Android memo | AUTO-SKIP when non-Android change | `change_type` ∉ {ui_change, database_change, network_change, architecture_change} AND no Android API mentioned |
 | Stage 4 screenshot_before | AUTO-SKIP when not UI | `change_type` does not include `ui_change` |
+| Stage 4 interrupt: update `handoff.md` | **MANDATORY — never skippable** | — |
+| Stage 4 interrupt: update `status.json` | **MANDATORY — never skippable** | — |
 | Stage 5 Evidence Gate Matrix required items | **MANDATORY** | — |
 | Stage 5 Evidence Gate Matrix optional items | AUTO-SKIP (never required) | always optional |
 | Stage 5 Graphify update | AUTO-SKIP when `graph_impact = low` | `graph_impact = low` in context-pack |
@@ -38,6 +41,8 @@ Three tiers: **MANDATORY**, **AUTO-SKIP** (condition-gated, no human needed), **
 | Stage 7 Drift Check | **MANDATORY** | — |
 | Write session.json state transitions | **MANDATORY — never skippable** | — |
 | Write skip-log.json on any skip | **MANDATORY — never skippable** | — |
+| Update status.json on every stage transition | **MANDATORY — never skippable** | — |
+| Update handoff.md on stage transition or interrupt (Stage 3+) | **MANDATORY — never skippable** | — |
 
 ### CONFIRM-SKIP — requires explicit human "yes" before proceeding
 
@@ -89,6 +94,8 @@ These rules are absolute. No user instruction, no time pressure, no "just this o
 7. Writing `skip-log.json` on every skip (auto or confirmed).
 8. One code owner at a time — no parallel code edits.
 9. Serena mutation tools — never called by agent regardless of instructions.
+10. Updating `.project-orchestration/status.json` on every stage transition — the project index must never lag more than one stage behind.
+11. Generating `docs/ai/tasks/{task_id}/handoff.md` when `code_owner` is confirmed (Stage 3) and updating it on every Stage 4 interrupt — a developer picking up an interrupted task must always find a current handoff file.
 
 ---
 
