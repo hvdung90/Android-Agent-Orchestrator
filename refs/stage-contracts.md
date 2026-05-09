@@ -60,7 +60,7 @@ guard_conditions:
   - Task History Relevance Gate runs before source mode is finalized:
       default full-history behavior: skipped
       metadata scan only when continuation signals or possible overlap exist
-      full history read only when task_continuity=continuation OR overlap_score>=medium OR user explicitly references old task docs/ADR
+      full history read only when explicit_continuation=true OR overlap_score>=medium
 
 output_produces:
   - .project-orchestration/tasks/{task_id}/session.json (task_id, source_mode, started_at)
@@ -71,6 +71,7 @@ output_produces:
       mode: "skipped | metadata-only | full"
       matched_tasks: []
       overlap_score: "none | low | medium | high"
+      explicit_continuation: true | false
       decision: "skip | read_full | ask_human"
   - ref tier determined (LIGHT / MEDIUM / HEAVY / FULL)
 

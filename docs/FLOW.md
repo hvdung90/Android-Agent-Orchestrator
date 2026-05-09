@@ -262,6 +262,20 @@ All task types start with Stage -1.
         └───────────────────┬─────┘
                             │
                             ▼
+          history_scan.decision = read_full?
+                            │
+                      ┌─────┴─────┐
+                     Yes          No
+                      │            │
+                      ▼            ▼
+       Read matched task history   Skip old task docs
+       before synthesis:
+       - requirements/*.md
+       - decisions/ADR-*.md
+       - design/*.md
+       - reports/execution.md
+                            │
+                            ▼
                   Store → docs/ai/tasks/{task_id}/discovery/
 ```
 

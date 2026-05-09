@@ -259,14 +259,15 @@ Run the **Task History Relevance Gate**:
 - Set `task_continuity` to `continuation` when the user references previous work, an existing `task_id`, ADR, requirements/design/execution path, current branch/PR, or an in-progress session.
 - Set `task_continuity` to `new` when the task is clearly independent and has no old-task reference.
 - Set `task_continuity` to `unknown` when files/modules/screens overlap previous task metadata but the relationship is unclear.
-- For `continuation` or `unknown`, scan metadata only first: `session.json`, requirements front matter, ADR front matter, and task titles. Do not read full old requirements/design/execution unless overlap is `medium` or `high`, or the user explicitly asks to continue/review old context.
+- For `continuation` or `unknown`, scan metadata only first: `session.json`, requirements front matter, ADR front matter, and task titles. Do not read full old requirements/design/execution unless `explicit_continuation=true` or overlap is `medium` or `high`.
 - If overlap is ambiguous and may affect strategy or requirements, ask one concise clarification before reading full history.
 
 Intake must record:
 - Jira / Figma / Confluence links provided by developer, if any
 - Source mode (A / B / C) derived from what was provided
 - `task_continuity` (`new | continuation | unknown`)
-- `history_scan` decision (`skipped | metadata-only | full | ask_human`)
+- `history_scan.mode` (`skipped | metadata-only | full`)
+- `history_scan.decision` (`skip | read_full | ask_human`)
 
 ### Stage 1 — Discovery
 

@@ -517,6 +517,7 @@ In-progress task state — allows resume after an interruption.
     "mode": "skipped | metadata-only | full",
     "matched_tasks": [],
     "overlap_score": "none | low | medium | high",
+    "explicit_continuation": true,
     "decision": "skip | read_full | ask_human"
   },
   "code_owner": "agent-name | null",
