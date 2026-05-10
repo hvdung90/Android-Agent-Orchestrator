@@ -1,5 +1,48 @@
 # Changelog
 
+## v4.9.0
+
+### Added
+
+- **Executable implementation plan** (`docs/ai/tasks/{task_id}/planning/implementation-plan.md`): Stage 3 now produces a per-task plan with exact files, exact test commands, expected outputs, and commit messages — no placeholders allowed.
+- **Gate E.5 — per-task TDD gate**: RED evidence (`evidence/red-<task-id>.txt`) must exist before any product code is written for that task. Cannot be bypassed; CONFIRM-SKIP only with explicit human approval.
+- **Android TDD mapping** in Stage 4: `change_type` → test-first target (`logic` → unit test, `ui` → Compose semantics test, `database` → `MigrationTest`, `network` → contract test, etc.).
+- **Per-task TDD loop** in Stage 4: RED → GREEN → module tests → refactor → commit → spec-compliance review → quality review → next task.
+- **Spec-compliance review before quality review**: spec-compliance (does it meet acceptance criteria?) is always done before quality/Karpathy review — order is enforced and non-reversible.
+- **"Do not use this skill when"** section in `SKILL.md`.
+- **Gate E.5** added to gate log, hard stop points, and compliance matrix.
+- `tdd_evidence_complete: true` field in Stage 4 `state_on_complete`.
+
+### Changed
+
+- `SKILL.md`: version → 4.9.0; description rewritten to triggering-conditions only (superpowers pattern); Stage 3 mandates `implementation-plan.md`; Stage 4 rewritten with Android TDD Iron Law and per-task loop.
+- `refs/stage-contracts.md`: Stage 3 `output_produces` adds `implementation-plan.md`; Stage 4 `input_requires` adds it; Stage 4 `output_produces` adds RED/GREEN evidence and per-task review records.
+- `refs/compliance-policy.md`: 4 new MANDATORY rows (implementation-plan.md, Gate E.5 RED, GREEN, spec-compliance review); TDD CONFIRM-SKIP row added; never-bypass items 12–13 added; Gate E.5 in gate log example; 3 new violations.
+- `docs/FLOW.md`: Stage 4 diagram updated with per-task TDD loop block; hard stops renumbered with Gate E and Gate E.5 entries.
+- All `refs/*.md` version headers: 4.8.0 → 4.9.0.
+
+---
+
+## v4.8.0
+
+### Added
+
+- **`handoff.md` artifact** (`docs/ai/tasks/{task_id}/handoff.md`): generated at Stage 3 when `code_owner` is confirmed; updated on every Stage 4 interrupt. Gives any incoming developer a full snapshot of task state without reading session.json.
+- **Project-level `status.json`** (`.project-orchestration/status.json`): global dashboard of all active tasks — `task_id`, `stage_reached`, `assignee`, `branch`, `pr_url`, `blocker`. Updated on every stage transition.
+- **`assignee`, `handoff_to`, `branch`, `pr_url`** fields in `session.json`.
+- **Graphify time-based staleness check**: two conditions now required — commit hash match AND `built_at + stale_after_days > now`. Catches projects with many small commits.
+- **Hard rules 21–23**: handoff.md mandatory, status.json mandatory on every transition, single-task scope per session.
+- **QUICKSTART.md Step 4**: handoff workflow with "dừng lại, bàn giao cho dev-b" and "resume task" instructions.
+
+### Changed
+
+- `refs/stage-contracts.md`: Stage -1 initializes `status.json`; Stage 3 produces `handoff.md` + sets `assignee`/`branch`; Stage 4 interrupt state mandates `handoff.md` update; Stages 5–7 update `status.json`.
+- `refs/compliance-policy.md`: Stage 3 `handoff.md` MANDATORY row; Stage 4 interrupt mandatory rows; `status.json` and `handoff.md` in never-bypass list (items 10–11).
+- `docs/FLOW.md`: `handoff.md` block in Stage 3; INTERRUPT/HANDOFF PATH box in Stage 4; Section 13 Handoff workflow added.
+- All `refs/*.md` version headers: 4.7.0 → 4.8.0.
+
+---
+
 ## v4.7.0
 
 ### Added
