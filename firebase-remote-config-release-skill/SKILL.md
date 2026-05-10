@@ -1,6 +1,8 @@
 ---
 name: firebase-remote-config-release-skill
 description: Review, design, plan, and safely operate Firebase Remote Config releases. Use when tasks mention Firebase Remote Config, RC manifest YAML, STG vs PROD diff, config rollout, config publish, staging or production Remote Config, Jenkins RC pipeline logs, manifest PR review, ready/draft rule classification, qa_* condition safety, default value mutation, app id rewrite, LIST_VERSIONS, ROLLBACK, SYNC_STG, or production Remote Config release/rollback planning.
+metadata:
+  version: 1.0.0
 ---
 
 # Firebase Remote Config Release Skill
@@ -23,15 +25,25 @@ Load only what the task needs:
 | Create/review manifest | `refs/manifest-schema.md`, `refs/safety-gates.md`, `refs/review-checklist.md` |
 | Jenkins command/log help | `refs/jenkins-commands.md` |
 | Rollback/incident | `refs/rollback-playbook.md`, `refs/jenkins-commands.md` |
+| SYNC_STG | `refs/jenkins-commands.md § SYNC_STG`, `refs/flow.md § SYNC_STG Flow` |
+| Debug Jenkins/Firebase error | `refs/review-checklist.md § Jenkins / Log Debug Signals`, `refs/flow.md § Debug Flow` |
 
-Use templates from `templates/` for reports/checklists. Use examples from `examples/` only as shape references.
+Use templates from `templates/` for reports/checklists.
+
+`examples/` contains concrete filled-in references:
+- `sample-manifest.yaml` — shape reference for manifest YAML structure.
+- `sample-review.md` — shape reference for a completed manifest review.
+- `stg-prod-checklist.md` — actionable pre-publish checklist for `stg_prod` tasks.
+- `prod-only-checklist.md` — actionable pre-publish checklist for `prod_only` tasks.
+
+`agents/openai.yaml` defines the display name and default prompt for when this skill is surfaced as a chat agent interface (e.g. OpenAI GPT action or similar). It is not required for CLI/agent use.
 
 ## Workflow
 
 1. **Intake and source discovery**
-   - Classify task: `rc_design`, `rc_manifest`, `rc_review`, `rc_publish`, `rc_rollback`, `rc_sync_stg`, `rc_debug`.
+   - Classify task: `rc_design`, `rc_manifest`, `rc_review`, `rc_publish`, `rc_rollback`, `rc_sync_stg`, `rc_debug`. If the task spans multiple types, run them sequentially in order: design → manifest → review → publish. `rc_debug` and `rc_rollback` always take immediate priority. See `refs/rc-workflow.md § Multi-Task Classification`.
    - Identify `environment_model` (`stg_prod | prod_only`), project, source env, target env, changeset, ticket/PR/log links, manifest path, and authorization level.
-   - Check required access for the task: docs/tickets, manifest repo, Git push/PR, Jenkins, Firebase read/write.
+   - Check required access for the task using `refs/auth-and-access.md`. If a local auth file is needed, follow the `.rc-agent-auth.yaml` structure defined there. Never request secrets unless the current operation requires them.
    - Read app requirements/ticket/design docs. If available, read code or Graphify to identify parameter names, conditions, feature flags, app ids, and rollout surfaces.
 
 2. **RC state analysis**
@@ -89,6 +101,8 @@ Use the closest template:
 - `templates/rc-release-report.md` for end-to-end planning.
 - `templates/manifest-review.md` for PR/manifest review.
 - `templates/publish-checklist.md` before staging/prod apply.
+- `examples/stg-prod-checklist.md` as a ready-to-fill checklist for `stg_prod` pre-publish.
+- `examples/prod-only-checklist.md` as a ready-to-fill checklist for `prod_only` pre-publish.
 
 Final answer must state:
 - task type,

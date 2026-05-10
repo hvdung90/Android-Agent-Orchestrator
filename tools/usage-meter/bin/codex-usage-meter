@@ -1,0 +1,4 @@
+#!/usr/bin/env node
+
+process.env.USAGE_METER_PROVIDER = "codex";
+require("../lib/usage-meter");

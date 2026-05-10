@@ -177,6 +177,68 @@ Default safety for `prod_only`:
 - prefer small rollout or kill-switch behavior,
 - require explicit approval for any `ready` item and production apply.
 
+## SYNC_STG Flow
+
+Syncs current PROD state to STG. Treat as a destructive STG mutation.
+
+```text
+Confirm no active STG experiment / QA test
+→ export / backup current STG
+→ export / backup current PROD
+→ human approves STG overwrite
+→ execute SYNC_STG
+→ verify STG matches PROD
+→ record pre-sync STG backup path
+```
+
+Required evidence:
+- pre-sync STG backup path,
+- pre-sync PROD backup path (same version used for sync),
+- human approval of STG overwrite,
+- post-sync STG spot-check.
+
+Risk: **Medium** — destroys STG-only conditions and values not present in PROD.
+
+## Debug Flow (rc_debug)
+
+Use when task is to explain a Jenkins or Firebase RC error, not to design or publish.
+
+```text
+[0] Intake
+    - task_type: rc_debug
+    - error source: Jenkins log | Firebase console | app behavior
+    - project / env / changeset if known
+        |
+        v
+[1] Gather error evidence
+    - read provided log text, screenshot, or error message
+    - identify: error code, stage of failure, parameters/conditions involved
+        |
+        v
+[2] Classify error
+    - see Jenkins / Log Debug Signals table in refs/review-checklist.md
+    - map signal → likely cause
+        |
+        v
+[3] Diagnose
+    - explain root cause
+    - identify whether the error is recoverable without re-publish
+        |
+        v
+[4] Fix plan
+    - provide remediation steps
+    - if re-publish needed: produce command plan at current permission level
+    - if access is missing: output missing-access checklist from refs/auth-and-access.md
+        |
+        v
+[5] Retry guidance
+    - confirm fix applied
+    - confirm no partial publish occurred
+    - if partial publish: escalate to rc_rollback flow
+```
+
+Output: plain diagnosis + fix plan. No manifest generated unless the fix requires one.
+
 ## Stop Points
 
 Stop and ask when:
@@ -188,4 +250,5 @@ Stop and ask when:
 - manifest touches production,
 - manifest review has blocking findings,
 - validate-only evidence is missing before production apply,
-- rollback version/plan is missing for production mutation.
+- rollback version/plan is missing for production mutation,
+- SYNC_STG requested but active STG experiment state is unknown.

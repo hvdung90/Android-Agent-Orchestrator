@@ -52,6 +52,18 @@ Before any production publish/rollback:
 - rollback plan,
 - post-publish verification plan.
 
+## SYNC_STG Gates
+
+Block `SYNC_STG` execution when any of these are present:
+
+- Active STG experiment or QA test not confirmed absent.
+- Pre-sync STG backup not captured.
+- Pre-sync PROD backup not captured.
+- Human approval of STG overwrite not recorded.
+- Target STG Firebase project id not confirmed.
+
+Risk: **Medium** — STG-only conditions and values will be permanently overwritten by PROD state.
+
 ## Environment-Specific Gates
 
 ### STG + PROD

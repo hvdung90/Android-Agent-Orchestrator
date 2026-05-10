@@ -89,6 +89,34 @@ Equivalent script:
 python3 rc_rollback.py --project-id <prod_project_id> --version <versionNumber>
 ```
 
+## SYNC_STG
+
+Syncs PROD RC state to STG. This overwrites STG — any active STG experiment or in-progress QA config will be lost.
+
+**Safety requirements before running:**
+- Confirm no active STG experiment or QA test is running.
+- Export and backup current STG state before sync.
+- Export and backup current PROD state before sync.
+- Human explicitly approves overwrite of STG.
+- Record pre-sync STG backup path.
+
+```text
+PROJECT=<project>
+MODE=SYNC_STG
+```
+
+Equivalent script:
+
+```bash
+python3 rc_sync_prod_to_stg.py --prod-project-id <prod_project_id> --stg-project-id <stg_project_id>
+```
+
+Expected outcome:
+- STG RC state matches PROD RC state at time of sync.
+- Previous STG state is only recoverable from the backup captured before sync.
+
+Risk: **Medium** — mutates STG; destroys active STG-only conditions/values not present in PROD.
+
 ## Known Jenkins Risks To Check
 
 - Groovy interpolation inside `sh '''...'''` does not expand Jenkins/Groovy variables.

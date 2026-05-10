@@ -1,0 +1,4 @@
+#!/usr/bin/env node
+
+process.env.USAGE_METER_PROVIDER = "claude";
+require("../lib/usage-meter");
