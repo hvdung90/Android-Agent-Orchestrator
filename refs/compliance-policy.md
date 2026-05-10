@@ -1,6 +1,6 @@
 # Compliance Policy
 
-_Skill version: 4.8.0 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 4.9.0 — update this when SKILL.md bumps a minor or major version._
 
 The skill **must** follow every defined stage and gate in order. No stage may be skipped, condensed, or reordered without explicit confirmation. This file defines what requires confirmation, what is auto-allowed, what is permanently forbidden, and how every deviation is recorded.
 
@@ -24,9 +24,14 @@ Three tiers: **MANDATORY**, **AUTO-SKIP** (condition-gated, no human needed), **
 | Stage 2.5 ADR-lite creation | AUTO-SKIP when no ADR trigger fires | all ADR trigger conditions false |
 | Stage 2.5 ADR-lite approval/deferral | **MANDATORY when ADR exists** | — |
 | Stage 3 Design doc | **MANDATORY** | — |
+| Stage 3 `implementation-plan.md` generation | **MANDATORY** — no placeholders | — |
 | Stage 3 `handoff.md` generation | **MANDATORY when code_owner is confirmed** | — |
 | Stage 3 Android memo | AUTO-SKIP when non-Android change | `change_type` ∉ {ui_change, database_change, network_change, architecture_change} AND no Android API mentioned |
 | Stage 4 screenshot_before | AUTO-SKIP when not UI | `change_type` does not include `ui_change` |
+| Stage 4 Gate E.5 RED evidence per task | **MANDATORY — never skippable** | — |
+| Stage 4 GREEN evidence per task | **MANDATORY — never skippable** | — |
+| Stage 4 spec-compliance review per task | **MANDATORY — never skippable** | — |
+| Stage 4 quality review (Karpathy) per task | **MANDATORY — never skippable** | — |
 | Stage 4 interrupt: update `handoff.md` | **MANDATORY — never skippable** | — |
 | Stage 4 interrupt: update `status.json` | **MANDATORY — never skippable** | — |
 | Stage 5 Evidence Gate Matrix required items | **MANDATORY** | — |
@@ -52,6 +57,7 @@ These steps are mandatory by default but a human may override them. Agent must *
 |---|---|
 | Stage 1.5 Clarification when any trigger fires | "Clarification trigger fired: `<reason>`. Skip clarification and proceed directly to requirements? (y/n)" |
 | Stage 2.5 ADR-lite when any decision trigger fires | "Decision trigger fired: `<reason>`. Skip ADR-lite and proceed to design? This removes the architecture decision record. (y/n)" |
+| Stage 4 Gate E.5 TDD for a specific task | "Task `<task-id>` is `<change_type>`. TDD is required. Skip RED-first for this task? Writing code without RED evidence. (y/n)" |
 | Stage 5 any required evidence item (tool unavailable) | "Required evidence `<item>` cannot be collected (`<reason>`). Skip and proceed without it? This will be recorded in skip-log.json. (y/n)" |
 | Stage 6 Karpathy CRITICAL/HIGH finding | "Karpathy flagged `<issue>`. Proceed to close without fixing? This overrides the QA gate. (y/n)" |
 | Stage 7 Drift Check failure | "Drift check failed: `<reason>`. Close anyway? This will be recorded in skip-log.json. (y/n)" |
@@ -96,6 +102,8 @@ These rules are absolute. No user instruction, no time pressure, no "just this o
 9. Serena mutation tools — never called by agent regardless of instructions.
 10. Updating `.project-orchestration/status.json` on every stage transition — the project index must never lag more than one stage behind.
 11. Generating `docs/ai/tasks/{task_id}/handoff.md` when `code_owner` is confirmed (Stage 3) and updating it on every Stage 4 interrupt — a developer picking up an interrupted task must always find a current handoff file.
+12. Generating `docs/ai/tasks/{task_id}/planning/implementation-plan.md` at Stage 3 with no placeholders — RED evidence cannot be written without knowing the exact test command.
+13. Collecting RED evidence (`evidence/red-<task-id>.txt`) before writing any product code for that task — spec-compliance and quality review order is spec first, then quality; never reversed.
 
 ---
 
@@ -153,7 +161,8 @@ Every gate transition must be recorded in `execution.md`:
 | Gate C  | passed | 2026-05-07T09:35Z | clarity_score: 8 |
 | Gate D  | passed | 2026-05-07T10:00Z | human approved requirements |
 | Gate D.5 | passed | 2026-05-07T10:15Z | ADR-lite: accepted |
-| Gate E  | passed | 2026-05-07T10:30Z | code_owner: ai-devkit |
+| Gate E  | passed | 2026-05-07T10:30Z | code_owner: ai-devkit; implementation-plan.md generated |
+| Gate E.5 | passed | 2026-05-07T10:45Z | RED evidence: evidence/red-task-1.txt, red-task-2.txt |
 | Gate F  | passed | 2026-05-07T11:45Z | all required evidence collected |
 | Gate G  | passed | 2026-05-07T12:00Z | Karpathy: no critical issues; Stage 7 finalized |
 ```
@@ -170,6 +179,9 @@ Brackets `[]` = may be auto-skipped under conditions above.
 - Code is touched before Stage 2 approval (Gate D).
 - Design starts before Stage 2.5 Decision Gate is complete.
 - Implementation begins before code_owner is set in session.json.
+- Implementation begins before `implementation-plan.md` exists with no placeholders (Gate E).
+- Product code is written for a task before RED evidence exists for that task (Gate E.5).
+- Spec-compliance review is skipped or run after quality review for any task.
 - Stage 5 closes without all required evidence items.
 - Stage 6 closes with unresolved CRITICAL Karpathy findings.
 - Stage 7 closes with missing ADR final status, Task Changelog, or Drift Check.

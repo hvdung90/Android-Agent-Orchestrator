@@ -1,6 +1,6 @@
 # Android Agent Orchestrator — Complete Flow
 
-_Reflects skill v4.8.0. Update when SKILL.md changes._
+_Reflects skill v4.9.0. Update when SKILL.md changes._
 
 ---
 
@@ -462,8 +462,32 @@ All task types start with Stage -1.
 └─────────────────────────────────────────────────────────────────┘
         │
         ▼
+  Read implementation-plan.md — work task by task
   Exactly ONE code owner edits code
   All other lanes: advisory only, no edits
+        │
+        ▼
+  ┌─────────────────────────────── PER-TASK TDD LOOP ─────────────┐
+  │                                                               │
+  │  ① Write smallest failing test (RED)                         │
+  │     Run → record RED to evidence/red-<task-id>.txt           │
+  │     Gate E.5: RED evidence MUST exist before product code     │
+  │                                                               │
+  │  ② Write minimum code to pass (GREEN)                        │
+  │     Run → record GREEN to evidence/green-<task-id>.txt       │
+  │                                                               │
+  │  ③ Run full module test suite                                │
+  │     ./gradlew :<module>:test                                  │
+  │                                                               │
+  │  ④ Refactor while green                                      │
+  │                                                               │
+  │  ⑤ Commit                                                    │
+  │                                                               │
+  │  ⑥ Spec-compliance review ✅  (FIRST — does it meet AC?)     │
+  │  ⑦ Quality/Karpathy review ✅ (SECOND — is it clean code?)   │
+  │                                                               │
+  │  → Next task                                                  │
+  └───────────────────────────────────────────────────────────────┘
         │
         │ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┐
         │           INTERRUPT / HANDOFF PATH
@@ -471,9 +495,9 @@ All task types start with Stage -1.
         │  Developer stops and wants to hand off:          │
         │                                                  │
         │  ① Update handoff.md (MANDATORY before stop):   │
-        │    - What was done                               │
+        │    - Last completed task (with RED/GREEN)        │
         │    - Files modified so far                       │
-        │    - Next action for incoming dev                │
+        │    - Next task for incoming dev                  │
         │    - Notes / WIP warnings                        │
         │                                                  │
         │  ② Update status.json → blocker + handoff_to    │
@@ -481,6 +505,7 @@ All task types start with Stage -1.
         │                                                  │
         │  Incoming dev runs: "resume task ANDROID-XX"     │
         │  Skill reads handoff.md → continues Stage 4     │
+        │  Gate E.5 still applies to remaining tasks       │
         │ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┘
         │
         ▼
@@ -810,10 +835,13 @@ Docs finalization (Stage 7)
 ⑥  Stage 2.5 → Stage 3 :  Decision trigger fired but ADR-lite not approved/deferred
 ⑦  Stage 3 → Stage 4   :  Missing design doc + single code owner
                            Missing branch name or assignee (must be set before coding)
-⑧  Stage 4 interrupt   :  handoff.md not updated before stopping (MANDATORY)
-⑨  Stage 5 → Stage 6   :  Missing runtime evidence + graph update
-⑩  Stage 6 → Stage 7   :  Karpathy review has not passed
-⑪  Stage 7 → Close     :  Missing ADR final status, Task Changelog, or Drift Check
+                           implementation-plan.md missing or contains placeholders (Gate E)
+⑧  Stage 4 per-task    :  Product code written before RED evidence exists (Gate E.5)
+                           Spec-compliance review skipped or run after quality review
+⑨  Stage 4 interrupt   :  handoff.md not updated before stopping (MANDATORY)
+⑩  Stage 5 → Stage 6   :  Missing runtime evidence + graph update
+⑪  Stage 6 → Stage 7   :  Karpathy review has not passed
+⑫  Stage 7 → Close     :  Missing ADR final status, Task Changelog, or Drift Check
                            handoff.md not finalized to status: complete
 ```
 

@@ -1,6 +1,6 @@
 # Contracts, Artifacts, and Gates
 
-_Skill version: 4.8.0 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 4.9.0 — update this when SKILL.md bumps a minor or major version._
 
 ---
 
@@ -22,6 +22,7 @@ Contract headers are required for:
 - `requirements/<task>.md`
 - `android-memo/<task>.md`
 - `design/<task>.md`
+- `planning/implementation-plan.md`
 - `decisions/ADR-*.md`
 - `execution.md`
 - `handoff.md`
@@ -270,6 +271,79 @@ task: <task_id>
 - files/modules:
 ```
 
+### 3b) `docs/ai/tasks/{task_id}/planning/implementation-plan.md`
+
+Purpose: executable step-by-step runnable checklist for Stage 4 TDD implementation. Each task is one acceptance criterion, 2–5 minutes of work. No placeholders, no TBD, no "implement similar to Task N".
+
+Required front matter:
+
+```yaml
+artifact: android-implementation-plan
+version: 1.0
+owner: ai-devkit
+status: draft | active | complete
+task: <task_id>
+```
+
+Required structure per task:
+
+```markdown
+# Implementation Plan — <task title>
+
+**Goal:** <one sentence>
+**change_type:** <ui_change | logic_change | ...>
+**code_owner:** <dev or agent name>
+
+---
+
+### Task 1: <acceptance criterion name>
+
+**Files**
+- Modify: `app/src/main/java/com/example/LoginViewModel.kt`
+- Test:   `app/src/test/java/com/example/LoginViewModelTest.kt`
+
+- [ ] **RED** — write failing test
+  ```kotlin
+  @Test fun `login emits error when credentials invalid`() { ... }
+  ```
+  Command: `./gradlew :feature-login:testDebugUnitTest --tests "*.LoginViewModelTest.login emits error*"`
+  Expected: FAIL — LoginViewModel.login() not yet implemented
+  Evidence: `evidence/red-task-1.txt`
+
+- [ ] **GREEN** — minimal implementation
+  ```kotlin
+  fun login(email: String, password: String) { ... }
+  ```
+  Command: `./gradlew :feature-login:testDebugUnitTest --tests "*.LoginViewModelTest.login emits error*"`
+  Expected: PASS
+  Evidence: `evidence/green-task-1.txt`
+
+- [ ] **Module tests** — all affected modules green
+  Command: `./gradlew :feature-login:test`
+  Expected: BUILD SUCCESSFUL
+
+- [ ] **Refactor** — only if tests remain green; no new behavior
+
+- [ ] **Commit**
+  `git commit -m "feat(login): emit error state when credentials invalid"`
+
+- [ ] **Spec review** ✅ — verify matches acceptance criterion, nothing extra
+- [ ] **Quality review** ✅ — Karpathy gate passed
+
+---
+
+### Task 2: ...
+```
+
+**Failure modes — any of these means the plan must be rewritten before Stage 4 starts:**
+- A task says "implement X" without showing the exact code.
+- A task says "write tests for the above" without the actual test code.
+- A task says "similar to Task N" — repeat the code; tasks may be read independently.
+- A test command is missing or says "run tests".
+- An expected output is missing or says "should pass".
+
+---
+
 ### 4) `docs/ai/tasks/{task_id}/decisions/ADR-NNNN-<slug>.md`
 
 Purpose: short decision record for Android tasks with architectural or broad behavioral impact.
@@ -324,6 +398,8 @@ Required Drift Check section:
 - [ ] public repo version sync checked against installed/local skill when applicable
 - [ ] .project-orchestration/status.json exists and task entry is current
 - [ ] docs/ai/tasks/{task_id}/handoff.md exists and status matches session.json stage_status
+- [ ] docs/ai/tasks/{task_id}/planning/implementation-plan.md has no placeholder (TBD/TODO/similar to Task N)
+- [ ] RED evidence exists for each completed Stage 4 task (unless TDD exemption recorded)
 ```
 
 ### 6) `docs/ai/tasks/{task_id}/handoff.md`
@@ -483,9 +559,26 @@ Required:
 
 Required:
 - design doc exists,
+- `implementation-plan.md` exists with exact files, test commands, RED/GREEN/commit steps (no placeholders),
 - Android memo exists if Android-specific,
 - approved or deferred ADR-lite linked if one was required,
-- single code owner selected.
+- single code owner selected,
+- branch and assignee set in `session.json`.
+
+### Gate E.5 — Test-first ready (per task in Stage 4)
+
+This gate is checked **per implementation task**, not per stage. Stage 4 does not proceed to coding a task until this gate passes for that task.
+
+Required:
+- test target identified for this acceptance criterion,
+- failing test written and recorded,
+- RED evidence observed and path recorded in `evidence/red-<task-id>.txt`,
+- failure confirmed to be for the right reason (feature missing, not import/syntax error).
+
+TDD exemption (CONFIRM-SKIP only):
+- Human explicitly approves bypass for this specific task.
+- Reason recorded in `skip-log.json` with tier: CONFIRM-SKIP.
+- Even with exemption: spec-compliance and code-quality reviews are still required.
 
 ### Gate F — Verification ready
 
@@ -498,7 +591,8 @@ Required:
 ### Gate G — Close ready
 
 Required:
-- Karpathy diff review passed,
+- spec-compliance review ✅ for every completed task,
+- Karpathy/code-quality review ✅ for every completed task,
 - final execution report written,
 - Task Changelog completed,
 - ADR-lite status finalized (`Accepted`, `Deferred`, or `Superseded`) if present,
@@ -716,6 +810,7 @@ If either check fails → flag graph as stale in `preflight.md`. Commit-mismatch
 | `requirements/<task>.md` | `docs/ai/tasks/{task_id}/requirements/` | Parent orchestrator / AI DevKit | review only |
 | `decisions/ADR-*.md` | `docs/ai/tasks/{task_id}/decisions/` | Parent orchestrator / AI DevKit | advise; human approves |
 | `design/<task>.md` | `docs/ai/tasks/{task_id}/design/` | Parent orchestrator / AI DevKit | review only |
+| `planning/implementation-plan.md` | `docs/ai/tasks/{task_id}/planning/` | Parent orchestrator / AI DevKit | code owner reads; human may annotate |
 | `android-memo/<task>.md` | `docs/ai/tasks/{task_id}/android-memo/` | Android skills | supply advice only |
 | `handoff.md` | `docs/ai/tasks/{task_id}/handoff.md` | Parent orchestrator / AI DevKit | human may append notes manually |
 | runtime evidence | `.project-orchestration/tasks/{task_id}/evidence/` | Android CLI | request commands |

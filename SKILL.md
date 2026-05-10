@@ -1,9 +1,9 @@
 ---
 name: android-agent-orchestrator
-description: Meta-skill for Android projects coordinating auth bootstrap, provisioning preflight, AI DevKit, Android skills, Android CLI, Graphify, Karpathy, and Serena code analysis into one disciplined workflow. Single .agent-auth.yaml manages all tokens; just-in-time token check per tool.
+description: Use when starting, planning, analyzing, or implementing any Android task — new feature, bug fix, refactor, migration, AGP upgrade, architecture review, or repo setup. Use when user says start task, new feature, fix bug, analyze repo, migrate, upgrade, implement, review architecture, or set up agents for an Android project.
 license: MIT
 metadata:
-  version: 4.8.0
+  version: 4.9.0
   category: orchestration
   lanes:
     - ai-devkit
@@ -25,7 +25,7 @@ metadata:
     - refs/playbooks.md
 ---
 
-# Android Agent Orchestrator v4.8.0
+# Android Agent Orchestrator v4.9.0
 
 ## Activation
 
@@ -33,7 +33,13 @@ Load this skill when the user asks to **start, plan, analyze, or implement an An
 
 Trigger phrases: `start task` · `new feature` · `fix bug` · `analyze repo` · `migrate` · `upgrade` · `set up agents` · `implement` · `review architecture`
 
-Do not load this skill for non-Android projects or purely conversational questions.
+**Do not use this skill when:**
+- Answering general Android questions without any repo changes planned.
+- Explanation-only or documentation read requests with no code output.
+- Non-code documentation rewrites unless they accompany a code change.
+- Throwaway prototypes where the user explicitly opts out of governance.
+- Purely conversational questions about Android APIs or concepts.
+- The project is not Android (Kotlin backend, KMP web-only, pure iOS, etc.).
 
 ---
 
@@ -59,6 +65,12 @@ Do not load this skill for non-Android projects or purely conversational questio
 > **Auth first. Audit tools. Read the map. Analyze code surface. Clarify before planning. Approve before coding.**
 
 ---
+
+## What changed in v4.9.0
+
+**v4.9.0** — TDD-first implementation layer + executable plans.
+
+Adds Android TDD gate (Gate E.5) before Stage 4: RED evidence required before any product-code change. Stage 3 now produces `implementation-plan.md` with exact files, exact test commands, RED/GREEN/commit steps per acceptance criterion — no placeholders. Stage 4 enforces per-task TDD loop with spec-compliance review before code-quality review. Adds `Do not use this skill when` section. Fixes description to be triggering-conditions only (superpowers pattern). Updates compliance matrix with TDD exemption as CONFIRM-SKIP.
 
 ## What changed in v4.8.0
 
@@ -358,17 +370,64 @@ If ADR-lite is not required, record `adr_required: false` and the reason in `ses
 
 → **Load `refs/contracts-and-artifacts.md`** for the ADR-lite schema and Decision Ownership matrix.
 
-### Stage 3 — Design split
+### Stage 3 — Design split + Executable Plan
 
 AI DevKit writes design/planning docs. Android skills write Android memo. No product-code changes.
 
 → **Load `refs/playbooks.md`** to select the correct workflow for the task type.
 
-When `code_owner` is confirmed, automatically generate `docs/ai/tasks/{task_id}/handoff.md` — a concise snapshot summarizing task state, stage, branch, next action, and assignee so any developer can pick up the task without reading multiple files. Update `assignee` in `session.json` to match `code_owner`. Update `.project-orchestration/status.json` entry for this task.
+**Executable implementation plan (MANDATORY):** After design is written, AI DevKit produces `docs/ai/tasks/{task_id}/planning/implementation-plan.md`. This is not a high-level outline — it is a step-by-step runnable checklist. Rules:
 
-### Stage 4 — Implementation lock
+- One task per acceptance criterion. Each task is 2–5 minutes of work.
+- Every task contains: exact file path(s), exact test command with expected output, RED step, GREEN step, refactor note, commit message.
+- No placeholders. No TBD. No "implement similar to Task N". Repeat the code if tasks may be read independently.
+- TDD mapping per change type must be stated explicitly:
 
-Exactly one code owner edits code.
+| change_type | Test-first target |
+|---|---|
+| `logic_change` | Unit test for ViewModel / UseCase / Repository |
+| `ui_change` | Compose semantics test or screenshot comparison |
+| `database_change` | Room `MigrationTest` |
+| `network_change` | Mock server / contract test |
+| `dependency_change` | Build success + license check |
+| `architecture_change` | Module boundary compile test |
+| `test_change` | (tests are the artifact — verify they fail for right reason) |
+| `config_change` | Build variant success + manifest diff |
+
+When `code_owner` is confirmed, generate `docs/ai/tasks/{task_id}/handoff.md` and update `session.json → assignee`, `branch`. Update `.project-orchestration/status.json`.
+
+### Stage 4 — Implementation Lock with Android TDD
+
+Exactly one code owner edits code. All other lanes are advisory only.
+
+**Iron law:** No product-code change without a failing test first, or an approved TDD exemption (CONFIRM-SKIP per compliance matrix).
+
+**If code is written before a failing test exists: delete it. No exceptions. Do not keep it as reference. Do not adapt it. Delete means delete.**
+
+**Per-task loop** (repeat for every task in `implementation-plan.md`):
+
+1. Read the exact task from `implementation-plan.md`. Do not batch multiple tasks.
+2. Write the smallest failing test for one acceptance criterion.
+3. Run the test — record RED output to `evidence/red-<task-id>.txt`. Verify failure is for the right reason (feature missing, not a typo or import error).
+4. Write the minimum Android code to make the test pass. YAGNI strictly enforced.
+5. Run the same test — record GREEN output to `evidence/green-<task-id>.txt`. All affected module tests must also pass.
+6. Run `./gradlew :<module>:test` for modules in `module_impact_chain.test_scope_modules`. All must be green.
+7. Refactor only while tests remain green. No new behavior.
+8. Commit this task: `git commit -m "<type>(<scope>): <what and why>"`.
+9. Dispatch **spec-compliance reviewer**: verifies this task matches acceptance criteria exactly — nothing missing, nothing extra. Does not trust implementer's summary; reads actual code.
+10. If spec issues found → fix → re-review. Only when spec compliance is ✅ proceed.
+11. Dispatch **Karpathy/code-quality reviewer**: surgical changes, no over-engineering, scope discipline.
+12. If quality issues found → fix → re-review. Only when quality is ✅ mark task done.
+13. Move to next task in `implementation-plan.md`.
+
+**Do not:**
+- Edit files not listed in the current task.
+- Batch multiple acceptance criteria into one unreviewed change.
+- Replace automated tests with manual evidence unless human explicitly approves (CONFIRM-SKIP).
+- Proceed when RED was not observed.
+- Pause between tasks to ask the human "should I continue?" — continue unless blocked.
+
+**Blocked states:** If a task cannot proceed (missing context, architectural blocker, model limitation) — record `BLOCKED: <reason>` in `session.json → blocker`, update `handoff.md`, stop and report to human. Do not retry the same approach without a change.
 
 ### Stage 5 — Verify
 
@@ -461,8 +520,9 @@ The parent orchestrator must wait:
 2. Before Requirements: wait for required Clarification outputs if any trigger fires.
 3. Before Design: wait for human approval of requirements.
 4. Before Design: wait for approved or explicitly deferred ADR-lite when Stage 2.5 requires one.
-5. Before Implementation: wait for approved requirements, decision gate result, design doc, Android memo if Android-specific, and chosen single code owner.
-6. Before Close: wait for runtime evidence, graph update if graph exists, Karpathy diff review, acceptance coverage check, and Stage 7 documentation finalization.
+5. Before Implementation: wait for approved requirements, decision gate result, design doc, executable `implementation-plan.md`, Android memo if Android-specific, and chosen single code owner with branch set.
+6. **Gate E.5 — Test-first ready (before each task in Stage 4):** wait for test target identified, failing test written, RED evidence recorded. This gate is per-task, not per-stage.
+7. Before Close: wait for runtime evidence, graph update if graph exists, spec-compliance review ✅, Karpathy diff review ✅, acceptance coverage check, and Stage 7 documentation finalization.
 
 ---
 
@@ -525,8 +585,8 @@ graphify-out/
 8. **Clarification** — if any trigger fires, run workers in parallel; finalize `change_type` and `module_impact_chain`; parent synthesizes context-pack + brief (sparse format).
 9. **Requirements** — AI DevKit writes canonical doc with version header + Affected Areas; **stop for human approval**; update `session.json → requirements_approved: true`.
 10. **Decision Gate** — decide whether ADR-lite is required; create Proposed ADR and stop for approval if required; write `adr_required`, `adr_status`, and `decision_record` to `session.json`.
-11. **Design split** — AI DevKit + Android skills in parallel; select code owner; update `session.json → code_owner`, `session.json → assignee`; ask for `branch` if not yet set; generate `docs/ai/tasks/{task_id}/handoff.md`; update `.project-orchestration/status.json`.
-12. **Implementation** — one owner edits code; capture `screenshot_before` if `change_type` includes `ui_change`; all other lanes advisory only. On interrupt: update `handoff.md` and `status.json` before stopping.
+11. **Design split** — AI DevKit + Android skills in parallel; produce `implementation-plan.md` with exact files, test commands, RED/GREEN/commit steps per acceptance criterion (no placeholders); select code owner; update `session.json → code_owner`, `session.json → assignee`; ask for `branch` if not yet set; generate `docs/ai/tasks/{task_id}/handoff.md`; update `.project-orchestration/status.json`.
+12. **Implementation (per-task TDD loop)** — one owner per task in `implementation-plan.md`; write failing test → RED evidence → minimal code → GREEN evidence → refactor → commit → spec-compliance review ✅ → code-quality review ✅ → next task. Capture `screenshot_before` if `change_type` includes `ui_change`. On interrupt: update `handoff.md` and `status.json` before stopping.
 13. **Verify** — derive required evidence from Evidence Gate Matrix using `change_type`; Android CLI runs required commands scoped to `module_impact_chain.build_order` if present; Graphify updates graph only if `graph_impact ≥ medium`. Write `evidence_collected` to `session.json`.
 14. **QA gate** — AI DevKit + Karpathy review diff; verify Gate F (all required evidence present); keep code frozen.
 15. **Docs / decision finalization** — update ADR status, Task Changelog, gate log, and drift check result; mark `session.json → stage_status: complete`; update `docs/ai/tasks/{task_id}/handoff.md` with final status; update `.project-orchestration/status.json` entry to `stage_status: complete`.

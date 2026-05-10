@@ -1,6 +1,6 @@
 # Stage Output Contracts
 
-_Skill version: 4.8.0 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 4.9.0 — update this when SKILL.md bumps a minor or major version._
 
 Each stage defines a typed contract: what it requires as input, what it must produce as output, and what state it writes to `session.json` on completion or interrupt.
 
@@ -280,6 +280,7 @@ guard_conditions:
 output_produces:
   - docs/ai/tasks/{task_id}/design/<task>.md (AI DevKit design doc)
   - docs/ai/tasks/{task_id}/planning/<task>.md (AI DevKit planning doc)
+  - docs/ai/tasks/{task_id}/planning/implementation-plan.md (executable TDD plan; MANDATORY — no placeholders)
   - docs/ai/tasks/{task_id}/android-memo/<task>.md (Android skills memo, if Android-specific — auto-skip written to skip-log if omitted)
   - docs/ai/tasks/{task_id}/handoff.md (generated when code_owner is confirmed; MANDATORY)
   - .project-orchestration/tasks/{task_id}/session.json: code_owner, assignee, branch set
@@ -313,6 +314,7 @@ stage: "4_implementation"
 input_requires:
   - docs/ai/tasks/{task_id}/design/<task>.md (stage 3 complete)
   - docs/ai/tasks/{task_id}/planning/<task>.md
+  - docs/ai/tasks/{task_id}/planning/implementation-plan.md (exists, no placeholders)
   - session.json: code_owner set, requirements_approved: true
   - session.json: adr_status is accepted | deferred | not_required
   - context-pack.json: module_impact_chain (for build scope awareness)
@@ -322,15 +324,21 @@ guard_conditions:
   - Karpathy guidelines applied to every code change
   - Serena advisory only (no mutation tools)
   - screenshot_before captured BEFORE first code change (if change_type includes ui_change)
+  - Gate E.5 enforced per task: RED evidence must exist before any product code for that task
 
 output_produces:
   - product code changes (owned by code_owner)
   - evidence/screen_before.png (if change_type: ui_change — captured before first edit)
+  - evidence/red-<task-id>.txt per task (RED test run output — MANDATORY before product code)
+  - evidence/green-<task-id>.txt per task (GREEN test run output — MANDATORY after implementation)
+  - spec-compliance review record per task (in execution.md or inline comment)
+  - quality review (Karpathy) record per task
   - .project-orchestration/status.json: entry updated (stage_reached: 4)
 
 state_on_complete:
   stage_reached: 4
   stage_status: complete
+  tdd_evidence_complete: true   # all tasks have red + green evidence
   blocker: null
 
 state_on_interrupt:
@@ -340,10 +348,10 @@ state_on_interrupt:
   partial_outputs:
     - "product code partial — do not consider shipped"
   # MANDATORY on interrupt: update docs/ai/tasks/{task_id}/handoff.md with current state,
-  # files modified so far, and next action before stopping.
+  # files modified so far, last completed task, and next action before stopping.
   # MANDATORY on interrupt: update .project-orchestration/status.json entry with blocker.
 
-resume_entry_point: "read partial code state; read handoff.md for context; continue from last successful compile point; re-run Karpathy gate"
+resume_entry_point: "read implementation-plan.md for task list; read handoff.md for last completed task; continue from next incomplete task; Gate E.5 still applies to remaining tasks"
 ```
 
 ---
