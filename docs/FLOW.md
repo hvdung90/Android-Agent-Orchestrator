@@ -1,6 +1,6 @@
 # Android Agent Orchestrator — Complete Flow
 
-_Reflects skill v4.9.0. Update when SKILL.md changes._
+_Reflects skill v4.10.1. Update when SKILL.md changes._
 
 ---
 
@@ -218,6 +218,21 @@ All task types start with Stage -1.
                             │
                             ▼
     Record: source mode (A/B/C), links, credential source
+                            │
+                            ▼
+    ┌───────────────────────────────────────────────────────┐
+    │  Preliminary mode scoring                             │
+    │  (complexity_score + risk_score → preliminary_mode)   │
+    │                                                       │
+    │  Signals from task description only:                  │
+    │  - file count estimate, layer crossing, link types    │
+    │  - ADR keyword? → governed                            │
+    │  - Jira + Figma both present? → min standard          │
+    │  - single-file bug fix, no links? → fast (tentative)  │
+    │                                                       │
+    │  Write preliminary_mode to session.json               │
+    │  (will be finalized and may be upgraded after Stage 1)│
+    └───────────────────────────────────────────────────────┘
                             │
                             ▼
     ┌───────────────────────────────────────────────────────┐
@@ -954,4 +969,124 @@ Stage 4  → interrupt / stop       → UPDATE (files modified, next action)
 Stage 4  → pr_url created         → UPDATE (add PR link)
 Stage 5  → evidence collected     → UPDATE (evidence paths)
 Stage 7  → task closed            → FINALIZE (status: complete)
+```
+
+---
+
+## 14. Workflow modes
+
+```
+STAGE 0: Task description received
+        │
+        ▼
+Preliminary mode estimate (from description + links)
+        │
+        ├── Single-file fix, no links, no ADR keywords  → preliminary: fast
+        ├── Feature request, multi-file, one module     → preliminary: standard
+        ├── Jira + Figma both present                   → preliminary: min standard
+        ├── ADR keyword, migration, multi-module        → preliminary: governed
+        └── Ambiguous                                   → preliminary: standard
+
+        Write preliminary_mode → session.json
+        │
+        ▼
+STAGE 1: Source reading + Graphify
+        │
+Finalize scores after reading all sources:
+        │
+        ├── complexity_score: 1-10
+        │     1-2: single-file additive
+        │     3-4: multi-file same layer
+        │     5-6: multi-layer (ViewModel + Repository)
+        │     7-8: multi-module
+        │     9-10: migration / AGP / architecture
+        │
+        ├── risk_score: 1-10
+        │     1-2: isolated logic, no ADR triggers
+        │     3-4: shared ViewModel/Repository state
+        │     5-6: auth / billing / permissions / DB migration
+        │     7-8: API surface change / god nodes
+        │     9-10: multiple high-risk signals
+        │
+        └── Apply override rules (in priority order):
+              Any ADR trigger fires       → governed (hard floor)
+              Jira + Figma both present   → min standard
+              Human explicit mode request → use as stated
+              Ambiguous/incomplete brief  → min standard
+
+        ▼
+Mode mapping:
+  complexity ≤ 3 AND risk ≤ 3  →  fast
+  complexity ≤ 7 AND risk ≤ 6  →  standard
+  otherwise                     →  governed
+
+  Write workflow_mode + scores → context-pack.json, session.json
+        │
+        ▼
+┌─────────────────────────────────────────────────────────────┐
+│                   FAST mode stage flow                      │
+│                                                             │
+│  -1 → 0 → 1 → 2(mini) → 2.5-lite → 3-lite →               │
+│  4(TDD) → 5(lite) → 6(lite) → 7(lite)                      │
+│                                                             │
+│  Every stage runs. Only depth and selected steps differ:    │
+│                                                             │
+│  AUTO-SKIP within stages (written to skip-log.json):        │
+│    Stage 1.5  — complexity/risk confirmed low at Stage 1    │
+│    Stage 2.5  ADR creation — AUTO-SKIP only when no trigger │
+│      fires (ADR trigger check MANDATORY; trigger → governed) │
+│    Stage 3  design doc + Android memo — plan ≤ 5 tasks only │
+│                                                             │
+│  CONFIRM-SKIP (ask human first):                            │
+│    Stage 6  full QA report — Karpathy diff review +         │
+│      Gate G close remain MANDATORY regardless               │
+│                                                             │
+│  LITE (always runs, minimal output):                        │
+│    Stage 2  — requirements ≤ 40 lines, ACs + facts only     │
+│    Stage 5  — evidence gate; graph update skipped if low    │
+│    Stage 7  — Task Changelog + Drift Check (MANDATORY);     │
+│      no ADR status update when no ADR exists                │
+│                                                             │
+│  NEVER SKIPPED regardless of mode:                          │
+│    Auth init, requirements approval, ADR trigger check,     │
+│    TDD Gate E.5, Karpathy diff review, Gate G close,        │
+│    session.json + skip-log.json writes, status.json updates │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│                STANDARD mode stage flow                     │
+│                                                             │
+│  -1 → 0 → 1 → [1.5] → 2 → [2.5] → 3 → 4 → 5 → 6 → 7      │
+│                                                             │
+│  Full sequence; artifact depth bounded:                     │
+│    requirements ≤ 120 lines                                 │
+│    design ≤ 180 lines                                       │
+│    implementation-plan ≤ 15 tasks                           │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│                GOVERNED mode stage flow                     │
+│                                                             │
+│  Full -1 → 7 with no artifact restrictions                  │
+│  Triggered by: migration / multi-module / ADR / Jira+Figma  │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Mode upgrade rules
+
+Mode can only be **upgraded** (fast → standard → governed) during a task. Downgrade requires explicit human confirmation.
+
+```
+Auto-upgrade triggers (logged to session.json + skip-log.json):
+  - Acceptance criteria count > 5 while in fast mode → standard
+  - ADR trigger fires during Stage 2.5 check → governed
+  - Graph shows god nodes in change path → governed
+  - Source reading reveals multi-module impact → governed
+
+Human-requested downgrade flow:
+  Agent: "Task is scored as [governed]. Downgrade to [standard]?
+          This removes: ADR gate, full QA gate.
+          Confirm? (y/n)"
+  If y → log mode_override in session.json + skip-log.json
+  If n → keep governed
 ```

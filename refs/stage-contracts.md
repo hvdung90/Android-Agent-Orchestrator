@@ -1,6 +1,6 @@
 # Stage Output Contracts
 
-_Skill version: 4.9.0 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 4.10.1 — update this when SKILL.md bumps a minor or major version._
 
 Each stage defines a typed contract: what it requires as input, what it must produce as output, and what state it writes to `session.json` on completion or interrupt.
 
@@ -75,12 +75,14 @@ output_produces:
       explicit_continuation: true | false
       decision: "skip | read_full | ask_human"
   - ref tier determined (LIGHT / MEDIUM / HEAVY / FULL)
+  - preliminary_mode (fast / standard / governed) derived from task description and link presence
 
 state_on_complete:
   stage_reached: 0
   stage_status: complete
   source_mode: "A | B | C"
   task_continuity: "new | continuation | unknown"
+  preliminary_mode: "fast | standard | governed"
   blocker: null
   # status.json updated: entry added or refreshed for this task_id
 
@@ -116,10 +118,16 @@ output_produces:
   - docs/ai/tasks/{task_id}/clarification/context-pack.json (partial — sources, graph_path, graph_impact, change_type, history_context if read)
   - module_impact_chain populated if graph_impact >= medium (Gradle Module Impact Analyzer)
   - .project-orchestration/tasks/{task_id}/skip-log.json appended if Gradle Module Impact Analyzer auto-skipped
+  - workflow_mode (fast / standard / governed) finalized; complexity_score and risk_score computed after all sources read
+  - mode_reasons list written to context-pack.json
+  - session.json updated: workflow_mode, complexity_score, risk_score, mode_reasons set
 
 state_on_complete:
   stage_reached: 1
   stage_status: complete
+  workflow_mode: "fast | standard | governed"
+  complexity_score: <1-10>
+  risk_score: <1-10>
   blocker: null
 
 state_on_interrupt:
@@ -155,6 +163,7 @@ output_produces:
   - module_impact_chain finalized (Gradle Module Impact Analyzer may refine graph_impact here)
   - change_type finalized
   - .project-orchestration/tasks/{task_id}/skip-log.json appended if Stage 1.5 was auto-skipped or confirm-skipped
+  - NOTE: workflow_mode is NOT set here — it was finalized at end of Stage 1; Stage 1.5 reads it, never writes it
 
 state_on_complete:
   stage_reached: 1
@@ -514,6 +523,11 @@ Any interrupt → stage_status: in_progress, blocker: "<reason>"
   "adr_required": false,
   "adr_status": "proposed | accepted | deferred | superseded | not_required | null",
   "decision_record": "docs/ai/tasks/{task_id}/decisions/ADR-NNNN-slug.md | null",
+  "workflow_mode": "fast | standard | governed | null",
+  "preliminary_mode": "fast | standard | governed | null",
+  "mode_override": "fast | standard | governed | null",
+  "complexity_score": 0,
+  "risk_score": 0,
   "change_type": "ui_change | database_change | network_change | dependency_change | architecture_change | logic_change | test_change | config_change | multi | null",
   "module_impact_chain_scope": "single | local-chain | full-project | null",
   "evidence_collected": [],

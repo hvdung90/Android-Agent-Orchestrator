@@ -1,5 +1,53 @@
 # Changelog
 
+## v4.10.1
+
+### Added
+
+- **TDD exemption categories** (`refs/compliance-policy.md`): Concrete table defining the only four cases where Gate E.5 CONFIRM-SKIP is reasonable — pure UI pixel/layout tweak (screenshot substitute), legacy untestable code (characterization test required first), pure refactor with no behavior change (existing suite must pass), and spike/investigation (no product code allowed). For each case: why TDD-first is impractical, allowed alternative, and what is still required. Invalid exemption reasons (hard-to-test, time pressure) listed explicitly. Every exemption still writes a structured record to `skip-log.json`.
+- **Preflight JSON output** (`templates/tooling-preflight.sh --json`): New `--json` flag emits machine-readable JSON to stdout. Schema: `ready_for_stage_0` (boolean gate), `blocking_gaps` (array), `non_blocking_gaps` (array), `tools` (per-tool status), `graph` (report/json present), `cache` (valid_until, graph_commit). Existing markdown behavior unchanged. Python 3 implementation; runs same checks as bash path.
+- **`preflight.json` schema** (`refs/contracts-and-artifacts.md`): Formal schema and agent decision rule added under the preflight artifact section. Rule: use `preflight.json → ready_for_stage_0` for boolean gate decisions; treat `preflight.md` as human-readable only.
+
+### Changed
+
+- `SKILL.md`: Stage -1 run command updated to generate both `preflight.json` (JSON flag) and `preflight.md`; minimal operating algorithm step 3 updated to reference `preflight.json` gate.
+- `templates/tooling-preflight.sh`: Added arg parsing for `--json` and `MODE` flags; JSON mode uses Python 3 for structured output; markdown mode is backward-compatible and unchanged.
+
+### Fixed (Codex review — 6 bugs)
+
+- **Bug 1 — circular dependency (High)**: `workflow_mode` was being finalized inside Stage 1.5, which also reads `workflow_mode` to decide whether to AUTO-SKIP — a circular read-before-write. Fixed: `workflow_mode` is now finalized at the **end of Stage 1** (after all sources read). Stage 1.5 only reads the mode; it never writes it. `SKILL.md` Stage 1 body, Stage 1.5 body, minimal algorithm step 8, and `refs/stage-contracts.md` Stage 1 / Stage 1.5 output + state blocks all updated.
+- **Bug 2 — Stage 2.5 full bypass (High)**: Compliance matrix had `Stage 2.5 Decision Gate (fast mode) | AUTO-SKIP` with no caveat, violating the hard rule "Decision Gate evaluation always mandatory". Fixed: split into two rows — ADR trigger check is **MANDATORY** regardless of mode; ADR creation + approval is AUTO-SKIP only if no trigger fires. If a trigger fires in fast mode → mode upgrades to governed.
+- **Bug 3 — Stage 3 skipped but Stage 4 needs its outputs (High)**: Fast mode sequence previously showed `-1→0→1→2→4`, skipping Stage 3 entirely, yet Stage 4 requires `implementation-plan.md`, `code_owner`, `branch`, and `handoff.md` from Stage 3. Fixed: fast mode now always runs **Stage 3-lite** (implementation-plan.md ≤ 5 tasks, code_owner, branch, minimal handoff.md). Only the design doc and Android memo are skipped. Fast mode sequence in `SKILL.md` corrected to `-1→0→1→2(mini)→2.5-lite→3-lite→4→5(lite)`.
+- **Bug 4 — Stage 6 Karpathy contradiction (Medium)**: Stage 6 CONFIRM-SKIP row implied the entire Stage 6 could be skipped in fast mode, contradicting hard rule "Stage 6 Karpathy diff review: never skippable". Fixed: row renamed to "Stage 6 full QA report" and clarified that Karpathy diff review + Gate G close remain MANDATORY.
+- **Bug 5 — handoff_md: skip contradicts hard rule (Medium)**: `artifact_budget.fast.handoff_md: skip` contradicted hard rule #11 (mandatory when code_owner confirmed). Fixed: changed to `handoff_md: minimal` with comment that minimal = code_owner, branch, next step only.
+- **Bug 6 — version drift (Low)**: All refs/*.md and docs/FLOW.md still showed `4.10.0` while SKILL.md and CHANGELOG referenced `4.10.1`. Fixed: all files bumped to `4.10.1`.
+
+---
+
+## v4.10.0
+
+### Added
+
+- **Three workflow modes (fast / standard / governed)**: Derived automatically from `complexity_score` + `risk_score`. Fast mode uses sequence -1→0→1→2(mini)→2.5-lite→3-lite→4→5(lite) for small isolated tasks; governed mode is the existing full workflow; standard is everything in between. (Note: fast mode sequence corrected in v4.10.1.)
+- **Scoring system**: `complexity_score` (1–10) and `risk_score` (1–10) computed at Stage 0 (preliminary) and finalized at **end of Stage 1** (after all sources read). Written to `context-pack.json` + `session.json`. Mode mapping: complexity ≤ 3 AND risk ≤ 3 → fast; complexity ≤ 7 AND risk ≤ 6 → standard; otherwise → governed.
+- **Override rules**: ADR trigger fires → minimum governed; Jira + Figma both present → minimum standard; human explicit request → use as stated; artifact count > 5 ACs in fast mode → auto-upgrade to standard.
+- **Artifact budget** (`refs/contracts-and-artifacts.md § Artifact budget`): fast: requirements ≤ 40 lines, design doc skip, implementation-plan ≤ 5 tasks, execution report minimal, handoff minimal; standard: requirements ≤ 120 lines, design ≤ 180 lines, plan ≤ 15 tasks; governed: unrestricted.
+- **Fast mode stage skips** (all written to skip-log.json): Stage 1.5 (AUTO-SKIP), Stage 2.5 ADR creation only if no trigger (AUTO-SKIP), Stage 3 design doc (AUTO-SKIP), Stage 6 full QA report (CONFIRM-SKIP — Karpathy still MANDATORY).
+- **`preliminary_mode`** field in `session.json` (set at Stage 0); **`workflow_mode`**, **`complexity_score`**, **`risk_score`**, **`mode_reasons`**, **`mode_override`** fields in `context-pack.json` and `session.json`.
+- **Hard rule #24**: mode gates artifact depth; mode can only be upgraded, never downgraded without human confirmation.
+- **Section 14 "Workflow modes"** in `docs/FLOW.md`: preliminary scoring flow, mode stage diagrams for fast / standard / governed, upgrade/downgrade rules.
+
+### Changed
+
+- `SKILL.md`: version → 4.10.0; added "Workflow Modes" section with scoring tables, mode mapping, fast-mode skip table, override rules; updated Stage 0 (preliminary_mode), Stage 1.5 (finalize scores), Stage 3 (fast mode lite note); updated minimal operating algorithm step 5 and step 8.
+- `refs/contracts-and-artifacts.md`: context-pack.json schema adds `preliminary_mode`, `complexity_score`, `risk_score`, `workflow_mode`, `mode_reasons`, `mode_override`; session.json schema adds same; adds `## Artifact budget` section; Gate E split into mode-specific requirements.
+- `refs/compliance-policy.md`: 4 new mode-based rows in compliance matrix (fast-mode AUTO-SKIP for Stage 1.5, 2.5, 3 design, Stage 6 CONFIRM-SKIP); mode downgrade added to CONFIRM-SKIP table; never-bypass item 14 added; 3 new violations for mode enforcement.
+- `refs/stage-contracts.md`: Stage 0 output/state adds `preliminary_mode`; Stage 1.5 output/state adds `workflow_mode`, `complexity_score`, `risk_score`; session.json schema updated with mode fields.
+- `docs/FLOW.md`: version → v4.10.0; preliminary mode scoring block added to Stage 0 diagram; Section 14 "Workflow modes" added.
+- All `refs/*.md` version headers: 4.9.0 → 4.10.0.
+
+---
+
 ## v4.9.0
 
 ### Added

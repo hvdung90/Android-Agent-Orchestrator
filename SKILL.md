@@ -3,7 +3,7 @@ name: android-agent-orchestrator
 description: Use when starting, planning, analyzing, or implementing any Android task — new feature, bug fix, refactor, migration, AGP upgrade, architecture review, or repo setup. Use when user says start task, new feature, fix bug, analyze repo, migrate, upgrade, implement, review architecture, or set up agents for an Android project.
 license: MIT
 metadata:
-  version: 4.9.0
+  version: 4.10.1
   category: orchestration
   lanes:
     - ai-devkit
@@ -25,7 +25,7 @@ metadata:
     - refs/playbooks.md
 ---
 
-# Android Agent Orchestrator v4.9.0
+# Android Agent Orchestrator v4.10.1
 
 ## Activation
 
@@ -65,6 +65,80 @@ Trigger phrases: `start task` · `new feature` · `fix bug` · `analyze repo` ·
 > **Auth first. Audit tools. Read the map. Analyze code surface. Clarify before planning. Approve before coding.**
 
 ---
+
+## Workflow Modes
+
+Three modes shape the stage sequence and artifact depth. Mode is derived automatically at Stage 0 (preliminary) and finalized after Stage 1. A developer can override it at any time by saying "use fast mode", "use standard mode", or "use governed mode".
+
+| Mode | Use when | Stage sequence | Artifact depth |
+|---|---|---|---|
+| **fast** | Single-file bug fix, isolated logic fix, ≤ 2 files, no architecture impact | -1 → 0 → 1 → 2(mini) → 2.5-lite → 3-lite → 4 → 5(lite) → 6(lite) → 7(lite) | Requirements ≤ 40 lines, 3-lite: plan + code_owner + branch (no design doc), lite verify |
+| **standard** | Normal Android feature, multi-file, single module, clear requirements | -1 → 0 → 1 → [1.5] → 2 → [2.5] → 3 → 4 → 5 → 6 → 7 | Requirements ≤ 120 lines, design ≤ 180 lines |
+| **governed** | Large feature, migration, multi-module, Jira + Figma, any ADR trigger | Full -1 → 7 | No restrictions |
+
+**Never changes regardless of mode:** auth init, human requirements approval, TDD evidence (Gate E.5), `session.json` + `skip-log.json` writes, `status.json` updates.
+
+**Fast mode: what changes** (all skips recorded in `skip-log.json`):
+
+| Stage / step | Fast mode behaviour |
+|---|---|
+| Stage 1.5 Clarification | AUTO-SKIP — `workflow_mode` already set at end of Stage 1; low complexity/risk confirmed |
+| Stage 2.5 ADR trigger check | **MANDATORY** — always runs; fast mode does NOT bypass trigger evaluation |
+| Stage 2.5 ADR creation + approval | AUTO-SKIP only if no ADR trigger fires; if trigger fires → mode upgrades to governed |
+| Stage 3 design doc + Android memo | AUTO-SKIP — Stage 3-lite: produce implementation-plan.md (≤ 5 tasks), code_owner, branch, minimal handoff.md only |
+| Stage 6 full QA report | CONFIRM-SKIP — ask human; Karpathy diff review + Gate G close remain MANDATORY |
+| Stage 7 finalization | Lite — Task Changelog + Drift Check (both MANDATORY); no ADR status update when no ADR exists |
+
+**Override rules (applied before scoring, in priority order):**
+1. Any ADR trigger fires → minimum `governed`
+2. Jira ticket + Figma link both present → minimum `standard`
+3. Human explicitly requests a mode → use that mode; log `mode_override` in `session.json`
+4. Task brief is incomplete or ambiguous → minimum `standard`
+5. Otherwise → use computed mode from scores
+
+### Scoring
+
+Computed at Stage 0 from task description (preliminary). Refined and finalized after Stage 1 when sources and Graphify data are available.
+
+**complexity_score (1–10):**
+
+| Signal | Score |
+|---|---|
+| 1–2 files, same module, same layer, additive-only change | 1–2 |
+| Multi-file, single module, same architectural layer | 3–4 |
+| Multi-file, multi-layer (e.g. ViewModel + Repository + tests) | 5–6 |
+| Multi-module change | 7–8 |
+| Migration, architecture restructure, or AGP / Kotlin version change | 9–10 |
+
+**risk_score (1–10):**
+
+| Signal | Score |
+|---|---|
+| Isolated logic, no shared state, no ADR triggers | 1–2 |
+| Touches ViewModel state or shared Repository | 3–4 |
+| Touches auth, billing, permissions, or notifications | 5–6 |
+| Database migration or persistence schema change | 5–6 |
+| API surface change across module boundary | 7–8 |
+| God nodes in change path | 7–8 |
+| Multiple high-risk signals simultaneously | 9–10 |
+
+**Mode mapping:**
+
+```
+complexity_score ≤ 3 AND risk_score ≤ 3   →  fast
+complexity_score ≤ 7 AND risk_score ≤ 6   →  standard
+otherwise                                   →  governed
+```
+
+Write `preliminary_mode` to `session.json` at Stage 0. **Finalize at the end of Stage 1** — after reading all sources and Graphify — write `workflow_mode` (final) + `complexity_score` + `risk_score` + `mode_reasons` to `context-pack.json` and `session.json`. Stage 1.5 reads the mode that Stage 1 already wrote; it does not re-score.
+
+---
+
+## What changed in v4.10.0
+
+**v4.10.0** — Workflow modes + scoring + artifact budget.
+
+Adds three workflow modes (fast / standard / governed) derived automatically from `complexity_score` + `risk_score`. Fast mode uses the full sequence -1→0→1→2(mini)→2.5-lite→3-lite→4→5(lite)→6(lite)→7(lite) — every stage still runs; only artifact depth and selected steps within stages are reduced or skipped (clarification, full design doc, full QA report). Standard mode runs the full sequence with bounded artifact depth. Governed mode is the existing full workflow with no restrictions. Scores and mode are written to `context-pack.json` and `session.json`. Override rules: Jira+Figma links → minimum standard; any ADR trigger → minimum governed; human explicit mode request → use as stated.
 
 ## What changed in v4.9.0
 
@@ -186,6 +260,7 @@ Load when `graph_impact ≥ medium` or multi-module change detected: `refs/sub-a
 21. **`status.json` is always current.** Update `.project-orchestration/status.json` on every stage transition. Never leave it more than one stage behind. This is the project-level view — any developer can read it without opening individual task files.
 22. **`handoff.md` when code owner changes.** Generate `docs/ai/tasks/{task_id}/handoff.md` whenever `code_owner` is set (Stage 3) or when Stage 4 is interrupted. Regenerate whenever `assignee`, `branch`, or `pr_url` changes.
 23. **`branch` and `assignee` must be set before Implementation.** `session.json → branch` and `session.json → assignee` must be populated before Stage 4 begins. If unknown, ask the human before proceeding.
+24. **Mode gates artifact depth.** Fast mode artifacts must stay within `artifact_budget.fast` (see `refs/contracts-and-artifacts.md`). Never write a full design doc for a fast-mode task. Mode can only be upgraded (fast→standard, standard→governed), never downgraded, unless the human explicitly requests it.
 
 ---
 
@@ -249,7 +324,7 @@ Run before Intake.
 
 **Cache check first:** Read `.project-orchestration/memory/tooling-cache.json`. If `valid_until` is in the future AND `graph_commit` matches `git rev-parse HEAD` → skip tool checks, use cached result, go directly to Stage 0.
 
-**Otherwise run:** `bash templates/tooling-preflight.sh` — all checks run in parallel; output is the preflight report draft.
+**Otherwise run:** `bash templates/tooling-preflight.sh --json > .project-orchestration/reports/preflight.json && bash templates/tooling-preflight.sh > .project-orchestration/reports/preflight.md` — parallel checks; JSON for gate decisions, markdown for human reading. Use `preflight.json → ready_for_stage_0` as the boolean gate; do not parse markdown for proceed/block decisions.
 
 Determine:
 - active provisioning mode,
@@ -293,6 +368,7 @@ Intake must record:
 - `task_continuity` (`new | continuation | unknown`)
 - `history_scan.mode` (`skipped | metadata-only | full`)
 - `history_scan.decision` (`skip | read_full | ask_human`)
+  - `preliminary_mode` (fast / standard / governed) estimated from task description, external link presence, and file scope — written to `session.json`
 
 ### Stage 1 — Discovery
 
@@ -308,6 +384,8 @@ Derive `change_type` (initial estimate) from source material and Graphify output
 
 If `graph_impact ≥ medium`: activate **Gradle Module Impact Analyzer** in parallel with other source readers. Output populates `context-pack.json → module_impact_chain`. Write `module_impact_chain_scope` to `session.json`.
 
+**Finalize workflow mode at end of Stage 1:** After all source reading and Graphify data are available, compute final `complexity_score` + `risk_score` → `workflow_mode`. Apply override rules (ADR trigger keyword → governed; Jira + Figma present → min standard). Write `workflow_mode`, `complexity_score`, `risk_score`, `mode_reasons` to `context-pack.json` and `session.json → workflow_mode`. Stage 1.5 reads this value — it does not re-compute.
+
 → **Load `refs/stage-contracts.md` § Stage 1** for typed input/output contract and interrupt state.
 
 ### Stage 1.5 — Clarification & Synthesis
@@ -321,6 +399,8 @@ Run Stage 1.5 if **ANY** of the following are true:
 - [ ] Graph exists and shows affected components not mentioned in sources
 - [ ] Graph shows god nodes in the change path
 - [ ] API, state handling, or error behavior is unspecified
+
+**Mode check (do not re-score):** Read `workflow_mode` from `session.json` (finalized at end of Stage 1). If `workflow_mode = fast` → AUTO-SKIP this stage (write to skip-log.json). If mode was upgraded during Stage 1 (e.g. ADR trigger keyword detected) → run clarification workers normally. Do not re-compute scores here.
 
 Skip or minimize when: docs are detailed, acceptance criteria are testable, no conflicts exist, and graph shows a clean isolated change surface.
 
@@ -372,7 +452,7 @@ If ADR-lite is not required, record `adr_required: false` and the reason in `ses
 
 ### Stage 3 — Design split + Executable Plan
 
-AI DevKit writes design/planning docs. Android skills write Android memo. No product-code changes.
+AI DevKit writes design/planning docs. Android skills write Android memo. No product-code changes. In **fast mode**: skip design doc entirely; produce `implementation-plan.md` only with ≤ 5 tasks. Write AUTO-SKIP for design doc to `skip-log.json`.
 
 → **Load `refs/playbooks.md`** to select the correct workflow for the task type.
 
@@ -577,12 +657,12 @@ graphify-out/
 
 1. **Auth init** — check `.agent-auth.yaml`; auto-create if missing (refs/auth-bootstrap.md Step 1). Cannot be skipped.
 2. **Cache + resume check** — read `.project-orchestration/memory/tooling-cache.json`; if valid → AUTO-SKIP Stage -1 (write skip-log). Scan `.project-orchestration/tasks/` for any `session.json` with `stage_status: in_progress` → offer resume using `refs/stage-contracts.md → resume_entry_point`. Read `.project-orchestration/status.json` and surface any blocked or in-progress tasks to the human at intake. Load `refs/compliance-policy.md` before any skip decision.
-3. **Tooling Preflight** — run `bash templates/tooling-preflight.sh`; write `preflight.md` (global); write `tooling-cache.json` (global); init `tasks/{task_id}/session.json` and `tasks/{task_id}/skip-log.json`.
+3. **Tooling Preflight** — run `bash templates/tooling-preflight.sh --json` → write `preflight.json`; run without flag → write `preflight.md`; write `tooling-cache.json`; init `tasks/{task_id}/session.json` and `tasks/{task_id}/skip-log.json`. Read `preflight.json → ready_for_stage_0` for the gate decision.
 4. **Intake** — collect links; derive source mode (A/B/C); resolve credential set; derive `task_id` (Jira key → slug → date-hash); write/update `tasks/{task_id}/session.json` with `task_id`, `source_mode`.
-5. **Determine ref tier** — LIGHT / MEDIUM / HEAVY / FULL; load only needed refs. Load `refs/stage-contracts.md` if resuming.
+5. **Determine ref tier + preliminary mode** — derive `preliminary_mode` from task description and link presence (fast/standard/governed); load only needed refs per tier (LIGHT/MEDIUM/HEAVY/FULL). Write `preliminary_mode` to `session.json`. Load `refs/stage-contracts.md` if resuming.
 6. **Discovery** — read Graphify if present; activate source readers in parallel; auto-follow Jira attachments (1 level). Derive `change_type` (initial). Activate Gradle Module Impact Analyzer if `graph_impact ≥ medium`. Write `module_impact_chain` and `change_type` to context-pack.
 7. **Token check** — just before each source reader, verify its token; prompt user if missing.
-8. **Clarification** — if any trigger fires, run workers in parallel; finalize `change_type` and `module_impact_chain`; parent synthesizes context-pack + brief (sparse format).
+8. **Finalize workflow mode (end of Stage 1)** — after all sources read and Graphify data available, compute `complexity_score` + `risk_score` → `workflow_mode`; apply override rules; write `workflow_mode`, `complexity_score`, `risk_score`, `mode_reasons` to `context-pack.json` and `session.json`. **Clarification (Stage 1.5)** — read `workflow_mode` from session (do not re-score); if `fast` → AUTO-SKIP; if any trigger fires and mode ≠ fast, run workers in parallel; finalize `change_type` and `module_impact_chain`; parent synthesizes context-pack + brief (sparse format).
 9. **Requirements** — AI DevKit writes canonical doc with version header + Affected Areas; **stop for human approval**; update `session.json → requirements_approved: true`.
 10. **Decision Gate** — decide whether ADR-lite is required; create Proposed ADR and stop for approval if required; write `adr_required`, `adr_status`, and `decision_record` to `session.json`.
 11. **Design split** — AI DevKit + Android skills in parallel; produce `implementation-plan.md` with exact files, test commands, RED/GREEN/commit steps per acceptance criterion (no placeholders); select code owner; update `session.json → code_owner`, `session.json → assignee`; ask for `branch` if not yet set; generate `docs/ai/tasks/{task_id}/handoff.md`; update `.project-orchestration/status.json`.
