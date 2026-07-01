@@ -4,6 +4,8 @@ version: 1.0
 owner: spec-kit
 status: proposed
 task: <task_id>
+supersedes: <ADR-NNNN | null>
+superseded_by: <ADR-NNNN | null>
 ---
 
 # ADR-NNNN - <title>
@@ -12,6 +14,8 @@ Status: Proposed | Accepted | Deferred | Superseded
 Date: <YYYY-MM-DD>
 Owner: <owner lane or person>
 Task: <task_id>
+Supersedes: <ADR-NNNN | none>
+Superseded by: <ADR-NNNN | none>
 
 ## Context
 

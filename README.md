@@ -127,6 +127,7 @@ refs/
 └── playbooks.md                  ← task-type → workflow mapping
 templates/
 ├── agent-auth.example.yaml       ← auth file template (Level 1/2/3)
+├── architecture-domain.md        ← docs/ai/architecture/<domain>.md template
 ├── preflight-report.md           ← preflight output template
 ├── start-task-prompts.md         ← copy/paste prompts for starting tasks
 └── tooling-preflight.sh          ← parallel audit script
@@ -135,8 +136,13 @@ examples/
 docs/
 ├── FLOW.md                       ← complete flow diagram, all use cases
 └── ai/
-    └── decisions/
-        └── 0000-template.md      ← ADR-lite template
+    ├── decisions/                ← GLOBAL: project-wide ADR ledger (immutable once Accepted)
+    │   ├── 0000-template.md      ← ADR-lite template
+    │   ├── README.md             ← index of every decision made (auto-created)
+    │   └── ADR-NNNN-*.md         ← sequential, project-wide numbering
+    └── architecture/             ← GLOBAL: living knowledge base, updated in place over time
+        ├── README.md             ← index of domain files (auto-created)
+        └── <domain>.md           ← e.g. networking.md, billing.md
 .project-orchestration/           ← runtime state (gitignored)
 ├── status.json                   ← all active tasks dashboard
 ├── memory/
@@ -153,8 +159,10 @@ docs/ai/tasks/{task_id}/
 ├── requirements/<task>.md        ← canonical requirements (human-approved)
 ├── design/<task>.md              ← design doc
 ├── planning/implementation-plan.md  ← executable TDD plan (exact files + test commands)
-├── decisions/ADR-NNNN-*.md      ← architecture decisions (if triggered)
 └── handoff.md                    ← current task snapshot for incoming dev
+
+docs/ai/decisions/                ← GLOBAL, not per-task — see File structure above
+docs/ai/architecture/             ← GLOBAL, not per-task — see File structure above
 
 .project-orchestration/tasks/{task_id}/
 ├── session.json                  ← stage state, assignee, branch, blocker

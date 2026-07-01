@@ -1,6 +1,6 @@
 # Compliance Policy
 
-_Skill version: 4.12.0 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 4.14.0 — update this when SKILL.md bumps a minor or major version._
 
 The skill **must** follow every defined stage and gate in order. No stage may be skipped, condensed, or reordered without explicit confirmation. This file defines what requires confirmation, what is auto-allowed, what is permanently forbidden, and how every deviation is recorded.
 
@@ -21,7 +21,8 @@ Three tiers: **MANDATORY**, **AUTO-SKIP** (condition-gated, no human needed), **
 | Stage 2 Requirements write | **MANDATORY** | — |
 | Stage 2 Human approval gate | **MANDATORY — never skippable** | — |
 | Stage 2.5 Decision Gate | **MANDATORY** | — |
-| Stage 2.5 ADR-lite creation | AUTO-SKIP when no ADR trigger fires | all ADR trigger conditions false |
+| Stage 2.5 duplicate-ADR check | **MANDATORY** — always runs before creating a new ADR | — |
+| Stage 2.5 ADR-lite creation | AUTO-SKIP when no ADR trigger fires, or when an existing Accepted ADR already covers it | all ADR trigger conditions false, or covering ADR found |
 | Stage 2.5 ADR-lite approval/deferral | **MANDATORY when ADR exists** | — |
 | Stage 3 Design doc | **MANDATORY** | — |
 | Stage 3 `implementation-plan.md` generation | **MANDATORY** — no placeholders | — |
@@ -43,6 +44,7 @@ Three tiers: **MANDATORY**, **AUTO-SKIP** (condition-gated, no human needed), **
 | Stage 5 Evidence Gate Matrix optional items | AUTO-SKIP (never required) | always optional |
 | Stage 5 architecture-map update | AUTO-SKIP when `graph_impact = low` | `graph_impact = low` in context-pack |
 | Stage 5 Gradle Module Impact build scope | AUTO-SKIP when `module_impact_chain` absent | `module_impact_chain` not populated |
+| Stage 7 architecture-doc update | AUTO-SKIP when trigger condition false | `adr_required=false AND estimated_build_scope=single AND change_type≠architecture_change` |
 | Stage 6 Karpathy diff review | **MANDATORY — never skippable** | — |
 | Stage 6 Gate G close | **MANDATORY** | — |
 | Stage 7 Docs/decision finalization | **MANDATORY** | — |
@@ -142,6 +144,7 @@ These rules are absolute. No user instruction, no time pressure, no "just this o
 12. Generating `docs/ai/tasks/{task_id}/planning/implementation-plan.md` at Stage 3 with no placeholders — RED evidence cannot be written without knowing the exact test command.
 13. Collecting RED evidence (`evidence/red-<task-id>.txt`) before writing any product code for that task — spec-compliance and quality review order is spec first, then quality; never reversed.
 14. Computing and recording `preliminary_mode` at Stage 0 and `workflow_mode` (final) after Stage 1 — mode must be set before any stage-skip decision is made. A mode cannot be applied retroactively to justify a skip that already happened.
+15. ADR ledger immutability — an `Accepted` ADR is never edited in place, only superseded (new ADR with `supersedes:`, old ADR gets `superseded_by:` + index update).
 
 ---
 
@@ -244,3 +247,7 @@ Each task runs in its own scoped directory under `.project-orchestration/tasks/{
 - `.project-orchestration/memory/tooling-cache.json`
 - `.project-orchestration/reports/preflight.md`
 - `docs/ai/inputs/` (human-provided, never overwritten by agent)
+
+**Shared (global) paths — readable by all tasks, writable only by Stage 2.5/Stage 7 of the currently active task (never by Stage -1, never on behalf of a different task_id):**
+- `docs/ai/decisions/` — ADR ledger + `README.md` index (Stage 2.5 creates/links, Stage 7 finalizes status)
+- `docs/ai/architecture/` — living knowledge base + `README.md` index (Stage 7 only, section-level patch, gated by the trigger condition in `refs/contracts-and-artifacts.md` § 4e)

@@ -3,7 +3,7 @@ name: android-agent-orchestrator
 description: Use when starting, planning, analyzing, or implementing any Android task — new feature, bug fix, refactor, migration, AGP upgrade, architecture review, or repo setup. Use when user says start task, new feature, fix bug, analyze repo, migrate, upgrade, implement, review architecture, or set up agents for an Android project.
 license: MIT
 metadata:
-  version: 4.12.0
+  version: 4.14.0
   category: orchestration
   lanes:
     - spec-kit
@@ -26,7 +26,7 @@ metadata:
     - refs/playbooks.md
 ---
 
-# Android Agent Orchestrator v4.12.0
+# Android Agent Orchestrator v4.14.0
 
 ## Activation
 
@@ -134,6 +134,18 @@ otherwise                                   →  governed
 Write `preliminary_mode` to `session.json` at Stage 0. **Finalize at the end of Stage 1** — after reading all sources and Graphify — write `workflow_mode` (final) + `complexity_score` + `risk_score` + `mode_reasons` to `context-pack.json` and `session.json`. Stage 1.5 reads the mode that Stage 1 already wrote; it does not re-score.
 
 ---
+
+## What changed in v4.14.0
+
+**v4.14.0** — Figma MCP-first design tokens.
+
+Figma Reader is now **MCP-first, PAT fallback**: at Stage 1 activation the agent self-checks its own tool list for Figma Dev Mode MCP tools (`get_metadata`, `get_design_context`, `get_variable_defs`, `get_screenshot`, `get_code_connect_suggestions`, `search_design_system`, `download_assets`) — no token needed on this path, auth is handled by the MCP server via the developer's logged-in Figma desktop app. `figma.personal_access_token` + REST API is now explicitly the fallback, used only when MCP tools are absent. Because a single Figma page/section/frame can contain multiple distinct layouts, Figma Reader must disambiguate scope from `get_metadata`'s node tree before extracting anything — match against the task description, or stop and ask the developer if ambiguous; unselected frames are recorded in `candidate_frames[]`. Figma Reader's output gains `design_tokens[]` (raw colors/spacing/typography from `get_variable_defs`), `component_reuse[]` (from `get_code_connect_suggestions`/`search_design_system`), `assets_exported[]`, `screenshot_ref`, `candidate_frames[]`, and `access_mode`. Android Advisor gains `token_reuse_recommendation[]` — Figma Reader never checks the target codebase itself; that resolution is Android Advisor's or the Stage 3 memo's job. The Figma reference screenshot (captured at Stage 1 Discovery, saved to `docs/ai/tasks/{task_id}/discovery/figma/`) is explicitly a distinct artifact from `screenshot_before`/`screenshot_after` Gate F evidence — never a substitute for it. **Deliberate non-change:** Stage -1/`preflight.json` gets no new field for this — a bash script cannot detect MCP tool availability, only the agent's own tool list can.
+
+## What changed in v4.13.0
+
+**v4.13.0** — Global ADR ledger + persistent architecture knowledge base.
+
+`docs/ai/tasks/{task_id}/decisions/ADR-NNNN-<slug>.md` (per-task, no cross-task index) is replaced by a **global, sequentially-numbered, immutable ADR ledger** at `docs/ai/decisions/ADR-NNNN-<slug>.md` with a `docs/ai/decisions/README.md` index (auto-created on first ADR, same lazy-create pattern as `status.json`). Stage 2.5 now checks the index for an existing related `Accepted` ADR before creating a new one (link to it instead of duplicating, or `supersedes:`/`superseded_by:` it if the decision changed) — an `Accepted` ADR is never hand-edited in place. Adds a new **persistent architecture knowledge base** at `docs/ai/architecture/<domain>.md` (+ `docs/ai/architecture/README.md` index), updated in place (section-level patch, not whole-file rewrite) by Stage 7 only when `adr_required: true` OR `module_impact_chain.estimated_build_scope` is `local-chain`/`full-project` OR `change_type: architecture_change` — trivial tasks never touch it. New template: `templates/architecture-domain.md`. **Migration note:** projects with pre-existing per-task ADRs from before this version should be offered a one-time migration into the global ledger the next time Stage 2.5 or Drift Check runs (CONFIRM-SKIP — ask first, do not migrate silently).
 
 ## What changed in v4.12.0
 
@@ -261,13 +273,15 @@ Load when `graph_impact ≥ medium` or multi-module change detected: `refs/sub-a
 15. Serena is read-only and advisory. Never call Serena code-mutation tools (`rename_symbol`, `replace_symbol_body`, `insert_*`, `safe_delete_symbol`). Code owner owns all edits.
 16. **Compliance first.** Before skipping any stage or step, load `refs/compliance-policy.md` and apply the compliance matrix. MANDATORY steps cannot be skipped. AUTO-SKIP requires the stated condition to be true and must be written to `skip-log.json`. CONFIRM-SKIP requires explicit human confirmation — implicit agreement is not enough.
 17. **Every skip is logged.** Write to `.project-orchestration/tasks/{task_id}/skip-log.json` on every auto-skip and confirm-skip. This log is never deleted.
-18. **Task isolation.** Write all task artifacts under `.project-orchestration/tasks/{task_id}/` and `docs/ai/tasks/{task_id}/`. Never read or overwrite another task's directory.
-19. **Decision changes need ADR-lite.** If a task touches a required decision trigger, create a Proposed ADR in Stage 2.5 and stop for human approval before Stage 3.
+18. **Task isolation.** Write all task artifacts under `.project-orchestration/tasks/{task_id}/` and `docs/ai/tasks/{task_id}/`. Never read or overwrite another task's directory. Exception: `docs/ai/decisions/` and `docs/ai/architecture/` are **global, task-attributed** paths — writable only by Stage 2.5/Stage 7 of the *currently active* task (never by Stage -1, and never on behalf of a different task_id).
+19. **Decision changes need ADR-lite.** If a task touches a required decision trigger, check the global ledger (`docs/ai/decisions/README.md`) for an existing covering ADR first; if none found, create a Proposed ADR in Stage 2.5 and stop for human approval before Stage 3.
 20. **Stage order is law.** Stages run -1 → 0 → 1 → [1.5] → 2 → 2.5 → 3 → 4 → 5 → 6 → 7. Any re-ordering or parallel shortcut not defined in this skill is a violation — stop and report to human.
 21. **`status.json` is always current.** Update `.project-orchestration/status.json` on every stage transition. Never leave it more than one stage behind. This is the project-level view — any developer can read it without opening individual task files.
 22. **`handoff.md` when code owner changes.** Generate `docs/ai/tasks/{task_id}/handoff.md` whenever `code_owner` is set (Stage 3) or when Stage 4 is interrupted. Regenerate whenever `assignee`, `branch`, or `pr_url` changes.
 23. **`branch` and `assignee` must be set before Implementation.** `session.json → branch` and `session.json → assignee` must be populated before Stage 4 begins. If unknown, ask the human before proceeding.
 24. **Mode gates artifact depth.** Fast mode artifacts must stay within `artifact_budget.fast` (see `refs/contracts-and-artifacts.md`). Never write a full design doc for a fast-mode task. Mode can only be upgraded (fast→standard, standard→governed), never downgraded, unless the human explicitly requests it.
+25. **ADR ledger is global and immutable.** Never edit an `Accepted` ADR's Decision/Consequences text in place. A changed decision gets a new ADR with `supersedes:`/`superseded_by:` cross-links; update only `status`, `superseded_by`, and the `docs/ai/decisions/README.md` index row on the superseded one.
+26. **Figma MCP availability is self-checked, not preflighted.** Figma MCP tool availability is checked by the agent's own tool list at Figma Reader activation time (Stage 1), never assumed or recorded from Stage -1 preflight — a bash script cannot detect MCP tool presence.
 
 ---
 
@@ -383,7 +397,7 @@ Read `.project-orchestration/reports/preflight.md`; read the active architecture
 
 If Task History Relevance Gate decided `full`, also read the matched task history before synthesis:
 - `docs/ai/tasks/{matched_task_id}/requirements/*.md`
-- `docs/ai/tasks/{matched_task_id}/decisions/ADR-*.md`
+- any ADR in `docs/ai/decisions/` whose `task:` front-matter field matches `{matched_task_id}` (or is linked from the matched requirements/design docs)
 - `docs/ai/tasks/{matched_task_id}/design/*.md`
 - `.project-orchestration/tasks/{matched_task_id}/reports/execution.md`
 
@@ -447,13 +461,22 @@ Create an ADR-lite when the task touches any of:
 - background work, permissions, billing, auth, or notifications,
 - test strategy with broad impact.
 
-If ADR-lite is required:
-- create `docs/ai/tasks/{task_id}/decisions/ADR-NNNN-<slug>.md` from `docs/ai/decisions/0000-template.md`,
+If a trigger fires, first check the **global decision ledger** before creating anything new:
+- read `docs/ai/decisions/README.md` (the index only — not every ADR file) and check whether an existing `Accepted` ADR already covers this decision category.
+- If a covering `Accepted` ADR exists and is still valid → link to it, record `adr_required: false, reason: "covered by ADR-NNNN"` in `session.json` and `execution.md` — do not create a duplicate.
+- If a covering ADR exists but the decision has changed → create a new ADR with `supersedes: ADR-NNNN`; when this new ADR is later Accepted, flip the old ADR's `status: superseded` + `superseded_by:` and its index row.
+
+If ADR-lite is required (no covering ADR found):
+- determine the next number: list `docs/ai/decisions/ADR-*.md`, take the highest existing number, allocate `max + 1` zero-padded to 4 digits (start at `0001`; `0000` is reserved for the template),
+- create `docs/ai/decisions/ADR-NNNN-<slug>.md` (**global**, not per-task) from `docs/ai/decisions/0000-template.md`,
 - set status to `Proposed`,
 - record owner, task, alternatives, consequences, validation evidence plan, and related files/modules,
+- add/update the row for this ADR in `docs/ai/decisions/README.md` (auto-create the index file first if it does not yet exist),
 - stop for human approval before Stage 3.
 
 If ADR-lite is not required, record `adr_required: false` and the reason in `session.json` and `execution.md`.
+
+**Never edit an `Accepted` ADR's Decision/Consequences text in place** — a changed decision always gets a new ADR with `supersedes:`; only `status`, `superseded_by`, and the index row may be updated on the old one.
 
 → **Load `refs/contracts-and-artifacts.md`** for the ADR-lite schema and Decision Ownership matrix.
 
@@ -535,7 +558,12 @@ Spec Kit + Karpathy review diff, evidence, graph update, acceptance coverage, an
 ### Stage 7 — Docs / Decision Finalization
 
 Spec Kit finalizes governance artifacts after QA:
-- update ADR-lite from `Proposed` to `Accepted`, `Deferred`, or `Superseded`,
+- update this task's ADR-lite from `Proposed` to `Accepted` or `Deferred` (in `docs/ai/decisions/`, the global ledger); if `Accepted` and its front matter has `supersedes: ADR-NNNN` set, flip that old ADR's `status: superseded` + `superseded_by:` and update its index row too,
+- update `docs/ai/decisions/README.md` index row for this task's ADR (status + originating task),
+- **update the architecture knowledge base** if any of: `adr_required: true`, OR `module_impact_chain.estimated_build_scope` is `local-chain`/`full-project`, OR `change_type: architecture_change` — otherwise AUTO-SKIP (most tasks skip this):
+  - create-or-update the relevant `docs/ai/architecture/<domain>.md` file(s) using `templates/architecture-domain.md`,
+  - **section-level patch only** — rewrite only the `##` section(s) this task's Affected Areas actually touch; leave every other section byte-for-byte untouched; always append exactly one row to the trailing `## Change Log` table,
+  - update `docs/ai/architecture/README.md` index (auto-create if missing),
 - update `.project-orchestration/tasks/{task_id}/reports/execution.md` with Task Changelog,
 - run drift checks for skill refs/templates/version consistency,
 - record any missing evidence as a blocker instead of marking success.
@@ -646,8 +674,13 @@ The parent orchestrator must wait:
 
 docs/ai/
 ├── inputs/                                   ← GLOBAL: human-provided, never overwritten
-├── decisions/
-│   └── 0000-template.md                      ← GLOBAL ADR-lite template
+├── decisions/                                ← GLOBAL: project-wide ADR ledger (immutable once Accepted)
+│   ├── 0000-template.md                      ← GLOBAL ADR-lite template
+│   ├── README.md                             ← GLOBAL: index of every ADR (auto-created on first ADR)
+│   └── ADR-NNNN-<slug>.md                    ← sequential, project-wide numbering (not per-task)
+├── architecture/                             ← GLOBAL: living knowledge base, updated in place over time
+│   ├── README.md                             ← GLOBAL: index of domain files (auto-created on first write)
+│   └── <domain>.md                           ← e.g. networking.md, billing.md; agent-named per project
 └── tasks/
     └── {task_id}/
         ├── discovery/
@@ -655,7 +688,6 @@ docs/ai/
         │   ├── context-pack.json
         │   └── clarification-brief.md
         ├── requirements/
-        ├── decisions/
         ├── design/
         ├── planning/
         ├── testing/

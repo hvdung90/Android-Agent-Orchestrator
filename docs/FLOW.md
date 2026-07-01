@@ -1,6 +1,6 @@
 # Android Agent Orchestrator — Complete Flow
 
-_Reflects skill v4.12.0. Update when SKILL.md changes._
+_Reflects skill v4.14.0. Update when SKILL.md changes._
 
 ---
 
@@ -310,9 +310,9 @@ All task types start with Stage -1.
        Read matched task history   Skip old task docs
        before synthesis:
        - requirements/*.md
-       - decisions/ADR-*.md
        - design/*.md
        - reports/execution.md
+       - docs/ai/decisions/*.md   (global ledger; match by task: field)
                             │
                             ▼
                   Store → docs/ai/tasks/{task_id}/discovery/
@@ -353,8 +353,8 @@ All task types start with Stage -1.
     │                                                     │
     │  Mode A ─► Jira Reader          ┐                   │
     │            Confluence Reader    │ parallel          │
-    │            Figma Reader         │ (credentials from │
-    │            Graph Impact Reader  ┘  .agent-auth.yaml)│
+    │            Figma Reader         │ Figma: MCP-first, │
+    │            Graph Impact Reader  ┘  else .agent-auth │
     │            ─────────────────────────────────────    │
     │            Ambiguity Detector   ┐                   │
     │            Conflict Detector    │ parallel          │
@@ -438,16 +438,26 @@ All task types start with Stage -1.
   Yes        No
    │          │
    ▼          ▼
-  Create     Record adr_required=false
-  Proposed   + reason in session.json
-  ADR-lite
-   │
-   ▼
-  ██████████████████████████████████████████████
-  █  MANDATORY STOP — Human approve/defer ADR  █
-  ██████████████████████████████████████████████
+  Check docs/ai/decisions/README.md   Record adr_required=false
+  for existing Accepted ADR that       + reason in session.json
+  already covers this decision
         │
-        ▼
+   ┌────┴─────────────┐
+  Covers it, valid    No match / decision changed
+   │                   │
+   ▼                   ▼
+  Link to it;         Create Proposed ADR-lite
+  adr_required=false  (docs/ai/decisions/, GLOBAL;
+  reason: "covered     number = max existing + 1;
+  by ADR-NNNN"         supersedes: <old ADR> if changed)
+   │                   │
+   │                   ▼
+   │  ██████████████████████████████████████████████
+   │  █  MANDATORY STOP — Human approve/defer ADR  █
+   │  ██████████████████████████████████████████████
+   │                   │
+   └─────────┬─────────┘
+             ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │  STAGE 3: DESIGN SPLIT                                          │
 │  Ref: refs/playbooks.md                                         │
@@ -565,9 +575,22 @@ All task types start with Stage -1.
 └─────────────────────────────────────────────────────────────────┘
         │
         ▼
-  Finalize ADR status, Task Changelog, Gate log, Drift Check.
-  No product-code changes.
+  Finalize ADR status (docs/ai/decisions/, update README.md index row),
+  Task Changelog, Gate log, Drift Check. No product-code changes.
         │
+        ▼
+  adr_required OR estimated_build_scope∈{local-chain,full-project}
+  OR change_type=architecture_change ?
+        │
+   ┌────┴────┐
+  Yes        No
+   │          │
+   ▼          ▼
+  Patch      AUTO-SKIP
+  docs/ai/architecture/<domain>.md
+  (section-level only) + README.md index
+   │          │
+   └────┬─────┘
         ▼
   ┌───────────────────────────────────────────────────────┐
   │  Handoff + Status finalization (MANDATORY):           │
@@ -928,8 +951,13 @@ READ by incoming dev (by priority):
 4.  docs/ai/tasks/{task_id}/
     ├── requirements/<task>.md                  ← what to build
     ├── design/<task>.md                        ← how to build it
-    ├── decisions/ADR-*.md                      ← why decisions were made
     └── clarification/context-pack.json         ← full context
+
+5.  docs/ai/decisions/README.md                 ← GLOBAL: every decision made so far, any task
+    → docs/ai/decisions/ADR-*.md                ← why (immutable once Accepted; superseded, not edited)
+
+6.  docs/ai/architecture/README.md              ← GLOBAL: current shape of the system, by domain
+    → docs/ai/architecture/<domain>.md          ← living doc, updated in place (not a task snapshot)
 ```
 
 ### status.json — project dashboard

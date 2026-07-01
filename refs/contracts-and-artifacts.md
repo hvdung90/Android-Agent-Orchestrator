@@ -1,6 +1,6 @@
 # Contracts, Artifacts, and Gates
 
-_Skill version: 4.12.0 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 4.14.0 — update this when SKILL.md bumps a minor or major version._
 
 ---
 
@@ -152,6 +152,8 @@ Exception: always include `feature_id`, `clarity_score`, `outcome`, `blocked`, `
   "acceptance_criteria": [],
   "screens": [],
   "states": [],
+  "design_tokens": [],
+  "component_reuse": [],
   "dependencies": [],
   "facts": [],
   "assumptions": [],
@@ -223,6 +225,13 @@ Exception: always include `feature_id`, `clarity_score`, `outcome`, `blocked`, `
 // module_impact_chain guidance:
 // Populated by Gradle Module Impact Analyzer when graph_impact ≥ medium.
 // Omit (sparse rule) when graph_impact = low or single-module change.
+
+// design_tokens / component_reuse guidance:
+// Populated only when Figma Reader ran with MCP access (access_mode: mcp) and
+// get_variable_defs / get_code_connect_suggestions returned results. Omit (sparse rule)
+// when Figma Reader did not run or returned no tokens/components.
+// token_reuse_recommendation, if present, comes from Android Advisor, not Figma Reader —
+// Figma Reader never checks the target codebase for existing resources.
 
 // history_context guidance:
 // Omit when task_continuity = new and no metadata scan was needed.
@@ -410,11 +419,13 @@ Required structure per task:
 
 ---
 
-### 4) `docs/ai/tasks/{task_id}/decisions/ADR-NNNN-<slug>.md`
+### 4) `docs/ai/decisions/ADR-NNNN-<slug>.md`
 
 Purpose: short decision record for Android tasks with architectural or broad behavioral impact.
 
-Create only when Stage 2.5 finds one or more decision triggers. Use `docs/ai/decisions/0000-template.md` as the global template.
+**Global, project-wide, sequential** — not per-task. Numbering is allocated across the whole project's ADR ledger, not restarted per task_id.
+
+Create only when Stage 2.5 finds one or more decision triggers **and** no existing `Accepted` ADR in `docs/ai/decisions/README.md` already covers it (see § 4c below). Use `docs/ai/decisions/0000-template.md` as the global template.
 
 Required front matter:
 
@@ -423,7 +434,9 @@ artifact: android-adr-lite
 version: 1.0
 owner: spec-kit
 status: proposed | accepted | deferred | superseded
-task: <task_id>
+task: <task_id>           # the task that originated this decision
+supersedes: <ADR-NNNN | null>
+superseded_by: <ADR-NNNN | null>
 ```
 
 Required sections:
@@ -433,6 +446,77 @@ Required sections:
 - Consequences
 - Validation
 - Related
+
+**Immutability rule:** once `status: accepted`, never edit the Decision/Consequences text in place. A changed decision gets a *new* ADR with `supersedes: ADR-NNNN`; when the new ADR is accepted, set the old one's `status: superseded` + `superseded_by: ADR-MMMM` and update its row in the index.
+
+### 4b) `docs/ai/decisions/README.md`
+
+Purpose: global index of every ADR in the project — the single place to see all decisions made so far without opening task folders.
+
+**Auto-created if missing** the first time Stage 2.5 creates an ADR in a project (same lazy-create pattern as `.project-orchestration/status.json`). Not shipped pre-populated by the skill itself — it is a per-project runtime artifact.
+
+Required front matter:
+
+```yaml
+artifact: android-adr-index
+version: 1.0
+owner: spec-kit
+```
+
+Required table:
+
+```markdown
+| ADR | Title | Status | Task | Supersedes | Superseded by |
+|---|---|---|---|---|---|
+```
+
+Updated at Stage 2.5 (new row on ADR creation) and Stage 7 (status flip on Accept/Defer/Supersede).
+
+### 4c) Numbering allocation rule
+
+At Stage 2.5, before creating a new ADR: list `docs/ai/decisions/ADR-*.md`, parse the numeric prefix of each, take the highest, allocate `max + 1` zero-padded to 4 digits. If no ADR files exist yet, start at `0001` (`0000` stays reserved for the template). This is a read-then-derive rule, not a counter file — the same pattern this skill already uses to derive `task_id` (no `next-task-id.txt` exists either).
+
+### 4d) Duplicate-ADR detection procedure
+
+At Stage 2.5, before creating a new ADR: read `docs/ai/decisions/README.md` only (not every individual ADR file — keeps the check cheap) and match the current task's decision-trigger category and requirements keywords against the index's Title/Status columns.
+- Match found, status `Accepted`, still valid → link to it; record `adr_required: false, reason: "covered by ADR-NNNN"` (reuses the existing `adr_required: false` + reason mechanism — this is simply a new valid reason string) — do not create a new ADR.
+- Match found, status `Accepted`, decision has changed → create a new ADR with `supersedes: ADR-NNNN` (see § 4 Immutability rule).
+- No match → proceed to create a new ADR normally.
+
+### 4e) `docs/ai/architecture/<domain>.md`
+
+Purpose: persistent, domain-organized knowledge base describing the **current shape of the system** — unlike everything else under `docs/ai/tasks/`, this is not a per-task snapshot; it is updated in place over time as the codebase evolves. Domain names are **not** fixed by the skill (it must generalize across arbitrary Android apps) — the agent names files per project, e.g. `networking.md`, `billing.md`, `navigation.md`.
+
+Use `templates/architecture-domain.md` as the template. Required front matter:
+
+```yaml
+artifact: android-architecture-domain
+version: 1.0
+owner: spec-kit
+last_updated_by_task: <task_id>
+```
+
+Required sections: `## Owner`, `## Tech stack`, `## References` (links to related ADRs in `docs/ai/decisions/`), one or more free-form domain body sections, `## Does NOT do` (explicit boundary), and a trailing `## Change Log` table (`| Date | Task | Change |`).
+
+**Update trigger (Stage 7) — create-or-update iff any of:**
+- `adr_required: true`, OR
+- `context-pack.json → module_impact_chain.estimated_build_scope` is `local-chain` or `full-project`, OR
+- `change_type: architecture_change`
+
+`workflow_mode` is deliberately **not** part of this condition — mode gates depth/verbosity of artifacts already required (same job `artifact_budget` does elsewhere), not whether this file is touched. If none of the three conditions hold, AUTO-SKIP — most tasks (single-module, no ADR) never touch this folder.
+
+**Editing semantics — section-level patch, never whole-file rewrite:** locate the `##` section(s) this task's requirements `Affected Areas` actually touch, rewrite only those sections' body text, leave every other section byte-for-byte untouched, and always append exactly one row to `## Change Log`. Modeled on how `handoff.md` already mixes agent-rewritten sections with one preserved section (here inverted: Change Log is the append-only part, domain sections are the ones surgically patched).
+
+### 4f) `docs/ai/architecture/README.md`
+
+Purpose: global index of every domain file. Auto-created if missing the first time Stage 7 writes a domain file (same lazy-create pattern as § 4b).
+
+Required table:
+
+```markdown
+| Domain file | Purpose | Owner | Last updated (task) |
+|---|---|---|---|
+```
 
 ### 5) `.project-orchestration/tasks/{task_id}/reports/execution.md`
 
@@ -466,6 +550,9 @@ Required Drift Check section:
 - [ ] docs/ai/tasks/{task_id}/handoff.md exists and status matches session.json stage_status
 - [ ] docs/ai/tasks/{task_id}/planning/implementation-plan.md has no placeholder (TBD/TODO/similar to Task N)
 - [ ] RED evidence exists for each completed Stage 4 task (unless TDD exemption recorded)
+- [ ] docs/ai/decisions/README.md exists and has exactly one row per ADR file present in docs/ai/decisions/ (no orphaned file, no orphaned row)
+- [ ] no Accepted ADR's Decision/Consequences text was hand-edited outside a supersede (status/superseded_by/index-row change only)
+- [ ] if docs/ai/architecture/ exists: docs/ai/architecture/README.md lists every domain file present, and no domain file is missing a Change Log entry for this task's changes when the § 4e trigger was met
 ```
 
 ### 6) `docs/ai/tasks/{task_id}/handoff.md`
@@ -617,8 +704,9 @@ Required:
 
 Required:
 - ADR trigger checklist evaluated,
-- if ADR required: Proposed ADR exists and human approval or deferral is recorded,
-- if ADR not required: `adr_required: false` and reason recorded in `session.json`,
+- duplicate-ADR check performed against `docs/ai/decisions/README.md` (§ 4d) before creating a new ADR,
+- if ADR required: Proposed ADR exists (global, `docs/ai/decisions/`) and human approval or deferral is recorded,
+- if ADR not required: `adr_required: false` and reason recorded in `session.json` (a covering-ADR reason is valid),
 - decision owner and required validation evidence recorded.
 
 ### Gate E — Design ready
@@ -667,7 +755,8 @@ Required:
 - Karpathy/code-quality review ✅ for every completed task,
 - final execution report written,
 - Task Changelog completed,
-- ADR-lite status finalized (`Accepted`, `Deferred`, or `Superseded`) if present,
+- ADR-lite status finalized (`Accepted`, `Deferred`, or `Superseded`) if present, and `docs/ai/decisions/README.md` index row updated to match,
+- if the architecture-KB trigger condition (§ 4e) was met: `docs/ai/architecture/` domain file(s) and index updated; if not met, this is correctly AUTO-SKIP,
 - drift checks completed,
 - no unresolved blockers remain.
 
@@ -689,6 +778,8 @@ When `change_type` is `multi`, apply the union of required items for each applic
 | `logic_change` | unit_test_pass, coverage_report (≥ 80% on changed files) | integration_test_pass, scenario_trace_log |
 | `test_change` | test_pass (no product code changed) | coverage_delta_report |
 | `config_change` | build_success_release_variant, manifest_diff | lint_report, proguard_mapping_diff |
+
+Figma reference screenshots (`get_screenshot`, captured by Figma Reader at Stage 1 Discovery, saved under `docs/ai/tasks/{task_id}/discovery/figma/`) are a distinct artifact from `screenshot_before`/`screenshot_after` above (ADB device captures at Stage 4/5, proof of what was built) — they are reference material for what to build and are never substituted for Gate F evidence.
 
 ### Evidence command reference (Android CLI)
 
@@ -789,7 +880,7 @@ In-progress task state — allows resume after an interruption.
   "requirements_approved": false,
   "adr_required": false,
   "adr_status": "proposed | accepted | deferred | superseded | not_required | null",
-  "decision_record": "docs/ai/tasks/{task_id}/decisions/ADR-NNNN-slug.md | null",
+  "decision_record": "docs/ai/decisions/ADR-NNNN-slug.md | null",
   "workflow_mode": "fast | standard | governed | null",
   "preliminary_mode": "fast | standard | governed | null",
   "mode_override": "fast | standard | governed | null",
@@ -920,7 +1011,10 @@ Understand-Anything is checked first; Graphify is the fallback only when Underst
 | `context-pack.json` | `docs/ai/tasks/{task_id}/clarification/context-pack.json` | Parent orchestrator / Spec Kit | propose raw fields |
 | `clarification-brief.md` | `docs/ai/tasks/{task_id}/clarification/clarification-brief.md` | Parent orchestrator / Spec Kit | recommend wording |
 | `requirements/<task>.md` | `docs/ai/tasks/{task_id}/requirements/` | Parent orchestrator / Spec Kit | review only |
-| `decisions/ADR-*.md` | `docs/ai/tasks/{task_id}/decisions/` | Parent orchestrator / Spec Kit | advise; human approves |
+| `decisions/ADR-*.md` | `docs/ai/decisions/` (GLOBAL) | Parent orchestrator / Spec Kit, Stage 2.5/7 of the active task only | advise; human approves |
+| `decisions/README.md` | `docs/ai/decisions/README.md` (GLOBAL) | Parent orchestrator | read only |
+| `architecture/*.md` | `docs/ai/architecture/` (GLOBAL) | Parent orchestrator / Spec Kit, Stage 7 of the active task only | domain experts propose section text; human may annotate |
+| `architecture/README.md` | `docs/ai/architecture/README.md` (GLOBAL) | Parent orchestrator | read only |
 | `design/<task>.md` | `docs/ai/tasks/{task_id}/design/` | Parent orchestrator / Spec Kit | review only |
 | `planning/implementation-plan.md` | `docs/ai/tasks/{task_id}/planning/` | Parent orchestrator / Spec Kit | code owner reads; human may annotate |
 | `android-memo/<task>.md` | `docs/ai/tasks/{task_id}/android-memo/` | Android skills | supply advice only |
@@ -949,6 +1043,7 @@ Understand-Anything is checked first; Graphify is the fallback only when Underst
 | Permissions / background work | Android skills + Android CLI | manifest diff + runtime evidence |
 | Billing / auth / notifications | Android skills + Android CLI | scenario test + runtime evidence |
 | Architecture impact | Understand-Anything (Graphify fallback) | graph diff/report |
+| Design tokens / component reuse (Figma → Android resources) | Figma Reader (raw) + Android Advisor (resolved) | Android Advisor's `token_reuse_recommendation` or Stage 3 memo confirmation |
 | Final go/no-go | Spec Kit | requirements coverage + Gate log |
 
 ---
@@ -957,7 +1052,8 @@ Understand-Anything is checked first; Graphify is the fallback only when Underst
 
 - Do not treat generated requirements as accepted until human approval is recorded.
 - Record assumptions separately from facts.
-- If a decision changes architecture or broad behavior, create ADR-lite.
+- If a decision changes architecture or broad behavior, create ADR-lite — but check `docs/ai/decisions/README.md` for an existing covering `Accepted` ADR first.
+- Never edit an `Accepted` ADR's Decision/Consequences text in place; supersede it instead.
 - If sources conflict, preserve both claims and block for clarification.
 - If verification evidence is missing, final status cannot be success.
 

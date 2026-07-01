@@ -20,7 +20,7 @@
 - `figma.personal_access_token`: empty
 - `github.personal_access_token`: set
 - Project overrides defined: 1 (name: "client-alpha", key: "CA")
-- Notes: Tokens for atlassian and figma will be requested just-in-time when a Jira or Figma link is provided by the developer. github token available for private repo access.
+- Notes: `atlassian.api_token` will be requested just-in-time when a Jira link is provided. `figma.personal_access_token` is requested only as a fallback if Figma MCP tools are unavailable when a Figma link is provided (MCP-first, see `refs/clarification-workflow.md` § Figma). github token available for private repo access.
 
 ## Spec Kit
 
@@ -97,4 +97,4 @@
 - Required graph action: none in audit mode; request refresh-graph mode to build
 - Tokens to request from user (just-in-time, when needed):
   - `atlassian.api_token` — when the developer provides a Jira or Confluence link
-  - `figma.personal_access_token` — when the developer provides a Figma link
+  - `figma.personal_access_token` — only if the developer provides a Figma link AND Figma MCP tools are unavailable (fallback path)

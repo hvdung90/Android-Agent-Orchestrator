@@ -1,6 +1,6 @@
 # Sub-agent Catalog and Dependency Rules
 
-_Skill version: 4.12.0 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 4.14.0 — update this when SKILL.md bumps a minor or major version._
 
 ## Design principle
 
@@ -60,17 +60,35 @@ unknowns_found: []
 
 ### Figma Reader
 
-Required auth: `figma.personal_access_token`
+**Access mode:** MCP-first — no token needed if Figma MCP tools are available; PAT+REST is the fallback only. See `refs/clarification-workflow.md` § Figma for the self-check and tool-call sequence, and `refs/auth-bootstrap.md` § Figma Reader for the fallback auth flow.
+
+`design_tokens[]` and `component_reuse[]` are **raw Figma-side findings only** — this reader never checks the target codebase for existing resources; that resolution happens in Android Advisor (`token_reuse_recommendation`) or the Stage 3 Android memo.
+
+**Scope disambiguation (check before you doc):** a Figma page/section/frame can contain multiple distinct layouts. If `get_metadata` surfaces more than one plausible screen-level frame, this reader must not guess or process all of them — match against the task description first; if ambiguous, stop and ask the developer which frame(s) are in scope. `screens[]` below lists only confirmed, in-scope frames; `candidate_frames[]` records frames that were seen but excluded, for transparency. See `refs/clarification-workflow.md` § Figma step 2 for the full procedure.
 
 ```yaml
 source_type: figma
 file_name: <name>
+node_id: <frame node-id if scoped>
 screens: []
+candidate_frames: []          # frames seen in get_metadata but not selected for this task, with reason
 components: []
 visible_states: [loading, error, empty, success]
 cta_labels: []
 notes: []
 missing_states: []
+screenshot_ref: <docs/ai/tasks/{task_id}/discovery/figma/<screen>.png | none>
+design_tokens:
+  - figma_name: <Figma variable name, e.g. "color/brand/primary">
+    category: color | spacing | typography | radius | elevation | other
+    value: <raw value from get_variable_defs, e.g. "#1A73E8" | "16px">
+    used_on: []              # screen/component names this token appears on
+component_reuse:
+  - figma_component: <name>
+    code_connect_match: <component path from get_code_connect_suggestions | none>
+    design_system_match: <result from search_design_system | none>
+assets_exported: []          # paths from download_assets, if run
+access_mode: mcp | rest_api  # which path this run used
 ```
 
 ### Doc Reader
@@ -242,7 +260,13 @@ dont: []
 migration_sequence: []
 compatibility_risks: []
 min_sdk_impact: <api level if relevant>
+token_reuse_recommendation:
+  - figma_token: <figma_name from Figma Reader's design_tokens[]>
+    matched_resource: <existing res name | null>
+    propose_new_name: <suggested Android resource name, only if no match>
 ```
+
+`token_reuse_recommendation` is populated only when Figma Reader's `design_tokens[]` is non-empty and Android Advisor is activated with codebase read access (Stage 1.5 or Stage 3 memo) to check `res/values/colors.xml`, `dimens.xml`, or `Theme.kt` for an existing match.
 
 ### QA Scenario Advisor
 

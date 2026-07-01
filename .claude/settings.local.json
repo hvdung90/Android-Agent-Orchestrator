@@ -22,7 +22,9 @@
       "WebFetch(domain:github.com)",
       "Read(//private/tmp/**)",
       "Bash(bash /Users/vulcan/Data/Android-Agent-Orchestrator/templates/tooling-preflight.sh --json)",
-      "Bash(bash /Users/vulcan/Data/Android-Agent-Orchestrator/templates/tooling-preflight.sh)"
+      "Bash(bash /Users/vulcan/Data/Android-Agent-Orchestrator/templates/tooling-preflight.sh)",
+      "Bash(grep -n \"^| \\\\`decisions/ADR\\\\|^### Gate D.5\\\\|^### Gate G\\\\|^## AI-authored artifact rules\" /Users/vulcan/Data/Android-Agent-Orchestrator/refs/contracts-and-artifacts.md)",
+      "Bash(python3 -c ' *)"
     ]
   }
 }

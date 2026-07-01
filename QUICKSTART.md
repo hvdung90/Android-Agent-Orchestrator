@@ -48,7 +48,7 @@ The agent stops at **Stage 2** and shows you the requirements doc. After approva
 
 ```
 docs/ai/tasks/{task_id}/requirements/<task>.md   ← review this
-docs/ai/tasks/{task_id}/decisions/ADR-*.md       ← review if Stage 2.5 requires ADR-lite
+docs/ai/decisions/ADR-*.md                       ← review if Stage 2.5 requires ADR-lite (GLOBAL, not per-task)
 ```
 
 Reply `approve` to continue to the decision gate, then design + implementation when no ADR is required or the ADR is approved/deferred.

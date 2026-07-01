@@ -1,6 +1,6 @@
 # Stage Output Contracts
 
-_Skill version: 4.12.0 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 4.14.0 — update this when SKILL.md bumps a minor or major version._
 
 Each stage defines a typed contract: what it requires as input, what it must produce as output, and what state it writes to `session.json` on completion or interrupt.
 
@@ -231,17 +231,22 @@ input_requires:
   - docs/ai/tasks/{task_id}/requirements/<task>.md (requirements_approved: true)
   - docs/ai/tasks/{task_id}/clarification/context-pack.json
   - refs/contracts-and-artifacts.md: ADR trigger list + Decision Ownership matrix
+  - docs/ai/decisions/README.md (read for duplicate-ADR check; auto-create if missing and a trigger fires)
 
 guard_conditions:
   - evaluate ADR triggers: module boundary, navigation graph, public API/internal contract,
     persistence schema, DI graph, Gradle/AGP/Kotlin version, Compose/View migration,
     state ownership, background work, permissions, billing, auth, notifications,
     broad test strategy
-  - if any trigger fires: create Proposed ADR-lite and stop for human approval
+  - if any trigger fires: check docs/ai/decisions/README.md for an existing covering Accepted ADR first
+  - if a covering ADR exists and is still valid: link to it, adr_required: false, reason: "covered by ADR-NNNN"
+  - if a covering ADR exists but decision changed: create new ADR with supersedes: ADR-NNNN
+  - if no covering ADR: create Proposed ADR-lite (numbered per § 4c) and stop for human approval
   - if no trigger fires: record adr_required: false and reason
 
 output_produces:
-  - docs/ai/tasks/{task_id}/decisions/ADR-NNNN-<slug>.md (if required)
+  - docs/ai/decisions/ADR-NNNN-<slug>.md (GLOBAL, if required)
+  - docs/ai/decisions/README.md (index row added for the new ADR)
   - .project-orchestration/tasks/{task_id}/session.json:
       adr_required: true | false
       adr_status: "proposed | accepted | deferred | superseded | not_required"
@@ -264,7 +269,7 @@ state_on_interrupt:
   stage_status: in_progress
   blocker: "waiting for human approval/deferral of ADR-lite"
   partial_outputs:
-    - "docs/ai/tasks/{task_id}/decisions/ADR-NNNN-<slug>.md (Proposed)"
+    - "docs/ai/decisions/ADR-NNNN-<slug>.md (Proposed, GLOBAL)"
 
 resume_entry_point: "ADR decision already exists; re-present Proposed ADR and await approval/deferral"
 ```
@@ -457,11 +462,17 @@ input_requires:
 guard_conditions:
   - no product-code changes allowed
   - if ADR exists: status must become Accepted, Deferred, or Superseded
+  - if architecture-doc trigger met (adr_required OR estimated_build_scope in {local-chain, full-project}
+    OR change_type: architecture_change): section-level patch only, never whole-file rewrite;
+    Change Log section always appended; otherwise AUTO-SKIP
   - Task Changelog must summarize behavior changes, not just file diffs
   - Drift Check must pass or list blockers
 
 output_produces:
-  - docs/ai/tasks/{task_id}/decisions/ADR-NNNN-<slug>.md updated with final status (if present)
+  - docs/ai/decisions/ADR-NNNN-<slug>.md updated with final status (GLOBAL, if present)
+  - docs/ai/decisions/README.md index row updated to match (GLOBAL)
+  - docs/ai/architecture/<domain>.md created-or-updated (GLOBAL, only if trigger condition met)
+  - docs/ai/architecture/README.md index updated (GLOBAL, only if trigger condition met)
   - .project-orchestration/tasks/{task_id}/reports/execution.md updated with Task Changelog
   - .project-orchestration/tasks/{task_id}/reports/execution.md updated with Drift Check
   - .project-orchestration/tasks/{task_id}/session.json: stage_status: complete
@@ -522,7 +533,7 @@ Any interrupt → stage_status: in_progress, blocker: "<reason>"
   "requirements_approved": false,
   "adr_required": false,
   "adr_status": "proposed | accepted | deferred | superseded | not_required | null",
-  "decision_record": "docs/ai/tasks/{task_id}/decisions/ADR-NNNN-slug.md | null",
+  "decision_record": "docs/ai/decisions/ADR-NNNN-slug.md | null",
   "workflow_mode": "fast | standard | governed | null",
   "preliminary_mode": "fast | standard | governed | null",
   "mode_override": "fast | standard | governed | null",

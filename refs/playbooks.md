@@ -1,6 +1,6 @@
 # Playbooks
 
-_Skill version: 4.12.0 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 4.14.0 — update this when SKILL.md bumps a minor or major version._
 
 Each playbook maps a task type to the correct provisioning mode, stage sequence, source mode, clarification workers, and architecture-map queries (Understand-Anything checked first, Graphify fallback).
 
@@ -92,6 +92,8 @@ Stage 7 — finalize ADR status + Task Changelog + Drift Check
 Stage -1 — audit or setup based on user intent; check Serena (non-blocking)
 Stage 0 — collect Jira + Figma + linked docs
 Stage 1 — source readers in parallel
+          Figma Reader: self-check MCP tools first (get_metadata → scoped get_design_context);
+                        PAT+REST fallback only if MCP absent
           [Serena: agent] find_symbol for key components named in Jira ticket
 Stage 1.5 — Ambiguity + Conflict + Missing-info + State Extractor
             [Serena: agent] find_implementations for any interface flagged by Missing-info

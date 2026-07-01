@@ -1,6 +1,6 @@
 # Clarification & Synthesis Workflow
 
-_Skill version: 4.12.0 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 4.14.0 — update this when SKILL.md bumps a minor or major version._
 
 ## Purpose
 
@@ -58,7 +58,26 @@ https://www.figma.com/design/<file-id>/<name>?node-id=<frame-id>
 
 To get a share link: Figma → right-click frame → Copy link.
 
-The agent fetches the frame and runs the Figma Reader. Extracts: screens, components, visible states, CTA labels, notes, missing states.
+**Access-mode self-check (agent-decided, done here — not at Stage -1):** Stage -1's bash preflight cannot detect MCP tool availability, so the agent checks its own tool list at this point:
+- If Figma MCP tools (`get_metadata`, `get_design_context`, `get_variable_defs`, `get_screenshot`, `get_code_connect_suggestions`, `search_design_system`, `download_assets`) appear in your available tools → **MCP path**, continue below.
+- Otherwise → **PAT+REST fallback**: load `refs/auth-bootstrap.md` § Figma Reader for the token check, then run the Figma Reader with `access_mode: rest_api` and skip the MCP-specific steps below.
+
+**MCP path — ordered tool-call sequence:**
+1. Call `get_metadata` on the linked node-id first — a lightweight node tree (id/name/type). Never call `get_design_context` unscoped on a whole-file link.
+2. **Disambiguate scope before extracting anything (check before you doc):** a Figma page/section/frame can contain multiple distinct layouts — different screens, or multiple states/variants of one screen. Inspect the `get_metadata` tree:
+   - If it resolves to exactly one screen-level frame → proceed to step 3 with that node-id.
+   - If it contains **multiple** plausible screen-level frames → do not guess and do not process all of them by default. First try to match frame names against the task description/requirements (e.g. task says "Login screen" and one frame is named `Login`) — if exactly one match, proceed with that frame and record the match. If the match is ambiguous or there is none → **stop and ask the developer** which frame(s) are in scope for this task, listing the candidate frame names + node-ids found. Record unselected frames in `candidate_frames[]` for transparency; do not extract tokens/screenshots for them.
+   - Repeat this check per distinct screen if the task spans more than one screen (e.g. a flow with 3 steps) — confirm the full set before continuing.
+3. Scope `get_design_context` to the confirmed node-id(s) from step 2 only.
+4. Call `get_variable_defs` once per file (not per node) to extract design tokens — colors, spacing, typography as named Figma Variables, not guessed from pixels.
+5. Call `get_screenshot` on each confirmed screen-level node-id for a visual reference.
+6. If component reuse matters for this task: call `get_code_connect_suggestions` and/or `search_design_system`. If asset export is needed: call `download_assets`.
+7. Run the Figma Reader, emitting the extended contract from `refs/sub-agents.md` (`design_tokens[]`, `component_reuse[]`, `candidate_frames[]`, `assets_exported[]`, `access_mode: mcp`).
+8. Save the screenshot(s) from step 5 to `docs/ai/tasks/{task_id}/discovery/figma/<screen>.png`; record the path(s) in `screenshot_ref`.
+
+**Token budget rule for large frames:** never call `get_design_context` unscoped on a file-level link — always call `get_metadata` first and pass its returned node-ids into a scoped `get_design_context` call. This mirrors the sparse-format token-cost discipline already applied to `context-pack.json`.
+
+**Figma reference screenshot vs. Gate F evidence:** the screenshot from step 5 is reference material for what to *build* (Stage 1 Discovery). It is a distinct artifact from `screenshot_before`/`screenshot_after` (ADB device captures, Stage 4/5, proof of what was *built*) — never a substitute for Gate F evidence.
 
 If only a link is provided with no annotations: Missing-info Detector will flag missing UI states as a Clarification gap.
 
