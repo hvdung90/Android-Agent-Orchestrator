@@ -1,6 +1,6 @@
 # Stage Output Contracts
 
-_Skill version: 4.10.1 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 4.12.0 — update this when SKILL.md bumps a minor or major version._
 
 Each stage defines a typed contract: what it requires as input, what it must produce as output, and what state it writes to `session.json` on completion or interrupt.
 
@@ -29,7 +29,7 @@ output_produces:
   - .project-orchestration/status.json (initialized if missing)    ← GLOBAL
   - .project-orchestration/tasks/{task_id}/session.json (stage_reached: -1)
   - .project-orchestration/tasks/{task_id}/skip-log.json (initialized empty)
-  - context fields: tooling_readiness, auth_status, provisioning_mode, blockers, graphify_staleness
+  - context fields: tooling_readiness, auth_status, provisioning_mode, blockers, architecture_map_staleness
 
 state_on_complete:
   stage_reached: -1
@@ -108,7 +108,7 @@ input_requires:
   - matched task history docs only when session.json history_scan.decision = read_full
 
 guard_conditions:
-  - graphify-out/GRAPH_REPORT.md read if graph exists
+  - active architecture-map output read if graph exists (.understand-anything/knowledge-graph.json or graphify-out/GRAPH_REPORT.md)
   - source readers run per source_mode (A: Jira+Confluence+Figma; B: Doc Reader; C: user message only)
   - if history_scan.decision = read_full: read matched task requirements, ADRs, design, and execution report before synthesis
   - if history_scan.decision = ask_human: block before Discovery until user confirms continuation vs independent task
@@ -287,8 +287,8 @@ guard_conditions:
   - no product-code changes allowed in this stage
 
 output_produces:
-  - docs/ai/tasks/{task_id}/design/<task>.md (AI DevKit design doc)
-  - docs/ai/tasks/{task_id}/planning/<task>.md (AI DevKit planning doc)
+  - docs/ai/tasks/{task_id}/design/<task>.md (Spec Kit design doc)
+  - docs/ai/tasks/{task_id}/planning/<task>.md (Spec Kit planning doc)
   - docs/ai/tasks/{task_id}/planning/implementation-plan.md (executable TDD plan; MANDATORY — no placeholders)
   - docs/ai/tasks/{task_id}/android-memo/<task>.md (Android skills memo, if Android-specific — auto-skip written to skip-log if omitted)
   - docs/ai/tasks/{task_id}/handoff.md (generated when code_owner is confirmed; MANDATORY)
@@ -378,13 +378,13 @@ input_requires:
 guard_conditions:
   - derive required evidence from Evidence Gate Matrix using change_type
   - if module_impact_chain present: scope build commands to build_order modules
-  - if graph_impact >= medium: run /graphify . --update
-  - if graph_impact = low: skip graphify update (record skip reason in execution.md)
+  - if graph_impact >= medium: run the active architecture-map update (/understand or /graphify . --update)
+  - if graph_impact = low: skip architecture-map update (record skip reason in execution.md)
 
 output_produces:
   - .project-orchestration/tasks/{task_id}/evidence/* (all required evidence files)
   - .project-orchestration/tasks/{task_id}/reports/execution.md (evidence manifest with Gate log)
-  - graphify-out/ updated (if graph_impact >= medium; skip written to skip-log if graph_impact = low)
+  - active architecture-map output updated (.understand-anything/ or graphify-out/, if graph_impact >= medium; skip written to skip-log if graph_impact = low)
   - .project-orchestration/tasks/{task_id}/session.json: stage_reached: 5, evidence_collected: [...]
   - .project-orchestration/status.json: entry updated (stage_reached: 5)
 

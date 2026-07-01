@@ -1,6 +1,6 @@
 # Sub-agent Catalog and Dependency Rules
 
-_Skill version: 4.10.1 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 4.12.0 — update this when SKILL.md bumps a minor or major version._
 
 ## Design principle
 
@@ -88,8 +88,11 @@ assumed_facts: []
 
 ### Graph Impact Reader
 
+Reads whichever architecture-map tool is active (Understand-Anything checked first; Graphify is the fallback).
+
 ```yaml
-source_type: graphify
+source_type: architecture-map
+tool: understand-anything | graphify | none
 graph_available: true | false
 graph_path: <A -> B -> C | none>
 affected_components: []
@@ -104,7 +107,7 @@ graph_freshness_note: <fresh | stale | unknown | graph missing>
 
 Activated at Stage 1 Discovery when `graph_impact ≥ medium` OR when affected components span more than one Gradle module. Read-only. Never edits build files.
 
-**Inputs:** `graphify-out/GRAPH_REPORT.md` affected components list + `settings.gradle[.kts]` module declarations.
+**Inputs:** active architecture-map output (`.understand-anything/knowledge-graph.json` or `graphify-out/GRAPH_REPORT.md`) affected components list + `settings.gradle[.kts]` module declarations.
 
 **Purpose:** Map architecture-level components to their Gradle module boundaries, derive the full build/test scope, and detect API surface changes that ripple across module boundaries.
 
@@ -282,8 +285,8 @@ Read-only and advisory. Never calls code-touching tools. Activated by parent orc
 
 | Condition | Stage | Tool called |
 |---|---|---|
-| Graphify identified affected components | 1 Discovery | `get_symbols_overview` |
-| Specific symbol named in Graphify output or task | 1 Discovery | `find_symbol` |
+| Architecture map identified affected components | 1 Discovery | `get_symbols_overview` |
+| Specific symbol named in architecture-map output or task | 1 Discovery | `find_symbol` |
 | Abstract class / interface in change path | 1.5 Clarification | `find_implementations` |
 | Surprising connection found by Graph Impact Reader | 1.5 Clarification | `find_referencing_symbols` |
 | Missing-info flags unknown implementation pattern | 1.5 Clarification | `find_referencing_symbols` |
@@ -339,7 +342,7 @@ recommendation: <one-line impact note for parent orchestrator>
 ```yaml
 source_type: tooling-preflight
 mode: audit | bootstrap | update | refresh-graph | force-reinstall
-ai_devkit:
+spec_kit:
   cli_present: true | false | unknown
   project_config_present: true | false
   action_recommended: none | install | init | install-project | update
@@ -351,11 +354,16 @@ android_skills:
   list_available: true | false
   relevant_skills_found: []
   action_recommended: none | find | add | add-all
-graphify:
-  cli_present: true | false | unknown
-  package_present: true | false | unknown
-  graph_report_present: true | false
-  graph_json_present: true | false
+architecture_map:
+  active_tool: understand-anything | graphify | none
+  understand_anything:
+    plugin_present: true | false | unknown
+    graph_present: true | false
+  graphify:
+    cli_present: true | false | unknown
+    package_present: true | false | unknown
+    graph_report_present: true | false
+    graph_json_present: true | false
   action_recommended: none | install | build | update
 karpathy:
   guidance_present: true | false | unknown

@@ -1,7 +1,7 @@
 ---
 artifact: android-adr-lite
 version: 1.0
-owner: ai-devkit
+owner: spec-kit
 status: proposed
 task: <task_id>
 ---

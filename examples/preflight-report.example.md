@@ -9,7 +9,7 @@
 - Ready for Stage 0: yes, with caveats
 - Blocking gaps: none for read-only analysis
 - Non-blocking gaps:
-  - Graphify graph missing (will build if approved)
+  - Understand-Anything not installed; falling back to Graphify (graph missing, will build if approved)
   - Karpathy plugin not detected (will apply principles manually)
   - `atlassian.api_token` empty (will request from user when Jira link provided)
 
@@ -22,11 +22,11 @@
 - Project overrides defined: 1 (name: "client-alpha", key: "CA")
 - Notes: Tokens for atlassian and figma will be requested just-in-time when a Jira or Figma link is provided by the developer. github token available for private repo access.
 
-## AI DevKit
+## Spec Kit
 
 - CLI present: yes
-- CLI evidence: `ai-devkit 2.1.0`
-- Project config `.ai-devkit.json`: present
+- CLI evidence: `specify-cli 0.12.2`
+- Project config `.specify/`: present
 - Action allowed: no update in audit mode
 - Action taken: none
 - Notes: config exists and looks current
@@ -49,8 +49,18 @@
 - Action taken: none
 - Notes: compose skill not found; will use android advisory memo as fallback
 
+## Understand-Anything
+
+- Plugin/skill present: no
+- `.understand-anything/knowledge-graph.json`: missing
+- Active architecture-map tool: no (falling back to Graphify)
+- Action allowed: no install in audit mode
+- Action taken: none
+- Notes: approve bootstrap or refresh-graph mode to install and build the knowledge graph before Discovery
+
 ## Graphify
 
+- Active architecture-map tool (fallback): no — also unavailable
 - CLI present: no
 - Package present: no
 - `graphify-out/GRAPH_REPORT.md`: missing
@@ -81,7 +91,7 @@
 
 - Proceed to Stage 0: yes for read-only task analysis
 - Required human decisions:
-  - Approve Graphify install/build if architecture graph is required for this task
+  - Approve Understand-Anything install/build (or Graphify as fallback) if an architecture graph is required for this task
   - Approve Karpathy plugin install or confirm manual application is acceptable
 - Required installs/updates: none in audit mode
 - Required graph action: none in audit mode; request refresh-graph mode to build

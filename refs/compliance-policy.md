@@ -1,6 +1,6 @@
 # Compliance Policy
 
-_Skill version: 4.10.1 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 4.12.0 — update this when SKILL.md bumps a minor or major version._
 
 The skill **must** follow every defined stage and gate in order. No stage may be skipped, condensed, or reordered without explicit confirmation. This file defines what requires confirmation, what is auto-allowed, what is permanently forbidden, and how every deviation is recorded.
 
@@ -41,7 +41,7 @@ Three tiers: **MANDATORY**, **AUTO-SKIP** (condition-gated, no human needed), **
 | Stage 4 interrupt: update `status.json` | **MANDATORY — never skippable** | — |
 | Stage 5 Evidence Gate Matrix required items | **MANDATORY** | — |
 | Stage 5 Evidence Gate Matrix optional items | AUTO-SKIP (never required) | always optional |
-| Stage 5 Graphify update | AUTO-SKIP when `graph_impact = low` | `graph_impact = low` in context-pack |
+| Stage 5 architecture-map update | AUTO-SKIP when `graph_impact = low` | `graph_impact = low` in context-pack |
 | Stage 5 Gradle Module Impact build scope | AUTO-SKIP when `module_impact_chain` absent | `module_impact_chain` not populated |
 | Stage 6 Karpathy diff review | **MANDATORY — never skippable** | — |
 | Stage 6 Gate G close | **MANDATORY** | — |
@@ -199,7 +199,7 @@ Every gate transition must be recorded in `execution.md`:
 | Gate C  | passed | 2026-05-07T09:35Z | clarity_score: 8 |
 | Gate D  | passed | 2026-05-07T10:00Z | human approved requirements |
 | Gate D.5 | passed | 2026-05-07T10:15Z | ADR-lite: accepted |
-| Gate E  | passed | 2026-05-07T10:30Z | code_owner: ai-devkit; implementation-plan.md generated |
+| Gate E  | passed | 2026-05-07T10:30Z | code_owner: spec-kit; implementation-plan.md generated |
 | Gate E.5 | passed | 2026-05-07T10:45Z | RED evidence: evidence/red-task-1.txt, red-task-2.txt |
 | Gate F  | passed | 2026-05-07T11:45Z | all required evidence collected |
 | Gate G  | passed | 2026-05-07T12:00Z | Karpathy: no critical issues; Stage 7 finalized |

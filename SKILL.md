@@ -3,12 +3,13 @@ name: android-agent-orchestrator
 description: Use when starting, planning, analyzing, or implementing any Android task — new feature, bug fix, refactor, migration, AGP upgrade, architecture review, or repo setup. Use when user says start task, new feature, fix bug, analyze repo, migrate, upgrade, implement, review architecture, or set up agents for an Android project.
 license: MIT
 metadata:
-  version: 4.10.1
+  version: 4.12.0
   category: orchestration
   lanes:
-    - ai-devkit
+    - spec-kit
     - android-skills
     - android-cli
+    - understand-anything
     - graphify
     - karpathy
   workers:
@@ -25,7 +26,7 @@ metadata:
     - refs/playbooks.md
 ---
 
-# Android Agent Orchestrator v4.10.1
+# Android Agent Orchestrator v4.12.0
 
 ## Activation
 
@@ -49,12 +50,12 @@ Trigger phrases: `start task` · `new feature` · `fix bug` · `analyze repo` ·
 
 - Stage -1 initializes the auth file, audits tool readiness, then proceeds to Intake.
 - `.agent-auth.yaml` is the single source of truth for all tokens (Atlassian, Figma, GitHub). Tokens are requested just-in-time when a tool needs them.
-- AI DevKit remains the conductor and the only owner of requirements, synthesis, routing, and final go/no-go.
+- Spec Kit remains the conductor and the only owner of requirements, synthesis, routing, and final go/no-go.
 - Android skills remain Android advisory specialists.
 - Android CLI remains runtime verification and official Android skill management.
-- Graphify remains the architecture map.
+- Understand-Anything is the primary architecture map; Graphify is the fallback when Understand-Anything is unavailable.
 - Karpathy remains the code-touching quality gate.
-- **Serena is the Code Analysis Worker** — symbol-level code retrieval, activated after Graphify identifies affected areas. Read-only in Discovery, advisory in Implementation. Never owns decisions or edits.
+- **Serena is the Code Analysis Worker** — symbol-level code retrieval, activated after the architecture map (Understand-Anything, falling back to Graphify) identifies affected areas. Read-only in Discovery, advisory in Implementation. Never owns decisions or edits.
 - **Gradle Module Impact Analyzer** derives `module_impact_chain` when `graph_impact ≥ medium` — maps architecture components to Gradle modules, produces `build_order` and `test_scope_modules` for Android CLI in Stage 5.
 - Sub-agents are internal workers used during Discovery and Clarification. They do not become independent lanes and they never own final decisions or product-code edits.
 - Jira Reader automatically tracks `linked_docs` and `linked_designs` (1 level deep).
@@ -134,6 +135,12 @@ Write `preliminary_mode` to `session.json` at Stage 0. **Finalize at the end of 
 
 ---
 
+## What changed in v4.12.0
+
+**v4.12.0** — Understand-Anything as primary architecture map.
+
+Adds [Understand-Anything](https://github.com/Egonex-AI/Understand-Anything) (`/understand`, `.understand-anything/knowledge-graph.json`) as the primary architecture-map tool, checked first at Stage -1. Graphify becomes the fallback — only checked/used when Understand-Anything is unavailable (plugin/skill not installed and no `.understand-anything/knowledge-graph.json`). Discovery, Verify, staleness checks, and all `graphify`-only tooling_readiness/preflight fields are generalized to an `architecture_map` concept with `active_tool: understand-anything | graphify | none`. Lane D renamed to Architecture Map. No change to Graphify's own behavior when it is the active tool.
+
 ## What changed in v4.10.0
 
 **v4.10.0** — Workflow modes + scoring + artifact budget.
@@ -203,16 +210,16 @@ Adds Stage 2.5 Decision Gate / ADR-lite before design, Stage 7 Docs/decision fin
 | Moment | Parallel | Serial |
 |---|---|---|
 | Tooling Preflight | Safe read-only checks | Install/update only when mode allows |
-| Intake | AI DevKit opens phase; Graphify existence check | No code touched |
-| Discovery | Graphify read + source readers + Android domain tagging | No code touched |
+| Intake | Spec Kit opens phase; architecture-map existence check (Understand-Anything → Graphify fallback) | No code touched |
+| Discovery | Architecture-map read (Understand-Anything → Graphify fallback) + source readers + Android domain tagging | No code touched |
 | Clarification | Multiple sub-agents analyze in parallel | Parent synthesis waits for required outputs |
-| Requirements | AI DevKit writes one canonical requirements doc | Single owner |
-| Decision Gate | AI DevKit decides ADR requirement; human approves Proposed ADR when required | Stop before Design if required |
-| Design split | AI DevKit writes plan; Android skills writes memo | Neither edits product code |
+| Requirements | Spec Kit writes one canonical requirements doc | Single owner |
+| Decision Gate | Spec Kit decides ADR requirement; human approves Proposed ADR when required | Stop before Design if required |
+| Design split | Spec Kit writes plan; Android skills writes memo | Neither edits product code |
 | Implementation | One code owner only | All other lanes advisory only |
-| Verify | Android CLI runs build/device/capture; Graphify updates | Code frozen |
-| QA gate | AI DevKit + Karpathy review diff | No new code changes |
-| Docs finalization | AI DevKit updates ADR status and task changelog | No product changes |
+| Verify | Android CLI runs build/device/capture; active architecture-map tool updates | Code frozen |
+| QA gate | Spec Kit + Karpathy review diff | No new code changes |
+| Docs finalization | Spec Kit updates ADR status and task changelog | No product changes |
 
 ---
 
@@ -245,7 +252,7 @@ Load when `graph_impact ≥ medium` or multi-module change detected: `refs/sub-a
 6. Sub-agents are read-only or advisory.
 7. Do not skip Clarification when source material is weak.
 8. No success without evidence.
-9. Read Graphify before touching code when `graphify-out/` exists.
+9. Read the active architecture map before touching code — Understand-Anything's `.understand-anything/knowledge-graph.json` if present, otherwise Graphify's `graphify-out/` if present.
 10. Stop after requirements, then stop again for ADR-lite approval when Stage 2.5 requires one.
 11. No invented commands.
 12. Karpathy applies to every code-touching step.
@@ -266,7 +273,7 @@ Load when `graph_impact ≥ medium` or multi-module change detected: `refs/sub-a
 
 ## Lanes
 
-### Lane A — AI DevKit
+### Lane A — Spec Kit
 Owns phase control, `docs/ai/**`, routing, synthesis, final requirements, planning, and review gates.
 
 ### Lane B — Android skills
@@ -275,8 +282,8 @@ Owns Android advisory memos, platform guidance, migration notes, API pitfalls, a
 ### Lane C — Android CLI
 Owns runtime evidence, screenshots, layout capture, device actions, official Android skill management, and verification commands.
 
-### Lane D — Graphify
-Owns graph build/query/update and architecture evidence.
+### Lane D — Architecture Map (Understand-Anything primary, Graphify fallback)
+Owns graph build/query/update and architecture evidence. Understand-Anything is checked first; Graphify is used only when Understand-Anything is unavailable.
 
 ### Lane E — Karpathy guidelines
 Owns code-touching behavior and diff review.
@@ -328,18 +335,18 @@ Run before Intake.
 
 Determine:
 - active provisioning mode,
-- whether AI DevKit exists,
-- whether `.ai-devkit.json` exists,
+- whether Spec Kit exists,
+- whether `.specify/` exists,
 - whether Android CLI exists,
 - whether Android skills can be listed/found/added,
-- whether Graphify exists,
-- whether `graphify-out/GRAPH_REPORT.md` and `graphify-out/graph.json` exist,
-- whether graph must be built, updated, or only read,
+- whether Understand-Anything is available (checked first — plugin/skill present and `.understand-anything/knowledge-graph.json` exists),
+- if Understand-Anything is unavailable, whether Graphify exists (fallback) — CLI/package present and `graphify-out/GRAPH_REPORT.md` + `graphify-out/graph.json` exist,
+- whether the active architecture-map tool's graph must be built, updated, or only read,
 - whether Karpathy guidelines exist as plugin, skill, or project instruction,
 - what actions are allowed,
 - what blockers prevent Stage 0.
 
-**Graphify time-based staleness check:** After the commit-hash check, also read `graph-stamp.json → built_at`. If `built_at` + 7 days < now → flag graph as `stale (time-based)` in `preflight.md`, regardless of whether commit hash matches. This catches projects where many small commits have landed without triggering a graph update. Record `graphify: stale-time` in `tooling-cache.json`; do not block Stage 0, but surface as a non-blocking gap.
+**Architecture-map time-based staleness check:** Applies to whichever tool is active. For Graphify: after the commit-hash check, also read `graph-stamp.json → built_at`. If `built_at` + 7 days < now → flag graph as `stale (time-based)` in `preflight.md`, regardless of whether commit hash matches. For Understand-Anything: check `.understand-anything/knowledge-graph.json` file mtime against the same 7-day window (it does not emit a separate stamp file). This catches projects where many small commits have landed without triggering a graph update. Record `architecture_map: stale-time` in `tooling-cache.json`; do not block Stage 0, but surface as a non-blocking gap.
 
 **Project status index:** Read `.project-orchestration/status.json`. If missing, create it with an empty `tasks: []` array. Check for any task entries with `stage_status: in_progress` and surface them alongside the resume check at Stage 0.
 
@@ -372,7 +379,7 @@ Intake must record:
 
 ### Stage 1 — Discovery
 
-Read `.project-orchestration/reports/preflight.md`, `graphify-out/GRAPH_REPORT.md` if present, docs in `docs/ai/inputs/` if present, and source material.
+Read `.project-orchestration/reports/preflight.md`; read the active architecture-map output — `.understand-anything/knowledge-graph.json` if Understand-Anything is active, otherwise `graphify-out/GRAPH_REPORT.md` if Graphify is active — docs in `docs/ai/inputs/` if present, and source material.
 
 If Task History Relevance Gate decided `full`, also read the matched task history before synthesis:
 - `docs/ai/tasks/{matched_task_id}/requirements/*.md`
@@ -380,11 +387,11 @@ If Task History Relevance Gate decided `full`, also read the matched task histor
 - `docs/ai/tasks/{matched_task_id}/design/*.md`
 - `.project-orchestration/tasks/{matched_task_id}/reports/execution.md`
 
-Derive `change_type` (initial estimate) from source material and Graphify output — record in `context-pack.json`.
+Derive `change_type` (initial estimate) from source material and architecture-map output — record in `context-pack.json`.
 
 If `graph_impact ≥ medium`: activate **Gradle Module Impact Analyzer** in parallel with other source readers. Output populates `context-pack.json → module_impact_chain`. Write `module_impact_chain_scope` to `session.json`.
 
-**Finalize workflow mode at end of Stage 1:** After all source reading and Graphify data are available, compute final `complexity_score` + `risk_score` → `workflow_mode`. Apply override rules (ADR trigger keyword → governed; Jira + Figma present → min standard). Write `workflow_mode`, `complexity_score`, `risk_score`, `mode_reasons` to `context-pack.json` and `session.json → workflow_mode`. Stage 1.5 reads this value — it does not re-compute.
+**Finalize workflow mode at end of Stage 1:** After all source reading and architecture-map data are available, compute final `complexity_score` + `risk_score` → `workflow_mode`. Apply override rules (ADR trigger keyword → governed; Jira + Figma present → min standard). Write `workflow_mode`, `complexity_score`, `risk_score`, `mode_reasons` to `context-pack.json` and `session.json → workflow_mode`. Stage 1.5 reads this value — it does not re-compute.
 
 → **Load `refs/stage-contracts.md` § Stage 1** for typed input/output contract and interrupt state.
 
@@ -413,7 +420,7 @@ Source modes:
 
 ### Stage 2 — Requirements
 
-AI DevKit writes canonical requirements from synthesized context. Stop for human review.
+Spec Kit writes canonical requirements from synthesized context. Stop for human review.
 
 → **Load `refs/contracts-and-artifacts.md`** for `requirements/<task>.md` schema and Gate D criteria.
 
@@ -426,7 +433,7 @@ Requirements must include:
 
 ### Stage 2.5 — Decision Gate / ADR-lite
 
-AI DevKit decides whether an ADR-lite is required before design.
+Spec Kit decides whether an ADR-lite is required before design.
 
 Create an ADR-lite when the task touches any of:
 - module boundary,
@@ -452,11 +459,11 @@ If ADR-lite is not required, record `adr_required: false` and the reason in `ses
 
 ### Stage 3 — Design split + Executable Plan
 
-AI DevKit writes design/planning docs. Android skills write Android memo. No product-code changes. In **fast mode**: skip design doc entirely; produce `implementation-plan.md` only with ≤ 5 tasks. Write AUTO-SKIP for design doc to `skip-log.json`.
+Spec Kit writes design/planning docs. Android skills write Android memo. No product-code changes. In **fast mode**: skip design doc entirely; produce `implementation-plan.md` only with ≤ 5 tasks. Write AUTO-SKIP for design doc to `skip-log.json`.
 
 → **Load `refs/playbooks.md`** to select the correct workflow for the task type.
 
-**Executable implementation plan (MANDATORY):** After design is written, AI DevKit produces `docs/ai/tasks/{task_id}/planning/implementation-plan.md`. This is not a high-level outline — it is a step-by-step runnable checklist. Rules:
+**Executable implementation plan (MANDATORY):** After design is written, Spec Kit produces `docs/ai/tasks/{task_id}/planning/implementation-plan.md`. This is not a high-level outline — it is a step-by-step runnable checklist. Rules:
 
 - One task per acceptance criterion. Each task is 2–5 minutes of work.
 - Every task contains: exact file path(s), exact test command with expected output, RED step, GREEN step, refactor note, commit message.
@@ -511,23 +518,23 @@ Exactly one code owner edits code. All other lanes are advisory only.
 
 ### Stage 5 — Verify
 
-Android CLI gathers runtime evidence. Graphify runs update after implementation if graph exists.
+Android CLI gathers runtime evidence. The active architecture-map tool runs an update after implementation if its graph exists — `/understand` for Understand-Anything, `/graphify . --update` for Graphify (fallback).
 
 **Evidence Gate Matrix:** Read `context-pack.json → change_type`. Look up required and optional evidence from the matrix in `refs/contracts-and-artifacts.md § Evidence Gate Matrix`. Run all required items. Gate F is not satisfied until all required items are present.
 
 **Module-scoped builds:** If `module_impact_chain` is present, scope build commands to `module_impact_chain.build_order` rather than full project build.
 
-**Graphify skip condition:** If `context-pack.json → graph_impact` is `low`, skip `/graphify . --update`. Record skip reason in execution report. Run update only when `graph_impact` is `medium` or `high`.
+**Architecture-map skip condition:** If `context-pack.json → graph_impact` is `low`, skip the update (`/understand` or `/graphify . --update`, whichever tool is active). Record skip reason in execution report. Run update only when `graph_impact` is `medium` or `high`.
 
 → **Load `refs/stage-contracts.md` § Stage 5** for typed input/output contract and interrupt state.
 
 ### Stage 6 — QA gate
 
-AI DevKit + Karpathy review diff, evidence, graph update, acceptance coverage, and scope discipline.
+Spec Kit + Karpathy review diff, evidence, graph update, acceptance coverage, and scope discipline.
 
 ### Stage 7 — Docs / Decision Finalization
 
-AI DevKit finalizes governance artifacts after QA:
+Spec Kit finalizes governance artifacts after QA:
 - update ADR-lite from `Proposed` to `Accepted`, `Deferred`, or `Superseded`,
 - update `.project-orchestration/tasks/{task_id}/reports/execution.md` with Task Changelog,
 - run drift checks for skill refs/templates/version consistency,
@@ -542,7 +549,7 @@ AI DevKit finalizes governance artifacts after QA:
 | `audit` | Check readiness only | No |
 | `bootstrap` | Install missing approved tools and initialize missing project setup | Yes, missing only |
 | `update` | Update approved installed tools and reconcile project setup | Yes |
-| `refresh-graph` | Build/update Graphify output | Graph only |
+| `refresh-graph` | Build/update the active architecture-map output (Understand-Anything preferred, Graphify fallback) | Graph only |
 | `force-reinstall` | Clean reinstall/reset when explicitly requested | Yes |
 
 If unsure, choose `audit`.
@@ -551,11 +558,13 @@ If unsure, choose `audit`.
 
 ## Tool action rules
 
-### AI DevKit
+### Spec Kit
 - If CLI missing in `audit`, report missing.
-- If `.ai-devkit.json` missing and setup requested, run `ai-devkit init`.
-- If `.ai-devkit.json` exists and setup/update requested, prefer `ai-devkit install`.
-- Use `npx ai-devkit@latest ...` only as fallback or when global install is not desired.
+- Install command (bootstrap/update mode, if approved): `uv tool install specify-cli --from git+https://github.com/github/spec-kit.git@vX.Y.Z` (pin the tag; do not install `@main`). Use `uvx --from git+https://github.com/github/spec-kit.git specify ...` as an ephemeral fallback when a global install is not desired.
+- If `.specify/` missing and setup requested, run `specify init --here --integration <agent>`, matching the active coding agent (e.g. `claude`, `copilot`, `codex`).
+- If `.specify/` exists and an update is requested, run `specify self check` first; only run `specify self upgrade` if a newer release is confirmed. Never bump versions silently.
+- Never hand-edit `.specify/memory/constitution.md` — it is produced by `/speckit.constitution` and holds human-approved project principles.
+- Never overwrite `.specify/templates/**` with `specify init --here --force` unless the human explicitly asked for a template refresh.
 
 ### Android CLI
 - If CLI missing in `audit`, report missing.
@@ -569,7 +578,15 @@ If unsure, choose `audit`.
 - Use `android skills add --skill=<skill-name>` only when the skill name is confirmed.
 - Use `android skills add --all` only when explicitly requested.
 
-### Graphify
+### Understand-Anything
+- Checked **first** for the architecture-map lane. If the plugin/skill is present or `.understand-anything/knowledge-graph.json` exists, it is the active architecture-map tool — do not also check Graphify.
+- If missing in `audit`, report missing and fall through to check Graphify.
+- Install (bootstrap/update mode, if approved): `/plugin marketplace add Egonex-AI/Understand-Anything` (Claude Code native), or `curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/install.sh | bash` for other agents.
+- If graph is missing, build only in `bootstrap` or `refresh-graph` by running `/understand`.
+- If implementation changed code and the graph exists, refresh in Verify with `/understand`; use `/understand-diff` for impact analysis of the current change.
+- Never hand-edit `.understand-anything/knowledge-graph.json` or `.understand-anything/config.json`.
+
+### Graphify (fallback — only checked when Understand-Anything is unavailable)
 - If `graphify-out/` exists, read it in Discovery.
 - If graph is missing, build only in `bootstrap` or `refresh-graph`.
 - If implementation changed code and graph exists, update in Verify.
@@ -645,9 +662,10 @@ docs/ai/
         ├── android-memo/
         └── handoff.md                        ← generated at Stage 3; updated on interrupt
 
+.understand-anything/
 graphify-out/
 .skills/
-.ai-devkit.json
+.specify/
 .agent-auth.yaml                              ← gitignored; auto-created; contains all tokens
 ```
 
@@ -660,15 +678,15 @@ graphify-out/
 3. **Tooling Preflight** — run `bash templates/tooling-preflight.sh --json` → write `preflight.json`; run without flag → write `preflight.md`; write `tooling-cache.json`; init `tasks/{task_id}/session.json` and `tasks/{task_id}/skip-log.json`. Read `preflight.json → ready_for_stage_0` for the gate decision.
 4. **Intake** — collect links; derive source mode (A/B/C); resolve credential set; derive `task_id` (Jira key → slug → date-hash); write/update `tasks/{task_id}/session.json` with `task_id`, `source_mode`.
 5. **Determine ref tier + preliminary mode** — derive `preliminary_mode` from task description and link presence (fast/standard/governed); load only needed refs per tier (LIGHT/MEDIUM/HEAVY/FULL). Write `preliminary_mode` to `session.json`. Load `refs/stage-contracts.md` if resuming.
-6. **Discovery** — read Graphify if present; activate source readers in parallel; auto-follow Jira attachments (1 level). Derive `change_type` (initial). Activate Gradle Module Impact Analyzer if `graph_impact ≥ medium`. Write `module_impact_chain` and `change_type` to context-pack.
+6. **Discovery** — read the active architecture map if present (Understand-Anything first, Graphify fallback); activate source readers in parallel; auto-follow Jira attachments (1 level). Derive `change_type` (initial). Activate Gradle Module Impact Analyzer if `graph_impact ≥ medium`. Write `module_impact_chain` and `change_type` to context-pack.
 7. **Token check** — just before each source reader, verify its token; prompt user if missing.
-8. **Finalize workflow mode (end of Stage 1)** — after all sources read and Graphify data available, compute `complexity_score` + `risk_score` → `workflow_mode`; apply override rules; write `workflow_mode`, `complexity_score`, `risk_score`, `mode_reasons` to `context-pack.json` and `session.json`. **Clarification (Stage 1.5)** — read `workflow_mode` from session (do not re-score); if `fast` → AUTO-SKIP; if any trigger fires and mode ≠ fast, run workers in parallel; finalize `change_type` and `module_impact_chain`; parent synthesizes context-pack + brief (sparse format).
-9. **Requirements** — AI DevKit writes canonical doc with version header + Affected Areas; **stop for human approval**; update `session.json → requirements_approved: true`.
+8. **Finalize workflow mode (end of Stage 1)** — after all sources read and architecture-map data available, compute `complexity_score` + `risk_score` → `workflow_mode`; apply override rules; write `workflow_mode`, `complexity_score`, `risk_score`, `mode_reasons` to `context-pack.json` and `session.json`. **Clarification (Stage 1.5)** — read `workflow_mode` from session (do not re-score); if `fast` → AUTO-SKIP; if any trigger fires and mode ≠ fast, run workers in parallel; finalize `change_type` and `module_impact_chain`; parent synthesizes context-pack + brief (sparse format).
+9. **Requirements** — Spec Kit writes canonical doc with version header + Affected Areas; **stop for human approval**; update `session.json → requirements_approved: true`.
 10. **Decision Gate** — decide whether ADR-lite is required; create Proposed ADR and stop for approval if required; write `adr_required`, `adr_status`, and `decision_record` to `session.json`.
-11. **Design split** — AI DevKit + Android skills in parallel; produce `implementation-plan.md` with exact files, test commands, RED/GREEN/commit steps per acceptance criterion (no placeholders); select code owner; update `session.json → code_owner`, `session.json → assignee`; ask for `branch` if not yet set; generate `docs/ai/tasks/{task_id}/handoff.md`; update `.project-orchestration/status.json`.
+11. **Design split** — Spec Kit + Android skills in parallel; produce `implementation-plan.md` with exact files, test commands, RED/GREEN/commit steps per acceptance criterion (no placeholders); select code owner; update `session.json → code_owner`, `session.json → assignee`; ask for `branch` if not yet set; generate `docs/ai/tasks/{task_id}/handoff.md`; update `.project-orchestration/status.json`.
 12. **Implementation (per-task TDD loop)** — one owner per task in `implementation-plan.md`; write failing test → RED evidence → minimal code → GREEN evidence → refactor → commit → spec-compliance review ✅ → code-quality review ✅ → next task. Capture `screenshot_before` if `change_type` includes `ui_change`. On interrupt: update `handoff.md` and `status.json` before stopping.
-13. **Verify** — derive required evidence from Evidence Gate Matrix using `change_type`; Android CLI runs required commands scoped to `module_impact_chain.build_order` if present; Graphify updates graph only if `graph_impact ≥ medium`. Write `evidence_collected` to `session.json`.
-14. **QA gate** — AI DevKit + Karpathy review diff; verify Gate F (all required evidence present); keep code frozen.
+13. **Verify** — derive required evidence from Evidence Gate Matrix using `change_type`; Android CLI runs required commands scoped to `module_impact_chain.build_order` if present; the active architecture-map tool updates its graph only if `graph_impact ≥ medium`. Write `evidence_collected` to `session.json`.
+14. **QA gate** — Spec Kit + Karpathy review diff; verify Gate F (all required evidence present); keep code frozen.
 15. **Docs / decision finalization** — update ADR status, Task Changelog, gate log, and drift check result; mark `session.json → stage_status: complete`; update `docs/ai/tasks/{task_id}/handoff.md` with final status; update `.project-orchestration/status.json` entry to `stage_status: complete`.
 
 ---

@@ -46,7 +46,7 @@ result = {
     "blocking_gaps": [],
     "non_blocking_gaps": [],
     "tools": {},
-    "graph": {},
+    "architecture_map": {},
     "cache": {}
 }
 
@@ -70,12 +70,12 @@ else:
     t["figma_token"] = "unknown"
     gaps_warn.append("auth_file_missing")
 
-# ── AI DevKit ─────────────────────────────────────────────────────────────────
-ai_devkit_ok = cmd_ok("command -v ai-devkit")
-t["ai_devkit"] = "present" if ai_devkit_ok else "missing"
-t["ai_devkit_config"] = "present" if os.path.isfile(".ai-devkit.json") else "missing"
-if not ai_devkit_ok:
-    gaps_blocking.append("ai_devkit_missing")
+# ── Spec Kit ─────────────────────────────────────────────────────────────────
+spec_kit_ok = cmd_ok("command -v specify")
+t["spec_kit"] = "present" if spec_kit_ok else "missing"
+t["spec_kit_config"] = "present" if os.path.isdir(".specify") else "missing"
+if not spec_kit_ok:
+    gaps_blocking.append("spec_kit_missing")
 
 # ── Android CLI ───────────────────────────────────────────────────────────────
 android_ok = cmd_ok("command -v android")
@@ -83,19 +83,45 @@ t["android_cli"] = "present" if android_ok else "missing"
 if not android_ok:
     gaps_warn.append("android_cli_missing")
 
-# ── Graphify ──────────────────────────────────────────────────────────────────
+# ── Understand-Anything (checked first for architecture-map lane) ─────────────
+ua_plugin = False
+plugins_dir = ".claude/plugins"
+if os.path.isdir(plugins_dir):
+    for root, dirs, files in os.walk(plugins_dir):
+        if any("understand-anything" in name.lower() for name in dirs + files):
+            ua_plugin = True
+            break
+ua_graph = os.path.isfile(".understand-anything/knowledge-graph.json")
+t["understand_anything"] = "present" if ua_plugin else "missing"
+
+# ── Graphify (fallback — only decides active_tool if Understand-Anything absent)
 graphify_cli = cmd_ok("command -v graphify")
 graphify_pkg = cmd_ok("python -m pip show graphifyy 2>/dev/null")
 graph_report = os.path.isfile("graphify-out/GRAPH_REPORT.md")
 graph_json   = os.path.isfile("graphify-out/graph.json")
 t["graphify_cli"]     = "present" if graphify_cli else "missing"
 t["graphify_package"] = "present" if graphify_pkg else "missing"
-result["graph"]["report_present"] = graph_report
-result["graph"]["json_present"]   = graph_json
-if not graphify_cli and not graphify_pkg:
-    gaps_warn.append("graphify_missing")
-elif not graph_report:
-    gaps_warn.append("graph_report_missing")
+
+if ua_plugin or ua_graph:
+    active_tool = "understand-anything"
+elif graphify_cli or graphify_pkg or graph_report or graph_json:
+    active_tool = "graphify"
+else:
+    active_tool = "none"
+
+result["architecture_map"] = {
+    "active_tool": active_tool,
+    "understand_anything_graph_present": ua_graph,
+    "graphify_report_present": graph_report,
+    "graphify_json_present": graph_json,
+}
+
+if active_tool == "none":
+    gaps_warn.append("architecture_map_missing")
+elif active_tool == "understand-anything" and not ua_graph:
+    gaps_warn.append("architecture_map_graph_missing")
+elif active_tool == "graphify" and not graph_report:
+    gaps_warn.append("architecture_map_graph_missing")
 
 # ── Karpathy ──────────────────────────────────────────────────────────────────
 karpathy = "missing"
@@ -197,18 +223,18 @@ write_section() {
   fi
 ) &
 
-# ② AI DevKit
+# ② Spec Kit
 (
-  out="$TMPDIR_PREFIX/aidevkit"
-  if command -v ai-devkit >/dev/null 2>&1; then
-    echo "- ai-devkit: present ($(command -v ai-devkit))" > "$out"
+  out="$TMPDIR_PREFIX/speckit"
+  if command -v specify >/dev/null 2>&1; then
+    echo "- specify: present ($(command -v specify))" > "$out"
   else
-    echo "- ai-devkit: missing" > "$out"
+    echo "- specify: missing" > "$out"
     [ "$MODE" = "audit" ] && echo "- action: report only (audit mode)" >> "$out"
   fi
-  [ -f ".ai-devkit.json" ] \
-    && echo "- .ai-devkit.json: present" >> "$out" \
-    || echo "- .ai-devkit.json: missing" >> "$out"
+  [ -d ".specify" ] \
+    && echo "- .specify/: present" >> "$out" \
+    || echo "- .specify/: missing" >> "$out"
 ) &
 
 # ③ Android CLI
@@ -234,7 +260,29 @@ write_section() {
   fi
 ) &
 
-# ⑤ Graphify
+# ⑤ Understand-Anything (checked first for architecture-map lane)
+(
+  out="$TMPDIR_PREFIX/understand"
+  found=0
+  if [ -d ".claude/plugins" ]; then
+    hits=$(find .claude/plugins -maxdepth 3 -iname "*understand-anything*" 2>/dev/null)
+    if [ -n "$hits" ]; then
+      echo "- plugin: present ($hits)" > "$out"
+      found=1
+    fi
+  fi
+  [ $found -eq 0 ] && echo "- plugin: missing" > "$out"
+  [ -f ".understand-anything/knowledge-graph.json" ] \
+    && echo "- .understand-anything/knowledge-graph.json: present" >> "$out" \
+    || echo "- .understand-anything/knowledge-graph.json: missing" >> "$out"
+  if [ $found -eq 1 ] || [ -f ".understand-anything/knowledge-graph.json" ]; then
+    echo "- active architecture-map tool: understand-anything" >> "$out"
+  else
+    echo "- not active; falling back to Graphify check" >> "$out"
+  fi
+) &
+
+# ⑥ Graphify (fallback — only active if Understand-Anything is unavailable)
 (
   out="$TMPDIR_PREFIX/graphify"
   if command -v graphify >/dev/null 2>&1; then
@@ -256,7 +304,7 @@ write_section() {
     || echo "- graph.json: missing" >> "$out"
 ) &
 
-# ⑥ Karpathy
+# ⑦ Karpathy
 (
   out="$TMPDIR_PREFIX/karpathy"
   found=0
@@ -276,7 +324,7 @@ write_section() {
   [ $found -eq 0 ] && echo "- Karpathy: not detected (will apply principles manually)" >> "$out" || true
 ) &
 
-# ⑦ Memory cache
+# ⑧ Memory cache
 (
   out="$TMPDIR_PREFIX/memory"
   if [ -f ".project-orchestration/memory/tooling-cache.json" ]; then
@@ -308,7 +356,7 @@ except: print('- session: unreadable')
   fi
 ) &
 
-# ⑧ Serena
+# ⑨ Serena
 (
   out="$TMPDIR_PREFIX/serena"
   if command -v uv >/dev/null 2>&1; then
@@ -332,14 +380,15 @@ wait  # ← all parallel checks complete here
 
 # ── Print results in order ────────────────────────────────────────────────────
 
-write_section "Auth"           auth
-write_section "AI DevKit"      aidevkit
-write_section "Android CLI"    androidcli
-write_section "Android skills" skills
-write_section "Graphify"       graphify
-write_section "Karpathy"       karpathy
-write_section "Serena"         serena
-write_section "Memory cache"   memory
+write_section "Auth"              auth
+write_section "Spec Kit"          speckit
+write_section "Android CLI"       androidcli
+write_section "Android skills"    skills
+write_section "Understand-Anything" understand
+write_section "Graphify"          graphify
+write_section "Karpathy"          karpathy
+write_section "Serena"            serena
+write_section "Memory cache"      memory
 
 echo
 echo "## Decision reminder"

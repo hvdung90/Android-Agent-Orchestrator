@@ -1,6 +1,6 @@
 # Clarification & Synthesis Workflow
 
-_Skill version: 4.10.1 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 4.12.0 — update this when SKILL.md bumps a minor or major version._
 
 ## Purpose
 
@@ -17,7 +17,7 @@ Stage -1 Tooling Preflight must be complete before Clarification.
 Clarification should consume:
 - source list from Intake,
 - preflight report summary,
-- Graphify availability and graph path if present,
+- Architecture-map availability (Understand-Anything checked first, Graphify fallback) and graph path if present,
 - Serena availability (`serena: ready | missing`) from preflight,
 - docs/tickets/design inputs.
 
@@ -124,7 +124,7 @@ Skip or minimize Clarification when:
 
 ## Code Analysis Worker (Serena) — activation in Clarification
 
-Serena is activated **after** source readers and Graphify Impact Reader produce their outputs. It does not replace them — it drills into specific symbols they surface.
+Serena is activated **after** source readers and the Graph Impact Reader produce their outputs. It does not replace them — it drills into specific symbols they surface.
 
 **Agent-decided activation rules for Stage 1.5:**
 
@@ -140,7 +140,7 @@ If Serena is `missing` or `not-configured` in preflight → skip silently; note 
 **Output of Code Analysis Worker feeds into `context-pack.json` fields:**
 - `dependencies[]` — add concrete implementors / callers found
 - `facts[]` — add "N callers of X found" evidence
-- `graph_impact` — may be upgraded if Serena reveals wider call surface than Graphify showed
+- `graph_impact` — may be upgraded if Serena reveals wider call surface than the architecture map showed
 
 ---
 

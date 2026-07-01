@@ -13,7 +13,7 @@ Then tell the agent: "set up agents for this repo"
 
 The agent runs Stage -1 in `bootstrap` mode:
 - Creates `.agent-auth.yaml` (tokens requested on demand)
-- Installs missing tools (AI DevKit, Android CLI, Graphify if approved)
+- Installs missing tools (Spec Kit, Android CLI, Understand-Anything — or Graphify as fallback — if approved)
 - Writes `.project-orchestration/reports/preflight.md`
 
 ---
@@ -117,7 +117,8 @@ The agent loads refs only when needed:
 .project-orchestration/tasks/{task_id}/       ← per-task state + evidence
 docs/ai/tasks/{task_id}/handoff.md            ← handoff snapshot for incoming dev
 docs/ai/                                      ← all agent-generated artifacts
-graphify-out/                                 ← architecture graph
+.understand-anything/                         ← architecture graph (primary tool)
+graphify-out/                                 ← architecture graph (fallback tool)
 ```
 
 ---
@@ -126,7 +127,7 @@ graphify-out/                                 ← architecture graph
 
 | Goal | Tell the agent |
 |---|---|
-| Rebuild architecture graph | "refresh the graph" |
+| Rebuild architecture graph (Understand-Anything, or Graphify fallback) | "refresh the graph" |
 | Update all tools | "update agents" |
 | Resume interrupted task | "resume task ANDROID-XX" |
 | Full clean reset | "force reinstall agents" |

@@ -1,6 +1,26 @@
 # Changelog
 
-## v4.10.1
+## v4.12.0
+
+### Added
+
+- **Understand-Anything as primary architecture map** (`SKILL.md`, `refs/*.md`, `templates/*`, `docs/FLOW.md`, `.gitignore`): [Understand-Anything](https://github.com/Egonex-AI/Understand-Anything) (`/understand`, `.understand-anything/knowledge-graph.json`) is now checked **first** at Stage -1 for the architecture-map lane. Graphify becomes the **fallback** — only checked/used when Understand-Anything's plugin/skill is not installed and `.understand-anything/knowledge-graph.json` does not exist. Lane D renamed from "Graphify" to "Architecture Map (Understand-Anything primary, Graphify fallback)".
+- `templates/tooling-preflight.sh`: new Understand-Anything detection block (plugin search under `.claude/plugins`, `.understand-anything/knowledge-graph.json` presence) in both `--json` and markdown modes. `preflight.json` gains `tools.understand_anything` and a new `architecture_map` object (`active_tool`, `understand_anything_graph_present`, `graphify_report_present`, `graphify_json_present`) replacing the old Graphify-only `graph` object. Non-blocking gap renamed `graphify_missing`/`graph_report_missing` → `architecture_map_missing`/`architecture_map_graph_missing`.
+- `refs/contracts-and-artifacts.md`: `context-pack.json → tooling_readiness.graphify` replaced with `tooling_readiness.architecture_map { active_tool, state }`. `owner:` enum gains `understand-anything`. Decision Ownership and stage-trigger tables updated to show Understand-Anything as primary owner of architecture impact.
+- `refs/sub-agents.md`: Tooling Preflight Auditor YAML contract gains `architecture_map { active_tool, understand_anything, graphify }` replacing the flat `graphify:` block. Graph Impact Reader `source_type` generalized from `graphify` to `architecture-map` with a `tool` field.
+
+### Changed
+
+- All prose referring to "Graphify" as *the* architecture-map check (Stage -1 determine list, Discovery reads, Verify updates, staleness checks, playbooks, `docs/FLOW.md` diagrams) now describes the priority-checked pair: Understand-Anything first, Graphify fallback. Graphify's own behavior when it is the active tool is unchanged.
+
+## v4.11.0
+
+### Changed
+
+- **Replaced AI DevKit with Spec Kit as Lane A** (`SKILL.md`, `refs/*.md`, `templates/*`, `docs/FLOW.md`, `docs/ai/decisions/0000-template.md`, `.gitignore`): Lane A conductor is now [Spec Kit](https://github.com/github/spec-kit) (`specify` CLI). Tooling check switched from `command -v ai-devkit` + `.ai-devkit.json` (file) to `command -v specify` + `.specify/` (directory, produced by `specify init`). Install/update rules now use the real Spec Kit commands: `uv tool install specify-cli --from git+https://github.com/github/spec-kit.git@vX.Y.Z` (or ephemeral `uvx --from git+https://github.com/github/spec-kit.git specify ...`) to install, `specify init --here --integration <agent>` to bootstrap, and `specify self check` / `specify self upgrade` to update. `.specify/memory/constitution.md` (produced by `/speckit.constitution`) is treated as human-approved and must never be hand-edited or silently overwritten.
+- All `owner: ai-devkit` artifact-contract fields renamed to `owner: spec-kit`; the `Tooling Preflight Auditor` output contract in `refs/sub-agents.md` renamed `ai_devkit` → `spec_kit`.
+- Orchestrator's own `docs/ai/**` artifact contract (requirements, design, planning, ADRs) is unchanged — Spec Kit's native `/speckit.specify`, `/speckit.plan`, `/speckit.tasks`, and `/speckit.clarify` commands may be used as the underlying mechanism for those stages, but the canonical human-reviewed artifact still lives under `docs/ai/tasks/{task_id}/**`.
+
 
 ### Added
 
@@ -316,7 +336,7 @@
 
 - Stage -1 Tooling Preflight before Stage 0 Intake.
 - Provisioning modes: `audit`, `bootstrap`, `update`, `refresh-graph`, `force-reinstall`.
-- Install/update decision rules for AI DevKit, Android CLI, Android skills, Graphify, and Karpathy guidelines.
+- Install/update decision rules for Spec Kit, Android CLI, Android skills, Graphify, and Karpathy guidelines.
 - `refs/provisioning-preflight.md`.
 - `templates/preflight-report.md`.
 - `templates/tooling-preflight.sh`.

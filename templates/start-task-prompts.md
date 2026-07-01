@@ -35,7 +35,7 @@ Questions to answer:
 - <question 3>
 
 Please run Stage -1 in audit mode.
-Read Graphify output if available.
+Read the active architecture-map output if available (Understand-Anything, or Graphify as fallback).
 Do not modify product code.
 Return findings, risks, and recommended next steps.
 ```
@@ -52,9 +52,9 @@ Prepare the repo for future Android tasks.
 
 Expected setup:
 - Create `.agent-auth.yaml` if missing, but do not print token values.
-- Initialize or reconcile AI DevKit project setup if needed.
+- Initialize or reconcile Spec Kit project setup if needed.
 - Check Android CLI and Android skills availability.
-- Build Graphify output only if useful for this codebase and approved.
+- Build Understand-Anything output only if useful for this codebase and approved; build Graphify instead only if Understand-Anything is unavailable.
 
 Please run Stage -1 in bootstrap mode.
 Install or initialize missing tools only when approval is required and granted.
@@ -73,9 +73,10 @@ Goal:
 Bring existing orchestration tools and skill setup up to date without changing product code.
 
 Update scope:
-- AI DevKit: <update/reconcile/none>
+- Spec Kit: <update/reconcile/none>
 - Android CLI and skills: <update/list/reconcile/none>
-- Graphify package: <update/none>
+- Understand-Anything: <update/none>
+- Graphify package (fallback, if Understand-Anything unavailable): <update/none>
 - Serena: <check/update/none>
 
 Constraints:
@@ -96,11 +97,11 @@ Stop after reporting updated tools, skipped tools, blockers, and follow-up actio
 Refresh the architecture graph for this repo using Android Agent Orchestrator.
 
 Goal:
-Update Graphify output so later tasks can use current architecture context.
+Update the architecture-map output so later tasks can use current architecture context. Understand-Anything is checked first; Graphify is only used as a fallback if Understand-Anything is unavailable.
 
 Graph target:
 - Scope: <whole repo or specific module/path>
-- Existing graph path: graphify-out/ or none
+- Existing graph path: .understand-anything/ or graphify-out/ or none
 - Reason: <stale graph/new codebase/pre-implementation analysis/post-implementation update>
 
 Constraints:
@@ -108,7 +109,7 @@ Constraints:
 - Do not install or update unrelated tools.
 
 Please run Stage -1 in refresh-graph mode.
-Run `/graphify .` if the graph is missing, or `/graphify . --update` if it exists.
+Run `/understand` (Understand-Anything). If Understand-Anything is unavailable, fall back to `/graphify .` if the graph is missing, or `/graphify . --update` if it exists.
 Write `.project-orchestration/reports/preflight.md`.
 Stop after reporting graph status, freshness, and any blockers.
 ```
@@ -323,7 +324,7 @@ Questions I need answered before implementation:
 
 Constraints:
 - Do not implement until the architecture surface and requirements are clear.
-- Refresh Graphify only if approved.
+- Refresh the architecture map (Understand-Anything, or Graphify fallback) only if approved.
 - Stop if clarification outcome is blocked.
 
 Please run Stage -1 audit first, then proceed through Stage 0-2 only.

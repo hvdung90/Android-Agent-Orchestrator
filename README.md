@@ -46,7 +46,7 @@ The short version:
 The skill runs through numbered stages. Each stage has a defined input, output, and gate:
 
 ```
-Stage -1  Tooling Preflight     Audit tools, check auth, read architecture graph
+Stage -1  Tooling Preflight     Audit tools, check auth, read architecture graph (Understand-Anything, or Graphify fallback)
 Stage  0  Intake                Classify task, derive source mode (Jira / Figma / plain text)
 Stage  1  Discovery             Run source readers, graph impact analysis
 Stage  1.5 Clarification        Resolve ambiguities, conflicts, missing info (auto-skipped if clear)
