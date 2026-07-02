@@ -480,6 +480,7 @@ At Stage 2.5, before creating a new ADR: list `docs/ai/decisions/ADR-*.md`, pars
 ### 4d) Duplicate-ADR detection procedure
 
 At Stage 2.5, before creating a new ADR: read `docs/ai/decisions/README.md` only (not every individual ADR file — keeps the check cheap) and match the current task's decision-trigger category and requirements keywords against the index's Title/Status columns.
+- **If `docs/ai/decisions/README.md` does not exist yet** → there are no ADRs in the ledger; treat as "no match" and proceed to create a new ADR normally (this also triggers the index file's first creation).
 - Match found, status `Accepted`, still valid → link to it; record `adr_required: false, reason: "covered by ADR-NNNN"` (reuses the existing `adr_required: false` + reason mechanism — this is simply a new valid reason string) — do not create a new ADR.
 - Match found, status `Accepted`, decision has changed → create a new ADR with `supersedes: ADR-NNNN` (see § 4 Immutability rule).
 - No match → proceed to create a new ADR normally.

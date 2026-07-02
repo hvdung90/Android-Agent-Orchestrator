@@ -469,7 +469,7 @@ Create an ADR-lite when the task touches any of:
 - test strategy with broad impact.
 
 If a trigger fires, first check the **global decision ledger** before creating anything new:
-- read `docs/ai/decisions/README.md` (the index only — not every ADR file) and check whether an existing `Accepted` ADR already covers this decision category.
+- read `docs/ai/decisions/README.md` (the index only — not every ADR file); if the file does not exist yet, treat it as "no ADRs exist" and skip straight to creating one below. Otherwise check whether an existing `Accepted` ADR already covers this decision category.
 - If a covering `Accepted` ADR exists and is still valid → link to it, record `adr_required: false, reason: "covered by ADR-NNNN"` in `session.json` and `execution.md` — do not create a duplicate.
 - If a covering ADR exists but the decision has changed → create a new ADR with `supersedes: ADR-NNNN`; when this new ADR is later Accepted, flip the old ADR's `status: superseded` + `superseded_by:` and its index row.
 
