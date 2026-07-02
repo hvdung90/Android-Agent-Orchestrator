@@ -3,7 +3,7 @@ name: android-agent-orchestrator
 description: Use when starting, planning, analyzing, or implementing any Android task — new feature, bug fix, refactor, migration, AGP upgrade, architecture review, or repo setup. Use when user says start task, new feature, fix bug, analyze repo, migrate, upgrade, implement, review architecture, or set up agents for an Android project.
 license: MIT
 metadata:
-  version: 4.14.0
+  version: 4.15.0
   category: orchestration
   lanes:
     - spec-kit
@@ -26,7 +26,7 @@ metadata:
     - refs/playbooks.md
 ---
 
-# Android Agent Orchestrator v4.14.0
+# Android Agent Orchestrator v4.15.0
 
 ## Activation
 
@@ -134,6 +134,12 @@ otherwise                                   →  governed
 Write `preliminary_mode` to `session.json` at Stage 0. **Finalize at the end of Stage 1** — after reading all sources and Graphify — write `workflow_mode` (final) + `complexity_score` + `risk_score` + `mode_reasons` to `context-pack.json` and `session.json`. Stage 1.5 reads the mode that Stage 1 already wrote; it does not re-score.
 
 ---
+
+## What changed in v4.15.0
+
+**v4.15.0** — Kotlin/Android convention verification.
+
+Adds a real check that design/plan/implementation actually follows Android/Kotlin conventions — previously the only gates were generic (Karpathy: "surgical, no over-engineering") with zero reference to any named Kotlin/Android standard. Stage 3 now computes `kotlin_convention_scope[]` once (from Affected Areas + `change_type`: Compose UI → `compose-multiplatform-patterns`, ViewModel/Repository/Navigation/DI → `android-clean-architecture`, coroutines/Flow → `kotlin-coroutines-flows`, tests → `kotlin-testing`, any Kotlin file → `kotlin-patterns`), written into `implementation-plan.md`'s header. Android Advisor consults the matching companion skill(s) as reference at design time. Stage 4 step 11's existing Karpathy dispatch widens to also run the convention check, three-tier fallback: `kotlin-reviewer` agent → companion skill docs → general knowledge — the check may degrade through these tiers, but recording which tier was used (`kotlin_convention_check`) is never optional (new hard rule #27). No new mandatory reviewer step; no change to the Stage 4 Karpathy compliance-matrix row's tier (still MANDATORY — never skippable), only its description widened, so historical `skip-log.json` entries keep their meaning. **Deliberate non-change:** Stage -1 preflight gets no new field for this — same reasoning as Figma MCP tool detection.
 
 ## What changed in v4.14.0
 
@@ -282,6 +288,7 @@ Load when `graph_impact ≥ medium` or multi-module change detected: `refs/sub-a
 24. **Mode gates artifact depth.** Fast mode artifacts must stay within `artifact_budget.fast` (see `refs/contracts-and-artifacts.md`). Never write a full design doc for a fast-mode task. Mode can only be upgraded (fast→standard, standard→governed), never downgraded, unless the human explicitly requests it.
 25. **ADR ledger is global and immutable.** Never edit an `Accepted` ADR's Decision/Consequences text in place. A changed decision gets a new ADR with `supersedes:`/`superseded_by:` cross-links; update only `status`, `superseded_by`, and the `docs/ai/decisions/README.md` index row on the superseded one.
 26. **Figma MCP availability is self-checked, not preflighted.** Figma MCP tool availability is checked by the agent's own tool list at Figma Reader activation time (Stage 1), never assumed or recorded from Stage -1 preflight — a bash script cannot detect MCP tool presence.
+27. **Kotlin/Android convention check recording is mandatory.** For every Stage 4 task with a non-empty `kotlin_convention_scope`, the check itself may degrade through the fallback tiers (`kotlin-reviewer` agent → companion skill docs → general knowledge), but recording which tier was used (`kotlin_convention_check`) in `execution.md` may never be omitted.
 
 ---
 
@@ -300,7 +307,7 @@ Owns runtime evidence, screenshots, layout capture, device actions, official And
 Owns graph build/query/update and architecture evidence. Understand-Anything is checked first; Graphify is used only when Understand-Anything is unavailable.
 
 ### Lane E — Karpathy guidelines
-Owns code-touching behavior and diff review.
+Owns code-touching behavior, diff review, and Kotlin/Android convention verification (idiomatic patterns, Compose, coroutines, clean architecture) when `kotlin_convention_scope` is non-empty.
 
 v4.2 does **not** add a sixth lane. Stage -1 is a stage.
 
@@ -506,6 +513,8 @@ Spec Kit writes design/planning docs. Android skills write Android memo. No prod
 
 When `code_owner` is confirmed, generate `docs/ai/tasks/{task_id}/handoff.md` and update `session.json → assignee`, `branch`. Update `.project-orchestration/status.json`.
 
+**Kotlin/Android convention scope (computed once here, reused at Stage 4):** derive `kotlin_convention_scope[]` from the requirements' Affected Areas checklist + `change_type` (mapping in `refs/contracts-and-artifacts.md` § Kotlin/Android convention scope). If non-empty, Android Advisor consults the matching companion skill(s) (`kotlin-patterns`, `android-clean-architecture`, `compose-multiplatform-patterns`, `kotlin-coroutines-flows`, `kotlin-testing`) if available as reference, recording `convention_refs_consulted[]`. Write `kotlin_convention_scope` into `implementation-plan.md`'s header — Stage 4 reuses this list, it never recomputes it. If empty, AUTO-SKIP (write to skip-log).
+
 ### Stage 4 — Implementation Lock with Android TDD
 
 Exactly one code owner edits code. All other lanes are advisory only.
@@ -526,7 +535,7 @@ Exactly one code owner edits code. All other lanes are advisory only.
 8. Commit this task: `git commit -m "<type>(<scope>): <what and why>"`.
 9. Dispatch **spec-compliance reviewer**: verifies this task matches acceptance criteria exactly — nothing missing, nothing extra. Does not trust implementer's summary; reads actual code.
 10. If spec issues found → fix → re-review. Only when spec compliance is ✅ proceed.
-11. Dispatch **Karpathy/code-quality reviewer**: surgical changes, no over-engineering, scope discipline.
+11. Dispatch **Karpathy/code-quality reviewer**: surgical changes, no over-engineering, scope discipline. **If `kotlin_convention_scope` (from Stage 3) is non-empty, also run the Kotlin/Android convention check as part of this same dispatch:** use the `kotlin-reviewer` agent if available → else consult the matching companion skill(s) from `kotlin_convention_scope` → else apply general Kotlin/Android knowledge. Record which tier was used as `kotlin_convention_check` in `execution.md` — **recording is mandatory even when the check degrades to general knowledge; never omit it.**
 12. If quality issues found → fix → re-review. Only when quality is ✅ mark task done.
 13. Move to next task in `implementation-plan.md`.
 
@@ -625,6 +634,7 @@ If unsure, choose `audit`.
 - If missing in `audit`, record the gap.
 - If code is touched, apply the principles even if the plugin is not installed, and record how the gate was applied.
 - Do not overwrite existing `CLAUDE.md` unless explicitly requested.
+- **Kotlin/Android convention check (part of the same Stage 4 dispatch, only when `kotlin_convention_scope` is non-empty):** three-tier fallback — dispatch the `kotlin-reviewer` agent if available; else consult the matching companion skill(s) (`kotlin-patterns`, `android-clean-architecture`, `compose-multiplatform-patterns`, `kotlin-coroutines-flows`, `kotlin-testing`) as reference; else apply general Kotlin/Android knowledge. Whichever tier runs, degrade gracefully — but always record `kotlin_convention_check` in `execution.md`; never omit the record even when the check itself falls through to general knowledge.
 
 ### Serena
 - Check `uv` presence and `uvx serena` availability in Stage -1 (non-blocking).

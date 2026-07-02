@@ -1,6 +1,6 @@
 # Provisioning Preflight
 
-_Skill version: 4.14.0 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 4.15.0 — update this when SKILL.md bumps a minor or major version._
 
 ## Purpose
 
@@ -204,6 +204,8 @@ Decision:
 | Missing | `bootstrap/update` | Install plugin or add project guidance if approved |
 | `CLAUDE.md` exists | Any | Do not overwrite silently |
 | Code-touching task | Any | Apply Karpathy principles manually even if install missing |
+
+**Kotlin/Android convention check — not Stage -1 detectable:** whether the `kotlin-reviewer` agent or the companion skills (`kotlin-patterns`, `android-clean-architecture`, `compose-multiplatform-patterns`, `kotlin-coroutines-flows`, `kotlin-testing`) are available is checked by the agent's own tool/skill list at Stage 3/Stage 4 activation time — same reasoning as the Figma MCP and Karpathy-plugin checks. No new field is added to `preflight.json`/`preflight.md` for this; a bash script cannot introspect what the agent itself has loaded.
 
 ---
 

@@ -1,5 +1,15 @@
 # Changelog
 
+## v4.15.0
+
+### Added
+
+- **Kotlin/Android convention verification** (`refs/sub-agents.md`, `refs/contracts-and-artifacts.md`, `SKILL.md`, `refs/compliance-policy.md`, `refs/provisioning-preflight.md`, `docs/FLOW.md`): the only prior checks (Karpathy: "surgical, no over-engineering") were generic — zero reference anywhere to Kotlin coding conventions, Jetpack/Compose best practices, or clean architecture. Stage 3 now computes `kotlin_convention_scope[]` **once** from the requirements' Affected Areas + `change_type` (mapping table in `refs/contracts-and-artifacts.md` § Kotlin/Android convention scope: Compose UI → `compose-multiplatform-patterns`, ViewModel/Repository/Navigation/DI → `android-clean-architecture`, coroutines/Flow → `kotlin-coroutines-flows`, tests → `kotlin-testing`, any Kotlin file → `kotlin-patterns`), written into `implementation-plan.md`'s header — Stage 4 reuses it, never recomputes. Android Advisor consults the matching companion skill(s) as design-time reference (`convention_refs_consulted[]`).
+- **Stage 4 step 11's existing Karpathy dispatch widens** to also run the convention check when `kotlin_convention_scope` is non-empty — no new mandatory reviewer step. Three-tier fallback: `kotlin-reviewer` agent (active diff inspection) → companion skill docs (reference) → general Kotlin/Android knowledge — mirrors Karpathy's own existing degrade-gracefully pattern. **The check may degrade through these tiers, but recording which tier was used (`kotlin_convention_check: agent | skill_docs | general_knowledge | not_applicable`) in `execution.md` is never optional** — new hard rule #27, new item in compliance-policy.md §3 "What can never be bypassed", new Drift Check item.
+- `refs/compliance-policy.md`: new row "Stage 3 Android Advisor convention consult" (AUTO-SKIP when scope empty). Existing "Stage 4 quality review (Karpathy) per task" row's *description* widens to "Karpathy + Kotlin/Android convention" — its **tier stays MANDATORY — never skippable, unchanged**, so historical `skip-log.json` entries keep their meaning under the append-only audit rule.
+- `refs/contracts-and-artifacts.md`: Decision Ownership table gains a "Kotlin/Android idiom & convention compliance" row. **Deliberate non-change:** no new `preflight.json` field — same reasoning as Figma MCP tool detection, a bash script cannot introspect which agents/skills the AI itself has loaded.
+- Lane E ("Karpathy guidelines") description extended to mention Kotlin/Android convention verification. Lane B ("Android skills" — the external `android` CLI tool) is unchanged; it is a distinct concept from the Claude Code companion skills this feature uses.
+
 ## v4.14.0
 
 ### Added

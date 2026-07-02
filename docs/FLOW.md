@@ -1,6 +1,6 @@
 # Android Agent Orchestrator — Complete Flow
 
-_Reflects skill v4.14.0. Update when SKILL.md changes._
+_Reflects skill v4.15.0. Update when SKILL.md changes._
 
 ---
 
@@ -477,6 +477,11 @@ All task types start with Stage -1.
   session.json → code_owner, assignee, branch set
         │
         ▼
+  Compute kotlin_convention_scope[] once (Affected Areas + change_type)
+  → written into implementation-plan.md header; Stage 4 reuses it
+  → Android Advisor consults matching companion skill(s) if available
+        │
+        ▼
   ┌───────────────────────────────────────────────────────┐
   │  HANDOFF ARTIFACT GENERATED (MANDATORY)               │
   │                                                       │
@@ -514,6 +519,7 @@ All task types start with Stage -1.
   │                                                               │
   │  ⑥ Spec-compliance review ✅  (FIRST — does it meet AC?)     │
   │  ⑦ Quality/Karpathy review ✅ (SECOND — is it clean code?)   │
+  │  ⑧ Kotlin/Android convention ✅ (same dispatch, if in scope) │
   │                                                               │
   │  → Next task                                                  │
   └───────────────────────────────────────────────────────────────┘

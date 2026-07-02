@@ -1,6 +1,6 @@
 # Sub-agent Catalog and Dependency Rules
 
-_Skill version: 4.14.0 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 4.15.0 — update this when SKILL.md bumps a minor or major version._
 
 ## Design principle
 
@@ -264,9 +264,13 @@ token_reuse_recommendation:
   - figma_token: <figma_name from Figma Reader's design_tokens[]>
     matched_resource: <existing res name | null>
     propose_new_name: <suggested Android resource name, only if no match>
+kotlin_convention_scope: []       # e.g. [kotlin-patterns, android-clean-architecture, compose-multiplatform-patterns]
+convention_refs_consulted: []     # which of the above were actually loaded/read for this task
 ```
 
 `token_reuse_recommendation` is populated only when Figma Reader's `design_tokens[]` is non-empty and Android Advisor is activated with codebase read access (Stage 1.5 or Stage 3 memo) to check `res/values/colors.xml`, `dimens.xml`, or `Theme.kt` for an existing match.
+
+`kotlin_convention_scope[]` is computed **once at Stage 3** from the Affected Areas checklist + `change_type` (mapping table in `refs/contracts-and-artifacts.md` § Kotlin/Android convention scope) and written into `implementation-plan.md`'s header — Stage 4's per-task quality review reuses this list, it never recomputes it. Android Advisor consults the matching companion skill(s) (`kotlin-patterns`, `android-clean-architecture`, `compose-multiplatform-patterns`, `kotlin-coroutines-flows`, `kotlin-testing`) as reference when available, recording which were actually read in `convention_refs_consulted[]`.
 
 ### QA Scenario Advisor
 

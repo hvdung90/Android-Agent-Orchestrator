@@ -1,6 +1,6 @@
 # Contracts, Artifacts, and Gates
 
-_Skill version: 4.14.0 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 4.15.0 — update this when SKILL.md bumps a minor or major version._
 
 ---
 
@@ -358,6 +358,7 @@ version: 1.0
 owner: spec-kit
 status: draft | active | complete
 task: <task_id>
+kotlin_convention_scope: []   # computed once at Stage 3 — see § Kotlin/Android convention scope; omit if empty
 ```
 
 Required structure per task:
@@ -532,6 +533,8 @@ Required Task Changelog section:
 | <behavior/area> | <previous state> | <new state> | <test/screenshot/log/ADR> |
 ```
 
+If any completed task had a non-empty `kotlin_convention_scope`, also record its `kotlin_convention_check` tier (`agent | skill_docs | general_knowledge`) per task — e.g. as a row or inline note; this is mandatory whenever the scope is non-empty (see § Kotlin/Android convention scope).
+
 Required Drift Check section:
 
 ```markdown
@@ -553,6 +556,7 @@ Required Drift Check section:
 - [ ] docs/ai/decisions/README.md exists and has exactly one row per ADR file present in docs/ai/decisions/ (no orphaned file, no orphaned row)
 - [ ] no Accepted ADR's Decision/Consequences text was hand-edited outside a supersede (status/superseded_by/index-row change only)
 - [ ] if docs/ai/architecture/ exists: docs/ai/architecture/README.md lists every domain file present, and no domain file is missing a Change Log entry for this task's changes when the § 4e trigger was met
+- [ ] every completed Stage 4 task with a non-empty `kotlin_convention_scope` has a recorded `kotlin_convention_check` tier — no silent omission
 ```
 
 ### 6) `docs/ai/tasks/{task_id}/handoff.md`
@@ -815,6 +819,24 @@ Android CLI derives required evidence at the start of Stage 5:
 
 ---
 
+## Kotlin/Android convention scope
+
+Computed once at Stage 3 from the requirements' Affected Areas checklist + `change_type`, written into `implementation-plan.md`'s header (§ 3b), reused (never recomputed) by Stage 4's per-task quality review.
+
+| Affected Area / signal | `kotlin_convention_scope` entry |
+|---|---|
+| Compose UI | `compose-multiplatform-patterns` |
+| ViewModel / Repository / UseCase / Navigation / DI | `android-clean-architecture` |
+| Coroutines / Flow / suspend usage | `kotlin-coroutines-flows` |
+| Tests (any) | `kotlin-testing` |
+| Any Kotlin file touched | `kotlin-patterns` (always included whenever the list is non-empty) |
+
+If no Affected Area maps and no Kotlin file is in scope (e.g. a pure version-catalog bump), `kotlin_convention_scope` stays empty — Stage 3's Android Advisor consult and Stage 4's convention check both AUTO-SKIP (see `refs/compliance-policy.md`).
+
+**Check-tier fallback (Stage 4, per task with non-empty scope):** dispatch the `kotlin-reviewer` agent if available → else consult the matching companion skill(s) from the table above → else apply general Kotlin/Android knowledge. Record which tier was used as `kotlin_convention_check: agent | skill_docs | general_knowledge | not_applicable` in `execution.md` — **recording this is mandatory even when the check itself degrades to general knowledge; never omit it.**
+
+---
+
 ---
 
 ## Local memory schemas
@@ -1044,6 +1066,7 @@ Understand-Anything is checked first; Graphify is the fallback only when Underst
 | Billing / auth / notifications | Android skills + Android CLI | scenario test + runtime evidence |
 | Architecture impact | Understand-Anything (Graphify fallback) | graph diff/report |
 | Design tokens / component reuse (Figma → Android resources) | Figma Reader (raw) + Android Advisor (resolved) | Android Advisor's `token_reuse_recommendation` or Stage 3 memo confirmation |
+| Kotlin/Android idiom & convention compliance | Android Advisor (design-time reference) + Karpathy/`kotlin-reviewer` (implementation-time check) | `kotlin_convention_check` tier recorded in `execution.md` |
 | Final go/no-go | Spec Kit | requirements coverage + Gate log |
 
 ---

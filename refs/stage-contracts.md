@@ -1,6 +1,6 @@
 # Stage Output Contracts
 
-_Skill version: 4.14.0 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 4.15.0 — update this when SKILL.md bumps a minor or major version._
 
 Each stage defines a typed contract: what it requires as input, what it must produce as output, and what state it writes to `session.json` on completion or interrupt.
 

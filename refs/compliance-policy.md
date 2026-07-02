@@ -1,6 +1,6 @@
 # Compliance Policy
 
-_Skill version: 4.14.0 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 4.15.0 — update this when SKILL.md bumps a minor or major version._
 
 The skill **must** follow every defined stage and gate in order. No stage may be skipped, condensed, or reordered without explicit confirmation. This file defines what requires confirmation, what is auto-allowed, what is permanently forbidden, and how every deviation is recorded.
 
@@ -28,6 +28,7 @@ Three tiers: **MANDATORY**, **AUTO-SKIP** (condition-gated, no human needed), **
 | Stage 3 `implementation-plan.md` generation | **MANDATORY** — no placeholders | — |
 | Stage 3 `handoff.md` generation | **MANDATORY when code_owner is confirmed** | — |
 | Stage 3 Android memo | AUTO-SKIP when non-Android change | `change_type` ∉ {ui_change, database_change, network_change, architecture_change} AND no Android API mentioned |
+| Stage 3 Android Advisor convention consult | AUTO-SKIP when `kotlin_convention_scope` is empty | no mapped Affected Area touched AND no Kotlin file in scope |
 | Stage 1.5 Clarification (fast mode) | AUTO-SKIP when `workflow_mode = fast` | `complexity_score ≤ 3 AND risk_score ≤ 3` finalized after Stage 1; write to skip-log |
 | Stage 2.5 ADR trigger check (fast mode) | **MANDATORY** | trigger evaluation always runs regardless of mode |
 | Stage 2.5 ADR creation + approval (fast mode) | AUTO-SKIP only if no ADR trigger fires | if any trigger fires → mode upgrades to governed; write to skip-log |
@@ -37,7 +38,7 @@ Three tiers: **MANDATORY**, **AUTO-SKIP** (condition-gated, no human needed), **
 | Stage 4 Gate E.5 RED evidence per task | **MANDATORY — never skippable** | — |
 | Stage 4 GREEN evidence per task | **MANDATORY — never skippable** | — |
 | Stage 4 spec-compliance review per task | **MANDATORY — never skippable** | — |
-| Stage 4 quality review (Karpathy) per task | **MANDATORY — never skippable** | — |
+| Stage 4 quality review (Karpathy + Kotlin/Android convention) per task | **MANDATORY — never skippable** | — |
 | Stage 4 interrupt: update `handoff.md` | **MANDATORY — never skippable** | — |
 | Stage 4 interrupt: update `status.json` | **MANDATORY — never skippable** | — |
 | Stage 5 Evidence Gate Matrix required items | **MANDATORY** | — |
@@ -145,6 +146,7 @@ These rules are absolute. No user instruction, no time pressure, no "just this o
 13. Collecting RED evidence (`evidence/red-<task-id>.txt`) before writing any product code for that task — spec-compliance and quality review order is spec first, then quality; never reversed.
 14. Computing and recording `preliminary_mode` at Stage 0 and `workflow_mode` (final) after Stage 1 — mode must be set before any stage-skip decision is made. A mode cannot be applied retroactively to justify a skip that already happened.
 15. ADR ledger immutability — an `Accepted` ADR is never edited in place, only superseded (new ADR with `supersedes:`, old ADR gets `superseded_by:` + index update).
+16. Recording `kotlin_convention_check` tier for every Stage 4 task with a non-empty `kotlin_convention_scope` — the check itself may degrade through the fallback tiers, the record may not be omitted.
 
 ---
 
