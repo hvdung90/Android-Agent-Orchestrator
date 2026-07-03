@@ -55,8 +55,8 @@ Stage  2.5 Decision Gate        Check if ADR-lite is needed → STOP for human a
 Stage  3  Design                Write design + executable implementation plan (tasks with test commands)
 Stage  4  Implementation        TDD per task: RED → GREEN → spec review → quality review → commit
 Stage  5  Verify                Collect all required evidence (build, tests, screenshots)
-Stage  6  QA Gate               Karpathy diff review + acceptance coverage check
-Stage  7  Finalization          ADR status, task changelog, drift check, handoff finalized
+Stage  6  QA Gate               Karpathy diff review + acceptance, regression, security/performance coverage
+Stage  7  Finalization          ADR status, impact closure, task summary, drift check, handoff finalized
 ```
 
 The agent **stops at Stage 2 and Stage 2.5** and will not write code without your explicit approval.
@@ -159,7 +159,8 @@ docs/ai/tasks/{task_id}/
 ├── requirements/<task>.md        ← canonical requirements (human-approved)
 ├── design/<task>.md              ← design doc
 ├── planning/implementation-plan.md  ← executable TDD plan (exact files + test commands)
-└── handoff.md                    ← current task snapshot for incoming dev
+├── handoff.md                    ← current task snapshot for incoming dev
+└── task-summary.md               ← compact continuity summary for future tasks
 
 docs/ai/decisions/                ← GLOBAL, not per-task — see File structure above
 docs/ai/architecture/             ← GLOBAL, not per-task — see File structure above

@@ -1,6 +1,6 @@
 # Sub-agent Catalog and Dependency Rules
 
-_Skill version: 4.15.0 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 4.16.0 — update this when SKILL.md bumps a minor or major version._
 
 ## Design principle
 
@@ -227,8 +227,14 @@ indirect_impacts:
   - component: <name>
     reason: <why affected>
     action_needed: monitor | update | test | notify
+    user_facing_feature: <feature/screen/flow or none>
 migration_order: []
 estimated_surface: small | medium | large
+features_to_retest:
+  - feature: <feature/screen/flow/module>
+    reason: <shared state/API/navigation/module dependency>
+    risk: low | medium | high
+    suggested_test: <unit/integration/instrumented/manual/monitor>
 ```
 
 ---
@@ -282,7 +288,21 @@ regression_zones:
   - component: <name>
     risk: <why>
     suggested_test: <test type>
+    feature: <user-facing feature/screen/flow>
+    required: true | false
 automation_candidates: []
+security_checks:
+  - concern: <auth | permission | storage | logging | network | input-validation | none>
+    check: <what to verify>
+    required: true | false
+performance_checks:
+  - concern: <startup | frame-time | memory | database | network | battery | none>
+    check: <what to measure or review>
+    required: true | false
+accessibility_checks:
+  - concern: <semantics | focus | contrast | touch-target | none>
+    check: <what to verify>
+    required: true | false
 ```
 
 ### Rollout/Risk Advisor

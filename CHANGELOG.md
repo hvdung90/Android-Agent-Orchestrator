@@ -1,5 +1,22 @@
 # Changelog
 
+## v4.16.0
+
+### Added
+
+- **Impact + regression planning layer** (`SKILL.md`, `refs/contracts-and-artifacts.md`, `refs/stage-contracts.md`, `refs/sub-agents.md`, `refs/compliance-policy.md`): `context-pack.json` now records `impact_assessment`, `regression_test_matrix`, `quality_gate_plan`, and `follow_up_watchlist` for code-touching tasks. This makes the agent explicitly answer: which features are affected, which features must be retested, which security/performance/accessibility checks apply, and which limitations are deferred.
+- **Impact Closure** (`refs/contracts-and-artifacts.md`, `refs/stage-contracts.md`, `refs/compliance-policy.md`): `execution.md` must close every required regression/security/performance row with evidence, blocker, or deferred follow-up before Gate G can pass.
+- **`task-summary.md` continuity artifact** (`refs/contracts-and-artifacts.md`, `SKILL.md`, `README.md`, `QUICKSTART.md`): Stage 7 writes a compact completed-task summary so future overlapping tasks can load a cheap memory artifact before reading full requirements/design/execution history.
+- **Compliance hardening** (`refs/compliance-policy.md`): new mandatory rows for impact/regression planning, required regression/security/performance evidence, Impact Closure, and task-summary generation. New hard rule #28 prevents code-touching tasks from closing without explicit impact and quality outcomes.
+- **"Code-touching task" definition** (`SKILL.md` § Stage 1, `refs/contracts-and-artifacts.md`): precisely defined as task types [E]-[J] per `docs/FLOW.md` / any task where `change_type` gets set, as opposed to [A]-[D] (Analyze, Bootstrap, Update, Refresh-graph) which end after Stage -1 — replaces the earlier ambiguous "analysis-only or tooling-only" phrasing with a term cross-referenced to the existing task-type taxonomy.
+- **Fast-mode lite scope for the impact/regression layer** (`SKILL.md` Fast Mode table + hard rule #28, `refs/contracts-and-artifacts.md` `artifact_budget.fast`): Impact + Regression Plan, Impact Closure, and `task-summary.md` stay MANDATORY for code-touching tasks but scope to the directly changed feature + signal-triggered `quality_gate_plan` categories only in fast mode — matching every other fast-mode artifact reduction already in this skill. A fast-mode task whose regression/impact data reveals indirect impact auto-upgrades to `standard` (same shape as the existing >5-ACs rule).
+
+### Changed
+
+- Stage 2 requirements now include an Impact / Regression section.
+- Stage 3 implementation plans now include per-task regression/security/performance checks and evidence paths.
+- Stage 6 QA now verifies regression matrix coverage and security/performance outcomes in addition to acceptance coverage and Karpathy review.
+
 ## v4.15.0
 
 ### Added

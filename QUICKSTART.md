@@ -54,6 +54,12 @@ docs/ai/decisions/ADR-*.md                       ← review if Stage 2.5 require
 Reply `approve` to continue to the decision gate, then design + implementation when no ADR is required or the ADR is approved/deferred.
 Reply with corrections to adjust requirements before coding starts.
 
+The requirements doc should also show:
+- which features/modules are directly affected,
+- which related features must be retested,
+- security/performance/accessibility checks required for the change,
+- known limitations or follow-ups that are not fully solved by this task.
+
 ---
 
 ## Step 4 — Handoff a task (multi-dev)
@@ -89,6 +95,7 @@ Shows every task: stage, assignee, branch, PR, blocker — in one file.
 
 ```
 docs/ai/tasks/{task_id}/handoff.md        ← full task snapshot for incoming dev
+docs/ai/tasks/{task_id}/task-summary.md   ← compact completed-task memory for future tasks
 .project-orchestration/status.json        ← all tasks dashboard
 ```
 

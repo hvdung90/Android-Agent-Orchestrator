@@ -1,6 +1,6 @@
 # Compliance Policy
 
-_Skill version: 4.15.0 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 4.16.0 — update this when SKILL.md bumps a minor or major version._
 
 The skill **must** follow every defined stage and gate in order. No stage may be skipped, condensed, or reordered without explicit confirmation. This file defines what requires confirmation, what is auto-allowed, what is permanently forbidden, and how every deviation is recorded.
 
@@ -17,6 +17,7 @@ Three tiers: **MANDATORY**, **AUTO-SKIP** (condition-gated, no human needed), **
 | Stage 0 Intake | **MANDATORY** | — |
 | Stage 1 Discovery — source readers | **MANDATORY** per source_mode | — |
 | Stage 1 Gradle Module Impact Analyzer | AUTO-SKIP when `graph_impact = low` | `graph_impact = low` confirmed in context-pack |
+| Stage 1/1.5 Impact + Regression Plan | **MANDATORY for code-touching tasks** | — |
 | Stage 1.5 Clarification | AUTO-SKIP when all exit conditions met | all 6 trigger conditions false AND docs detailed |
 | Stage 2 Requirements write | **MANDATORY** | — |
 | Stage 2 Human approval gate | **MANDATORY — never skippable** | — |
@@ -39,9 +40,11 @@ Three tiers: **MANDATORY**, **AUTO-SKIP** (condition-gated, no human needed), **
 | Stage 4 GREEN evidence per task | **MANDATORY — never skippable** | — |
 | Stage 4 spec-compliance review per task | **MANDATORY — never skippable** | — |
 | Stage 4 quality review (Karpathy + Kotlin/Android convention) per task | **MANDATORY — never skippable** | — |
+| Stage 4 regression/security/performance check status per task | **MANDATORY when declared in `quality_gate_plan`** | — |
 | Stage 4 interrupt: update `handoff.md` | **MANDATORY — never skippable** | — |
 | Stage 4 interrupt: update `status.json` | **MANDATORY — never skippable** | — |
 | Stage 5 Evidence Gate Matrix required items | **MANDATORY** | — |
+| Stage 5 required regression/security/performance evidence | **MANDATORY when declared in context-pack** | — |
 | Stage 5 Evidence Gate Matrix optional items | AUTO-SKIP (never required) | always optional |
 | Stage 5 architecture-map update | AUTO-SKIP when `graph_impact = low` | `graph_impact = low` in context-pack |
 | Stage 5 Gradle Module Impact build scope | AUTO-SKIP when `module_impact_chain` absent | `module_impact_chain` not populated |
@@ -51,6 +54,8 @@ Three tiers: **MANDATORY**, **AUTO-SKIP** (condition-gated, no human needed), **
 | Stage 7 Docs/decision finalization | **MANDATORY** | — |
 | Stage 7 ADR final status | **MANDATORY when ADR exists** | — |
 | Stage 7 Task Changelog | **MANDATORY** | — |
+| Stage 7 Impact Closure | **MANDATORY for code-touching tasks** | — |
+| Stage 7 `task-summary.md` | **MANDATORY for code-touching tasks** | — |
 | Stage 7 Drift Check | **MANDATORY** | — |
 | Write session.json state transitions | **MANDATORY — never skippable** | — |
 | Write skip-log.json on any skip | **MANDATORY — never skippable** | — |
@@ -68,6 +73,7 @@ These steps are mandatory by default but a human may override them. Agent must *
 | Stage 2.5 ADR-lite when any decision trigger fires | "Decision trigger fired: `<reason>`. Skip ADR-lite and proceed to design? This removes the architecture decision record. (y/n)" |
 | Stage 4 Gate E.5 TDD for a specific task | "Task `<task-id>` is `<change_type>`. TDD is required. Skip RED-first for this task? Writing code without RED evidence. (y/n)" — see TDD exemption categories below |
 | Stage 5 any required evidence item (tool unavailable) | "Required evidence `<item>` cannot be collected (`<reason>`). Skip and proceed without it? This will be recorded in skip-log.json. (y/n)" |
+| Stage 5 required regression/security/performance evidence (tool unavailable or manual-only) | "Required impact evidence `<item>` cannot be collected (`<reason>`). Defer with follow-up `<tracking_ref>` or block the task? Confirm defer? (y/n)" |
 | Stage 6 Karpathy CRITICAL/HIGH finding | "Karpathy flagged `<issue>`. Proceed to close without fixing? This overrides the QA gate. (y/n)" |
 | Stage 7 Drift Check failure | "Drift check failed: `<reason>`. Close anyway? This will be recorded in skip-log.json. (y/n)" |
 | Any stage re-ordering or parallel shortcut not defined in SKILL.md | "This would run Stage `<X>` before Stage `<Y>` is complete. Confirm? (y/n)" |
@@ -147,6 +153,7 @@ These rules are absolute. No user instruction, no time pressure, no "just this o
 14. Computing and recording `preliminary_mode` at Stage 0 and `workflow_mode` (final) after Stage 1 — mode must be set before any stage-skip decision is made. A mode cannot be applied retroactively to justify a skip that already happened.
 15. ADR ledger immutability — an `Accepted` ADR is never edited in place, only superseded (new ADR with `supersedes:`, old ADR gets `superseded_by:` + index update).
 16. Recording `kotlin_convention_check` tier for every Stage 4 task with a non-empty `kotlin_convention_scope` — the check itself may degrade through the fallback tiers, the record may not be omitted.
+17. Impact closure — for every code-touching task, Stage 7 must record impacted features, regression evidence, security/performance outcomes, and unresolved follow-ups in `execution.md` and `task-summary.md`.
 
 ---
 
@@ -207,7 +214,7 @@ Every gate transition must be recorded in `execution.md`:
 | Gate E  | passed | 2026-05-07T10:30Z | code_owner: spec-kit; implementation-plan.md generated |
 | Gate E.5 | passed | 2026-05-07T10:45Z | RED evidence: evidence/red-task-1.txt, red-task-2.txt |
 | Gate F  | passed | 2026-05-07T11:45Z | all required evidence collected |
-| Gate G  | passed | 2026-05-07T12:00Z | Karpathy: no critical issues; Stage 7 finalized |
+| Gate G  | passed | 2026-05-07T12:00Z | Karpathy: no critical issues; Impact Closure complete; Stage 7 finalized |
 ```
 
 ---
@@ -226,8 +233,9 @@ Brackets `[]` = may be auto-skipped under conditions above.
 - Product code is written for a task before RED evidence exists for that task (Gate E.5).
 - Spec-compliance review is skipped or run after quality review for any task.
 - Stage 5 closes without all required evidence items.
+- Stage 5 closes without required regression/security/performance evidence or explicit deferred follow-up.
 - Stage 6 closes with unresolved CRITICAL Karpathy findings.
-- Stage 7 closes with missing ADR final status, Task Changelog, or Drift Check.
+- Stage 7 closes with missing ADR final status, Impact Closure, Task Changelog, task-summary.md, or Drift Check.
 - `workflow_mode` is not set before any fast-mode AUTO-SKIP is recorded.
 - Mode is downgraded (e.g. governed → fast) without explicit human confirmation.
 - `artifact_budget.fast` is exceeded without mode being upgraded to `standard`.

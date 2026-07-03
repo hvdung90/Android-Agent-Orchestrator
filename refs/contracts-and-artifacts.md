@@ -1,6 +1,6 @@
 # Contracts, Artifacts, and Gates
 
-_Skill version: 4.15.0 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 4.16.0 — update this when SKILL.md bumps a minor or major version._
 
 ---
 
@@ -155,6 +155,41 @@ Exception: always include `feature_id`, `clarity_score`, `outcome`, `blocked`, `
   "design_tokens": [],
   "component_reuse": [],
   "dependencies": [],
+  "impact_assessment": {
+    "direct_features": [],
+    "indirect_features": [],
+    "modules": [],
+    "apis_or_contracts": [],
+    "data_or_state": [],
+    "runtime_or_release": []
+  },
+  "regression_test_matrix": [
+    {
+      "feature": "<feature/screen/flow/module>",
+      "reason": "<why this can regress>",
+      "risk": "low | medium | high",
+      "test_type": "unit | integration | instrumented | compose-ui | screenshot | manual | monitor",
+      "command_or_scenario": "<exact command or manual scenario>",
+      "required": true,
+      "evidence": "<planned evidence path>"
+    }
+  ],
+  "quality_gate_plan": {
+    "security": [],
+    "privacy": [],
+    "performance": [],
+    "accessibility": [],
+    "compatibility": []
+  },
+  "follow_up_watchlist": [
+    {
+      "item": "<known limitation, deferred fix, or monitoring concern>",
+      "reason": "<why not solved in this task>",
+      "owner": "<team/person/unknown>",
+      "tracking_ref": "<ticket/ADR/path or none>",
+      "severity": "low | medium | high"
+    }
+  ],
   "facts": [],
   "assumptions": [],
   "unknowns": [],
@@ -233,6 +268,21 @@ Exception: always include `feature_id`, `clarity_score`, `outcome`, `blocked`, `
 // token_reuse_recommendation, if present, comes from Android Advisor, not Figma Reader —
 // Figma Reader never checks the target codebase for existing resources.
 
+// impact_assessment / regression_test_matrix / quality_gate_plan / follow_up_watchlist guidance:
+// Populated before Stage 2 for every code-touching task — see SKILL.md § Stage 1 for the precise definition
+// (task types [E]-[J] / any task where change_type gets set). Task types [A]-[D] (Analyze, Bootstrap, Update
+// tools, Refresh graph) end after Stage -1 and never populate these fields.
+// direct_features are user-visible areas intentionally changed; indirect_features are flows that share state,
+// APIs, persistence, navigation, DI, design tokens, or module dependencies with the change.
+// regression_test_matrix is the concrete answer to "what must be tested again after this change?"
+// quality_gate_plan records security/privacy/performance/accessibility/compatibility checks needed for this
+// task; empty categories are omitted under the sparse rule.
+// follow_up_watchlist is for known limitations or risks that are not fully fixed by this task; Stage 7 carries
+// these into execution.md and task-summary.md.
+// Fast mode: scope to the lite form — direct_features + a regression row for the changed feature itself only;
+// skip the indirect-feature sweep and any quality_gate_plan category with no obvious signal (auth/network/UI/
+// storage touch). See artifact_budget.fast below.
+
 // history_context guidance:
 // Omit when task_continuity = new and no metadata scan was needed.
 // Include scan metadata when Stage 0 detected continuation signals or possible overlap.
@@ -302,6 +352,14 @@ task: <task_id>
 ## Verification Plan
 - <required evidence from Evidence Gate Matrix>
 
+## Impact / Regression
+- Direct features changed:
+- Indirect features to retest:
+- Required regression scenarios:
+- Security / privacy checks:
+- Performance / accessibility / compatibility checks:
+- Deferred follow-ups / known limitations:
+
 ## Out of Scope
 - <explicit non-goal>
 ```
@@ -370,6 +428,9 @@ Required structure per task:
 **change_type:** <ui_change | logic_change | ...>
 **code_owner:** <dev or agent name>
 
+**Regression scope:** <features/scenarios from context-pack.regression_test_matrix>
+**Security / performance scope:** <checks from context-pack.quality_gate_plan>
+
 ---
 
 ### Task 1: <acceptance criterion name>
@@ -405,6 +466,7 @@ Required structure per task:
 
 - [ ] **Spec review** ✅ — verify matches acceptance criterion, nothing extra
 - [ ] **Quality review** ✅ — Karpathy gate passed
+- [ ] **Regression / security / performance** ✅ — required checks recorded in execution.md
 
 ---
 
@@ -534,6 +596,18 @@ Required Task Changelog section:
 | <behavior/area> | <previous state> | <new state> | <test/screenshot/log/ADR> |
 ```
 
+Required Impact Closure section:
+
+```markdown
+## Impact Closure
+
+| Feature / concern | Required check | Status | Evidence / follow-up |
+|---|---|---|---|
+| <feature or security/performance concern> | <test or review> | passed | <path> |
+```
+
+Every required row from `context-pack.json → regression_test_matrix` and every non-empty category in `quality_gate_plan` must appear here. If a row is not fully verified, status must be `blocked` or `deferred` with an explicit follow-up reference.
+
 If any completed task had a non-empty `kotlin_convention_scope`, also record its `kotlin_convention_check` tier (`agent | skill_docs | general_knowledge`) per task — e.g. as a row or inline note; this is mandatory whenever the scope is non-empty (see § Kotlin/Android convention scope).
 
 Required Drift Check section:
@@ -558,6 +632,8 @@ Required Drift Check section:
 - [ ] no Accepted ADR's Decision/Consequences text was hand-edited outside a supersede (status/superseded_by/index-row change only)
 - [ ] if docs/ai/architecture/ exists: docs/ai/architecture/README.md lists every domain file present, and no domain file is missing a Change Log entry for this task's changes when the § 4e trigger was met
 - [ ] every completed Stage 4 task with a non-empty `kotlin_convention_scope` has a recorded `kotlin_convention_check` tier — no silent omission
+- [ ] every required regression/security/performance row from context-pack appears in Impact Closure with evidence, blocker, or deferred follow-up
+- [ ] docs/ai/tasks/{task_id}/task-summary.md exists and includes impact summary, evidence summary, and follow-up watchlist
 ```
 
 ### 6) `docs/ai/tasks/{task_id}/handoff.md`
@@ -616,6 +692,48 @@ Required sections:
 - `status: complete` only when `session.json → stage_status: complete`.
 - Owner is always `spec-kit`; incoming developer adds human notes under "Notes for incoming dev" manually if needed — agent does not overwrite that section after initial write.
 
+### 6b) `docs/ai/tasks/{task_id}/task-summary.md`
+
+Purpose: compact continuity artifact for future tasks. Read this before full requirements/design/execution when Task History Relevance Gate finds overlap. It should be short enough to load cheaply and specific enough to avoid rereading all history.
+
+Required front matter:
+
+```yaml
+artifact: android-task-summary
+version: 1.0
+owner: spec-kit
+status: complete
+task: <task_id>
+```
+
+Required sections:
+
+```markdown
+# Task Summary — <task title>
+
+## What Changed
+- <behavior/module/API/state change>
+
+## Impact
+- Direct features:
+- Indirect features retested:
+- Known limitations:
+
+## Decisions
+- <ADR or inline decision>
+
+## Evidence
+- <test/build/screenshot/log path>
+
+## Follow-up Watchlist
+- <tracking ref, owner, severity>
+```
+
+Generation rules:
+- Written only at Stage 7 after Gate G passes or records an explicit deferred follow-up.
+- Must not duplicate full requirements/design prose; link to them instead.
+- Must include unresolved limitations from `follow_up_watchlist`, even when the task closes successfully.
+
 ---
 
 ### 7) `.project-orchestration/status.json`
@@ -642,13 +760,15 @@ Purpose: project-level index of all tasks. Readable by any developer or agent in
       "pr_url": null,
       "blocker": null,
       "updated_at": "2026-05-09T09:45:00Z",
-      "handoff_doc": "docs/ai/tasks/ANDROID-42/handoff.md"
+      "handoff_doc": "docs/ai/tasks/ANDROID-42/handoff.md",
+      "summary_doc": null
     }
   ]
 }
 ```
 
 **Update rule:** On every stage transition, find the task's entry by `task_id` and update `stage_reached`, `stage_status`, `assignee`, `blocker`, and `updated_at`. Add a new entry if this `task_id` is not yet listed. Never remove entries (use `stage_status: complete` to mark done tasks).
+At Stage 7, also set `summary_doc` once `task-summary.md` exists.
 
 ---
 
@@ -751,7 +871,8 @@ Required:
 - All **required** evidence items for the task's `change_type` collected (see Evidence Gate Matrix below),
 - Active architecture-map tool update run if `graph_impact ≥ medium`,
 - acceptance coverage checked,
-- `module_impact_chain.build_order` modules all built successfully (if module_impact_chain present).
+- `module_impact_chain.build_order` modules all built successfully (if module_impact_chain present),
+- all required rows from `regression_test_matrix` and `quality_gate_plan` have evidence or an explicit blocker/deferred follow-up.
 
 ### Gate G — Close ready
 
@@ -759,6 +880,7 @@ Required:
 - spec-compliance review ✅ for every completed task,
 - Karpathy/code-quality review ✅ for every completed task,
 - final execution report written,
+- Impact Closure completed for regression/security/performance checks,
 - Task Changelog completed,
 - ADR-lite status finalized (`Accepted`, `Deferred`, or `Superseded`) if present, and `docs/ai/decisions/README.md` index row updated to match,
 - if the architecture-KB trigger condition (§ 4e) was met: `docs/ai/architecture/` domain file(s) and index updated; if not met, this is correctly AUTO-SKIP,
@@ -783,6 +905,18 @@ When `change_type` is `multi`, apply the union of required items for each applic
 | `logic_change` | unit_test_pass, coverage_report (≥ 80% on changed files) | integration_test_pass, scenario_trace_log |
 | `test_change` | test_pass (no product code changed) | coverage_delta_report |
 | `config_change` | build_success_release_variant, manifest_diff | lint_report, proguard_mapping_diff |
+
+### Security / performance evidence overlays
+
+These overlays are applied on top of the `change_type` matrix when `quality_gate_plan` contains the matching category. They are required only when the plan says they are required.
+
+| Concern | Required evidence examples |
+|---|---|
+| security | no new secrets logged, auth/permission path reviewed, sensitive storage unchanged or encrypted, network TLS/interceptor behavior verified |
+| privacy | PII collection/use unchanged or documented, analytics payload reviewed, consent/permission path verified |
+| performance | startup/frame/network/db cost checked for affected flow, no obvious main-thread blocking, before/after trace or benchmark when high risk |
+| accessibility | content descriptions/semantics/focus/order verified for affected UI |
+| compatibility | minSdk/API behavior, feature flags, rollout, and migration/rollback path verified |
 
 Figma reference screenshots (`get_screenshot`, captured by Figma Reader at Stage 1 Discovery, saved under `docs/ai/tasks/{task_id}/discovery/figma/`) are a distinct artifact from `screenshot_before`/`screenshot_after` above (ADB device captures at Stage 4/5, proof of what was built) — they are reference material for what to build and are never substituted for Gate F evidence.
 
@@ -912,6 +1046,8 @@ In-progress task state — allows resume after an interruption.
   "change_type": "ui_change | database_change | network_change | dependency_change | architecture_change | logic_change | test_change | config_change | multi | null",
   "module_impact_chain_scope": "single | local-chain | full-project | null",
   "evidence_collected": [],
+  "impact_closure_status": "not_started | partial | complete | blocked | null",
+  "follow_up_watchlist": [],
   "blocker": "null | <human-readable reason>",
   "partial_outputs": []
 }
@@ -986,6 +1122,10 @@ artifact_budget:
     implementation_plan_max_tasks: 5   # if task has more than 5 ACs → upgrade to standard
     execution_report: minimal          # gate log + evidence list only; no full prose
     handoff_md: minimal                # MANDATORY when code_owner set (hard rule #11); minimal = code_owner, branch, next step only
+    impact_regression_plan: lite       # direct_features + own-feature regression row only; skip indirect sweep unless a signal fires
+    quality_gate_plan: signal-only     # only categories with an obvious signal (auth/network/UI/storage touch), not a full 5-category sweep
+    impact_closure: minimal            # same minimal-prose treatment as execution_report; scoped to what was actually populated
+    task_summary_md: minimal           # already meant to be compact; fast mode keeps it to a few lines
 
   standard:
     requirements_max_lines: 120
@@ -1001,6 +1141,7 @@ artifact_budget:
 - If a task in `fast` mode has > 5 acceptance criteria → auto-upgrade mode to `standard`; write upgrade reason to `skip-log.json`.
 - If `requirements` content would exceed `max_lines` → trim background/rationale first; keep ACs and facts.
 - If `design_doc: skip` → write one AUTO-SKIP entry to `skip-log.json` with reason `workflow_mode: fast`.
+- If a `fast` mode task's `regression_test_matrix` or `impact_assessment` reveals indirect impact beyond the directly changed feature (shared state, cross-module dependency, cross-feature API) → auto-upgrade mode to `standard`; write upgrade reason to `skip-log.json` (same trigger shape as the >5-ACs rule above).
 - `governed` mode never has artifact limits — write as much as the task needs.
 
 ---
