@@ -5,7 +5,26 @@
       "mcp__plugin_everything-claude-code_github__get_file_contents",
       "mcp__plugin_everything-claude-code_github__search_repositories",
       "mcp__plugin_everything-claude-code_exa__web_fetch_exa",
-      "WebSearch"
+      "WebSearch",
+      "Bash(python3 -c \"import json,sys,base64; d=json.load\\(sys.stdin\\); print\\(base64.b64decode\\(d['content']\\).decode\\(\\)\\)\")",
+      "Bash(gh api:*)",
+      "Bash(python3 -c \"import json,sys; data=json.load\\(sys.stdin\\); [print\\(f['name'], f['type']\\) for f in data]\")",
+      "Bash(ls /Users/vulcan/Data/Android-Agent-Orchestrator/CHANGELOG*)",
+      "Bash(sed:*)",
+      "Bash(python3:*)",
+      "Bash(git apply *)",
+      "Bash(cd /tmp/spec-kit-review && grep -n \"AI DevKit\\\\|ai-devkit\\\\|ai_devkit\" README.md -i)",
+      "Bash(cd /tmp/spec-kit-review && grep -rn \"ai-devkit\\\\|ai_devkit\\\\|AI DevKit\\\\|\\\\.ai-devkit\" -i . 2>/dev/null | grep -v \"^./.git/\")",
+      "Bash(bash -n templates/tooling-preflight.sh)",
+      "Bash(grep -n \"#ai-devkit\\\\|#spec-kit\" -ri . --include=\"*.md\")",
+      "Bash(git worktree *)",
+      "Bash(gh repo *)",
+      "WebFetch(domain:github.com)",
+      "Read(//private/tmp/**)",
+      "Bash(bash /Users/vulcan/Data/Android-Agent-Orchestrator/templates/tooling-preflight.sh --json)",
+      "Bash(bash /Users/vulcan/Data/Android-Agent-Orchestrator/templates/tooling-preflight.sh)",
+      "Bash(grep -n \"^| \\\\`decisions/ADR\\\\|^### Gate D.5\\\\|^### Gate G\\\\|^## AI-authored artifact rules\" /Users/vulcan/Data/Android-Agent-Orchestrator/refs/contracts-and-artifacts.md)",
+      "Bash(python3 -c ' *)"
     ]
   }
 }

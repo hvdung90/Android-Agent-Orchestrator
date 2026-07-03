@@ -6,6 +6,7 @@
 
 # Agent runtime output (project-specific, not part of the skill pack)
 .project-orchestration/
+.understand-anything/
 graphify-out/
-.ai-devkit.json
+.specify/
 .skills/

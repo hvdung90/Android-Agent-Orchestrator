@@ -1,6 +1,6 @@
 # Sub-agent Catalog and Dependency Rules
 
-_Skill version: 4.10.1 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 4.18.0 — update this when SKILL.md bumps a minor or major version._
 
 ## Design principle
 
@@ -60,17 +60,35 @@ unknowns_found: []
 
 ### Figma Reader
 
-Required auth: `figma.personal_access_token`
+**Access mode:** MCP-first — no token needed if Figma MCP tools are available; PAT+REST is the fallback only. See `refs/clarification-workflow.md` § Figma for the self-check and tool-call sequence, and `refs/auth-bootstrap.md` § Figma Reader for the fallback auth flow.
+
+`design_tokens[]` and `component_reuse[]` are **raw Figma-side findings only** — this reader never checks the target codebase for existing resources; that resolution happens in Android Advisor (`token_reuse_recommendation`) or the Stage 3 Android memo.
+
+**Scope disambiguation (check before you doc):** a Figma page/section/frame can contain multiple distinct layouts. If `get_metadata` surfaces more than one plausible screen-level frame, this reader must not guess or process all of them — match against the task description first; if ambiguous, stop and ask the developer which frame(s) are in scope. `screens[]` below lists only confirmed, in-scope frames; `candidate_frames[]` records frames that were seen but excluded, for transparency. See `refs/clarification-workflow.md` § Figma step 2 for the full procedure.
 
 ```yaml
 source_type: figma
 file_name: <name>
+node_id: <frame node-id if scoped>
 screens: []
+candidate_frames: []          # frames seen in get_metadata but not selected for this task, with reason
 components: []
 visible_states: [loading, error, empty, success]
 cta_labels: []
 notes: []
 missing_states: []
+screenshot_ref: <docs/ai/tasks/{task_id}/discovery/figma/<screen>.png | none>
+design_tokens:
+  - figma_name: <Figma variable name, e.g. "color/brand/primary">
+    category: color | spacing | typography | radius | elevation | other
+    value: <raw value from get_variable_defs, e.g. "#1A73E8" | "16px">
+    used_on: []              # screen/component names this token appears on
+component_reuse:
+  - figma_component: <name>
+    code_connect_match: <component path from get_code_connect_suggestions | none>
+    design_system_match: <result from search_design_system | none>
+assets_exported: []          # paths from download_assets, if run
+access_mode: mcp | rest_api  # which path this run used
 ```
 
 ### Doc Reader
@@ -88,8 +106,11 @@ assumed_facts: []
 
 ### Graph Impact Reader
 
+Reads whichever architecture-map tool is active (Understand-Anything checked first; Graphify is the fallback).
+
 ```yaml
-source_type: graphify
+source_type: architecture-map
+tool: understand-anything | graphify | none
 graph_available: true | false
 graph_path: <A -> B -> C | none>
 affected_components: []
@@ -104,7 +125,7 @@ graph_freshness_note: <fresh | stale | unknown | graph missing>
 
 Activated at Stage 1 Discovery when `graph_impact ≥ medium` OR when affected components span more than one Gradle module. Read-only. Never edits build files.
 
-**Inputs:** `graphify-out/GRAPH_REPORT.md` affected components list + `settings.gradle[.kts]` module declarations.
+**Inputs:** active architecture-map output (`.understand-anything/knowledge-graph.json` or `graphify-out/GRAPH_REPORT.md`) affected components list + `settings.gradle[.kts]` module declarations.
 
 **Purpose:** Map architecture-level components to their Gradle module boundaries, derive the full build/test scope, and detect API surface changes that ripple across module boundaries.
 
@@ -206,8 +227,14 @@ indirect_impacts:
   - component: <name>
     reason: <why affected>
     action_needed: monitor | update | test | notify
+    user_facing_feature: <feature/screen/flow or none>
 migration_order: []
 estimated_surface: small | medium | large
+features_to_retest:
+  - feature: <feature/screen/flow/module>
+    reason: <shared state/API/navigation/module dependency>
+    risk: low | medium | high
+    suggested_test: <unit/integration/instrumented/manual/monitor>
 ```
 
 ---
@@ -239,7 +266,31 @@ dont: []
 migration_sequence: []
 compatibility_risks: []
 min_sdk_impact: <api level if relevant>
+token_reuse_recommendation:
+  - figma_token: <figma_name from Figma Reader's design_tokens[]>
+    matched_resource: <existing res name | null>
+    propose_new_name: <suggested Android resource name, only if no match>
+kotlin_convention_scope: []       # e.g. [kotlin-patterns, android-clean-architecture, compose-multiplatform-patterns]
+convention_refs_consulted: []     # which of the above were actually loaded/read for this task
+kotlin_android_versions:
+  kotlin: <version or unknown>
+  agp: <version or unknown>
+  compose_bom: <version or none>
+  compose_compiler: <version or unknown>
+  coroutines: <version or unknown>
+  min_sdk: <api or unknown>
+  target_sdk: <api or unknown>
+kotlin_android_rule_checklist:
+  - area: android-kotlin-style | kotlin-coding-conventions | android-architecture | compose | coroutines-flow | testing | interop-api | static-analysis
+    required: true | false
+    references: []
+    checks: []
+    evidence: <planned evidence path or review row>
 ```
+
+`token_reuse_recommendation` is populated only when Figma Reader's `design_tokens[]` is non-empty and Android Advisor is activated with codebase read access (Stage 1.5 or Stage 3 memo) to check `res/values/colors.xml`, `dimens.xml`, or `Theme.kt` for an existing match.
+
+`kotlin_convention_scope[]` is computed **once at Stage 3** from the Affected Areas checklist + `change_type` (mapping table in `refs/contracts-and-artifacts.md` § Kotlin/Android convention scope) and written into `implementation-plan.md`'s header — Stage 4's per-task quality review reuses this list, it never recomputes it. Android Advisor consults official Android/Kotlin docs and/or matching companion skill(s) (`kotlin-patterns`, `android-clean-architecture`, `compose-multiplatform-patterns`, `kotlin-coroutines-flows`, `kotlin-testing`) as reference when available, recording which were actually read in `convention_refs_consulted[]`. For Kotlin product-code changes, Android Advisor also emits `kotlin_android_versions` and `kotlin_android_rule_checklist`.
 
 ### QA Scenario Advisor
 
@@ -251,7 +302,21 @@ regression_zones:
   - component: <name>
     risk: <why>
     suggested_test: <test type>
+    feature: <user-facing feature/screen/flow>
+    required: true | false
 automation_candidates: []
+security_checks:
+  - concern: <auth | permission | storage | logging | network | input-validation | none>
+    check: <what to verify>
+    required: true | false
+performance_checks:
+  - concern: <startup | frame-time | memory | database | network | battery | none>
+    check: <what to measure or review>
+    required: true | false
+accessibility_checks:
+  - concern: <semantics | focus | contrast | touch-target | none>
+    check: <what to verify>
+    required: true | false
 ```
 
 ### Rollout/Risk Advisor
@@ -282,13 +347,13 @@ Read-only and advisory. Never calls code-touching tools. Activated by parent orc
 
 | Condition | Stage | Tool called |
 |---|---|---|
-| Graphify identified affected components | 1 Discovery | `get_symbols_overview` |
-| Specific symbol named in Graphify output or task | 1 Discovery | `find_symbol` |
+| Architecture map identified affected components | 1 Discovery | `get_symbols_overview` |
+| Specific symbol named in architecture-map output or task | 1 Discovery | `find_symbol` |
 | Abstract class / interface in change path | 1.5 Clarification | `find_implementations` |
 | Surprising connection found by Graph Impact Reader | 1.5 Clarification | `find_referencing_symbols` |
 | Missing-info flags unknown implementation pattern | 1.5 Clarification | `find_referencing_symbols` |
 | Code owner needs usage pattern before editing | 4 Implementation (advisory) | `find_declaration` |
-| graph_impact ≥ medium AND Kotlin LS confirmed stable | 5 Verify | `get_diagnostics_for_file` |
+| graph_impact ≥ medium AND Kotlin LSP support confirmed | 5 Verify | `get_diagnostics_for_file` |
 | Scope discipline check at QA gate | 6 QA (optional) | `find_referencing_symbols` |
 
 #### Backend selection (dev-decided, not agent-decided)
@@ -300,11 +365,11 @@ Read-only and advisory. Never calls code-touching tools. Activated by parent orc
 
 Default is LSP. Agent does not start Android Studio. Dev configures JetBrains backend separately.
 
-#### Kotlin LS stability gate
+#### Kotlin LSP support gate
 
-Kotlin Language Server is pre-alpha. Before calling `get_diagnostics_for_file` or `get_diagnostics_for_symbol`:
-- If dev confirms Kotlin LS stable → proceed.
-- If stability unknown → skip diagnostics; note in report: `"serena diagnostics skipped: kotlin-ls pre-alpha"`.
+Kotlin Language Server is JetBrains official Alpha; Android Gradle Plugin support is experimental. Before calling `get_diagnostics_for_file` or `get_diagnostics_for_symbol`:
+- If project support is confirmed (`kotlin_lsp_support: confirmed`) or the developer opts in → proceed.
+- If support is unknown → skip diagnostics; note in report: `"serena diagnostics skipped: kotlin-lsp alpha / agp support unconfirmed"`.
 
 #### Tools NEVER called by agent (code owner only)
 
@@ -328,7 +393,7 @@ results:
 callers_count: <n>
 implementors_count: <n>
 diagnostics: []            # only when get_diagnostics_* called
-kotlin_ls_stable: true | false | unknown
+kotlin_lsp_support: confirmed | unsupported | unknown
 recommendation: <one-line impact note for parent orchestrator>
 ```
 
@@ -339,7 +404,7 @@ recommendation: <one-line impact note for parent orchestrator>
 ```yaml
 source_type: tooling-preflight
 mode: audit | bootstrap | update | refresh-graph | force-reinstall
-ai_devkit:
+spec_kit:
   cli_present: true | false | unknown
   project_config_present: true | false
   action_recommended: none | install | init | install-project | update
@@ -351,11 +416,16 @@ android_skills:
   list_available: true | false
   relevant_skills_found: []
   action_recommended: none | find | add | add-all
-graphify:
-  cli_present: true | false | unknown
-  package_present: true | false | unknown
-  graph_report_present: true | false
-  graph_json_present: true | false
+architecture_map:
+  active_tool: understand-anything | graphify | none
+  understand_anything:
+    plugin_present: true | false | unknown
+    graph_present: true | false
+  graphify:
+    cli_present: true | false | unknown
+    package_present: true | false | unknown
+    graph_report_present: true | false
+    graph_json_present: true | false
   action_recommended: none | install | build | update
 karpathy:
   guidance_present: true | false | unknown
@@ -364,7 +434,7 @@ serena:
   uv_present: true | false
   mcp_configured: true | false
   backend: lsp | jetbrains | unknown
-  kotlin_ls_stable: true | false | unknown
+  kotlin_lsp_support: confirmed | unsupported | unknown
   action_recommended: none | install | configure
 blockers: []
 warnings: []

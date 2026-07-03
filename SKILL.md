@@ -3,12 +3,13 @@ name: android-agent-orchestrator
 description: Use when starting, planning, analyzing, or implementing any Android task — new feature, bug fix, refactor, migration, AGP upgrade, architecture review, or repo setup. Use when user says start task, new feature, fix bug, analyze repo, migrate, upgrade, implement, review architecture, or set up agents for an Android project.
 license: MIT
 metadata:
-  version: 4.10.1
+  version: 4.18.0
   category: orchestration
   lanes:
-    - ai-devkit
+    - spec-kit
     - android-skills
     - android-cli
+    - understand-anything
     - graphify
     - karpathy
   workers:
@@ -25,7 +26,7 @@ metadata:
     - refs/playbooks.md
 ---
 
-# Android Agent Orchestrator v4.10.1
+# Android Agent Orchestrator v4.18.0
 
 ## Activation
 
@@ -49,12 +50,12 @@ Trigger phrases: `start task` · `new feature` · `fix bug` · `analyze repo` ·
 
 - Stage -1 initializes the auth file, audits tool readiness, then proceeds to Intake.
 - `.agent-auth.yaml` is the single source of truth for all tokens (Atlassian, Figma, GitHub). Tokens are requested just-in-time when a tool needs them.
-- AI DevKit remains the conductor and the only owner of requirements, synthesis, routing, and final go/no-go.
+- Spec Kit remains the conductor and the only owner of requirements, synthesis, routing, and final go/no-go.
 - Android skills remain Android advisory specialists.
 - Android CLI remains runtime verification and official Android skill management.
-- Graphify remains the architecture map.
+- Understand-Anything is the primary architecture map; Graphify is the fallback when Understand-Anything is unavailable.
 - Karpathy remains the code-touching quality gate.
-- **Serena is the Code Analysis Worker** — symbol-level code retrieval, activated after Graphify identifies affected areas. Read-only in Discovery, advisory in Implementation. Never owns decisions or edits.
+- **Serena is the Code Analysis Worker** — symbol-level code retrieval, activated after the architecture map (Understand-Anything, falling back to Graphify) identifies affected areas. Read-only in Discovery, advisory in Implementation. Never owns decisions or edits.
 - **Gradle Module Impact Analyzer** derives `module_impact_chain` when `graph_impact ≥ medium` — maps architecture components to Gradle modules, produces `build_order` and `test_scope_modules` for Android CLI in Stage 5.
 - Sub-agents are internal workers used during Discovery and Clarification. They do not become independent lanes and they never own final decisions or product-code edits.
 - Jira Reader automatically tracks `linked_docs` and `linked_designs` (1 level deep).
@@ -86,8 +87,10 @@ Three modes shape the stage sequence and artifact depth. Mode is derived automat
 | Stage 2.5 ADR trigger check | **MANDATORY** — always runs; fast mode does NOT bypass trigger evaluation |
 | Stage 2.5 ADR creation + approval | AUTO-SKIP only if no ADR trigger fires; if trigger fires → mode upgrades to governed |
 | Stage 3 design doc + Android memo | AUTO-SKIP — Stage 3-lite: produce implementation-plan.md (≤ 5 tasks), code_owner, branch, minimal handoff.md only |
+| Stage 1/1.5 Impact + Regression Plan | Lite — `direct_features` + a regression row for the changed feature itself only (MANDATORY); indirect-feature sweep and any `quality_gate_plan` category with no obvious signal (auth/network/UI/storage touch) AUTO-SKIP |
 | Stage 6 full QA report | CONFIRM-SKIP — ask human; Karpathy diff review + Gate G close remain MANDATORY |
-| Stage 7 finalization | Lite — Task Changelog + Drift Check (both MANDATORY); no ADR status update when no ADR exists |
+| Stage 7 finalization | Lite — Task Changelog + Artifact Integrity Check are MANDATORY; Skill Drift Check runs only when skill files changed; no ADR status update when no ADR exists |
+| Stage 7 Impact Closure + `task-summary.md` | Lite — both stay MANDATORY but scoped to what Stage 1/1.5 actually populated; no exhaustive category sweep |
 
 **Override rules (applied before scoring, in priority order):**
 1. Any ADR trigger fires → minimum `governed`
@@ -104,6 +107,8 @@ Computed at Stage 0 from task description (preliminary). Refined and finalized a
 
 | Signal | Score |
 |---|---|
+| UI copy/pixel tweak, no layout/logic change | 1 |
+| Dependency patch/minor version bump, no code change, changelog reviewed | 1–2 |
 | 1–2 files, same module, same layer, additive-only change | 1–2 |
 | Multi-file, single module, same architectural layer | 3–4 |
 | Multi-file, multi-layer (e.g. ViewModel + Repository + tests) | 5–6 |
@@ -114,6 +119,8 @@ Computed at Stage 0 from task description (preliminary). Refined and finalized a
 
 | Signal | Score |
 |---|---|
+| UI copy/pixel tweak, no layout/logic change | 1 |
+| Dependency patch/minor version bump, no code change, changelog reviewed | 1 |
 | Isolated logic, no shared state, no ADR triggers | 1–2 |
 | Touches ViewModel state or shared Repository | 3–4 |
 | Touches auth, billing, permissions, or notifications | 5–6 |
@@ -133,6 +140,60 @@ otherwise                                   →  governed
 Write `preliminary_mode` to `session.json` at Stage 0. **Finalize at the end of Stage 1** — after reading all sources and Graphify — write `workflow_mode` (final) + `complexity_score` + `risk_score` + `mode_reasons` to `context-pack.json` and `session.json`. Stage 1.5 reads the mode that Stage 1 already wrote; it does not re-score.
 
 ---
+
+## What changed in v4.18.0
+
+**v4.18.0** — Low-friction execution defaults. Strips unnecessary ceremony from small/safe tasks without weakening governance for risky ones; no MANDATORY tier was loosened, only clarified/split where it was overloaded.
+
+- Stage 3 `implementation-plan.md` code snippets are now optional in `fast`/`standard` mode — exact file path, exact test method name, exact command, and exact expected output remain mandatory in all modes; full code bodies are required only in `governed` mode.
+- Stage 7 Drift Check split into **Artifact Integrity Check** (always MANDATORY — task artifacts, ADR ledger, evidence consistency) and **Skill Drift Check** (MANDATORY only when the task modified the orchestrator skill's own files — `SKILL.md`/`refs/**`/`templates/**`/`docs/FLOW.md`/`CHANGELOG.md`; AUTO-SKIP otherwise). Fixes a real bug where every product-repo task was forced through skill-repo-only version-sync checks.
+- Evidence Gate Matrix: the "repo-native first, record unavailable, don't block" pattern (previously Kotlin-static-analysis-only) now applies to every required evidence item. Tool absent/not configured → AUTO-record an Unavailable-tool record, no human ask. Tool present but check fails → still blocks Gate F, CONFIRM-SKIP to defer.
+- New Unavailable-tool record shape (tool, detection_command, detection_output, status, recorded_at) defined once in `refs/contracts-and-artifacts.md`, referenced everywhere a tool may be missing instead of ad hoc prose.
+- Two new low-signal scoring rows (UI copy/pixel tweak; dependency patch/minor bump, no code change) and two matching `refs/playbooks.md` Quick decision table rows, cross-referencing existing TDD-exemption and `dependency_change` mechanisms — no new playbook numbers, no risk-scoring changes for genuinely risky changes.
+- New `commit_policy: per_task | single_commit | no_commit` (default `per_task`, human-request-only, never auto-derived from `workflow_mode`). `no_commit` requires a non-git refactor checkpoint (diff/stash) since Stage 4's refactor step can no longer rely on a git commit as its safety net.
+- New "Autonomy policy" section in `refs/compliance-policy.md` names the existing AUTO-SKIP/CONFIRM-SKIP boundary for discoverability — documentation only, no tier changed.
+
+## What changed in v4.17.0
+
+**v4.17.0** — Kotlin/Android official-rule enforcement.
+
+Turns the Kotlin/Android convention gate from a reviewer reminder into an evidence-backed rule set. Stage 3 now builds a `kotlin_android_rule_checklist` from official Android/Kotlin areas (Android Kotlin style, Kotlin coding conventions, Android architecture, Compose, coroutines/Flow, testing, interop/API, lint/static analysis) and records the project Kotlin/AGP/Compose versions when discoverable. Stage 4 may no longer fall through directly to general knowledge: official docs or companion skill references must be consulted when `kotlin_convention_scope` is non-empty; general knowledge is only a last-resort degraded tier and must be recorded as such. Stage 5 now requires `kotlin_static_analysis_pass` for every Kotlin product-code change, using repo-native checks first (`lint`, `ktlint`, `detekt`, `spotless`, formatter/check tasks) and recording unavailable checks explicitly.
+
+**Kotlin LSP note updated:** Kotlin Language Server is now treated as JetBrains official Alpha. Diagnostics remain optional because Android Gradle Plugin support is experimental; use them only when project support is confirmed, otherwise rely on Gradle/lint/static-analysis evidence.
+
+---
+
+## What changed in v4.16.0
+
+**v4.16.0** — Regression, security/performance, and task-continuity hardening.
+
+Adds a concrete **impact + regression planning layer** so the skill does not stop at "affected areas" in the abstract. Stage 1/1.5 now produces `impact_assessment`, `regression_test_matrix`, `quality_gate_plan`, and `follow_up_watchlist` in `context-pack.json`: which user-facing features may regress, why, which tests or manual scenarios must be rerun, and which known limitations are deliberately deferred. Stage 2 requirements and Stage 3 implementation plans must carry those fields forward into the Verification Plan and executable task checklist. Stage 4/6 quality review now records security and performance outcomes in addition to Karpathy/Kotlin convention review. Stage 7 finalization writes a compact `task-summary.md` so future tasks can load a small continuity artifact before reading full requirements/design/history.
+
+**Deliberate non-change:** this remains a workflow/orchestration skill, not a static analyzer. Security/performance gates are evidence contracts and reviewer prompts; tool-specific scanners are optional evidence unless the project's Android CLI or build already provides them.
+
+## What changed in v4.15.0
+
+**v4.15.0** — Kotlin/Android convention verification.
+
+Adds a real check that design/plan/implementation actually follows Android/Kotlin conventions — previously the only gates were generic (Karpathy: "surgical, no over-engineering") with zero reference to any named Kotlin/Android standard. Stage 3 now computes `kotlin_convention_scope[]` once (from Affected Areas + `change_type`: Compose UI → `compose-multiplatform-patterns`, ViewModel/Repository/Navigation/DI → `android-clean-architecture`, coroutines/Flow → `kotlin-coroutines-flows`, tests → `kotlin-testing`, any Kotlin file → `kotlin-patterns`), written into `implementation-plan.md`'s header. Android Advisor consults the matching companion skill(s) as reference at design time. Stage 4 step 11's existing Karpathy dispatch widens to also run the convention check, three-tier fallback: `kotlin-reviewer` agent → companion skill docs → general knowledge — the check may degrade through these tiers, but recording which tier was used (`kotlin_convention_check`) is never optional (new hard rule #27). No new mandatory reviewer step; no change to the Stage 4 Karpathy compliance-matrix row's tier (still MANDATORY — never skippable), only its description widened, so historical `skip-log.json` entries keep their meaning. **Deliberate non-change:** Stage -1 preflight gets no new field for this — same reasoning as Figma MCP tool detection.
+
+## What changed in v4.14.0
+
+**v4.14.0** — Figma MCP-first design tokens.
+
+Figma Reader is now **MCP-first, PAT fallback**: at Stage 1 activation the agent self-checks its own tool list for Figma Dev Mode MCP tools (`get_metadata`, `get_design_context`, `get_variable_defs`, `get_screenshot`, `get_code_connect_suggestions`, `search_design_system`, `download_assets`) — no token needed on this path, auth is handled by the MCP server via the developer's logged-in Figma desktop app. `figma.personal_access_token` + REST API is now explicitly the fallback, used only when MCP tools are absent. Because a single Figma page/section/frame can contain multiple distinct layouts, Figma Reader must disambiguate scope from `get_metadata`'s node tree before extracting anything — match against the task description, or stop and ask the developer if ambiguous; unselected frames are recorded in `candidate_frames[]`. Figma Reader's output gains `design_tokens[]` (raw colors/spacing/typography from `get_variable_defs`), `component_reuse[]` (from `get_code_connect_suggestions`/`search_design_system`), `assets_exported[]`, `screenshot_ref`, `candidate_frames[]`, and `access_mode`. Android Advisor gains `token_reuse_recommendation[]` — Figma Reader never checks the target codebase itself; that resolution is Android Advisor's or the Stage 3 memo's job. The Figma reference screenshot (captured at Stage 1 Discovery, saved to `docs/ai/tasks/{task_id}/discovery/figma/`) is explicitly a distinct artifact from `screenshot_before`/`screenshot_after` Gate F evidence — never a substitute for it. **Deliberate non-change:** Stage -1/`preflight.json` gets no new field for this — a bash script cannot detect MCP tool availability, only the agent's own tool list can.
+
+## What changed in v4.13.0
+
+**v4.13.0** — Global ADR ledger + persistent architecture knowledge base.
+
+`docs/ai/tasks/{task_id}/decisions/ADR-NNNN-<slug>.md` (per-task, no cross-task index) is replaced by a **global, sequentially-numbered, immutable ADR ledger** at `docs/ai/decisions/ADR-NNNN-<slug>.md` with a `docs/ai/decisions/README.md` index (auto-created on first ADR, same lazy-create pattern as `status.json`). Stage 2.5 now checks the index for an existing related `Accepted` ADR before creating a new one (link to it instead of duplicating, or `supersedes:`/`superseded_by:` it if the decision changed) — an `Accepted` ADR is never hand-edited in place. Adds a new **persistent architecture knowledge base** at `docs/ai/architecture/<domain>.md` (+ `docs/ai/architecture/README.md` index), updated in place (section-level patch, not whole-file rewrite) by Stage 7 only when `adr_required: true` OR `module_impact_chain.estimated_build_scope` is `local-chain`/`full-project` OR `change_type: architecture_change` — trivial tasks never touch it. New template: `templates/architecture-domain.md`. **Migration note:** projects with pre-existing per-task ADRs from before this version should be offered a one-time migration into the global ledger the next time Stage 2.5 or Drift Check runs (CONFIRM-SKIP — ask first, do not migrate silently).
+
+## What changed in v4.12.0
+
+**v4.12.0** — Understand-Anything as primary architecture map.
+
+Adds [Understand-Anything](https://github.com/Egonex-AI/Understand-Anything) (`/understand`, `.understand-anything/knowledge-graph.json`) as the primary architecture-map tool, checked first at Stage -1. Graphify becomes the fallback — only checked/used when Understand-Anything is unavailable (plugin/skill not installed and no `.understand-anything/knowledge-graph.json`). Discovery, Verify, staleness checks, and all `graphify`-only tooling_readiness/preflight fields are generalized to an `architecture_map` concept with `active_tool: understand-anything | graphify | none`. Lane D renamed to Architecture Map. No change to Graphify's own behavior when it is the active tool.
 
 ## What changed in v4.10.0
 
@@ -203,16 +264,16 @@ Adds Stage 2.5 Decision Gate / ADR-lite before design, Stage 7 Docs/decision fin
 | Moment | Parallel | Serial |
 |---|---|---|
 | Tooling Preflight | Safe read-only checks | Install/update only when mode allows |
-| Intake | AI DevKit opens phase; Graphify existence check | No code touched |
-| Discovery | Graphify read + source readers + Android domain tagging | No code touched |
+| Intake | Spec Kit opens phase; architecture-map existence check (Understand-Anything → Graphify fallback) | No code touched |
+| Discovery | Architecture-map read (Understand-Anything → Graphify fallback) + source readers + Android domain tagging | No code touched |
 | Clarification | Multiple sub-agents analyze in parallel | Parent synthesis waits for required outputs |
-| Requirements | AI DevKit writes one canonical requirements doc | Single owner |
-| Decision Gate | AI DevKit decides ADR requirement; human approves Proposed ADR when required | Stop before Design if required |
-| Design split | AI DevKit writes plan; Android skills writes memo | Neither edits product code |
+| Requirements | Spec Kit writes one canonical requirements doc | Single owner |
+| Decision Gate | Spec Kit decides ADR requirement; human approves Proposed ADR when required | Stop before Design if required |
+| Design split | Spec Kit writes plan; Android skills writes memo | Neither edits product code |
 | Implementation | One code owner only | All other lanes advisory only |
-| Verify | Android CLI runs build/device/capture; Graphify updates | Code frozen |
-| QA gate | AI DevKit + Karpathy review diff | No new code changes |
-| Docs finalization | AI DevKit updates ADR status and task changelog | No product changes |
+| Verify | Android CLI runs build/device/capture; active architecture-map tool updates | Code frozen |
+| QA gate | Spec Kit + Karpathy review diff | No new code changes |
+| Docs finalization | Spec Kit updates ADR status and task changelog | No product changes |
 
 ---
 
@@ -245,7 +306,7 @@ Load when `graph_impact ≥ medium` or multi-module change detected: `refs/sub-a
 6. Sub-agents are read-only or advisory.
 7. Do not skip Clarification when source material is weak.
 8. No success without evidence.
-9. Read Graphify before touching code when `graphify-out/` exists.
+9. Read the active architecture map before touching code — Understand-Anything's `.understand-anything/knowledge-graph.json` if present, otherwise Graphify's `graphify-out/` if present.
 10. Stop after requirements, then stop again for ADR-lite approval when Stage 2.5 requires one.
 11. No invented commands.
 12. Karpathy applies to every code-touching step.
@@ -254,19 +315,26 @@ Load when `graph_impact ≥ medium` or multi-module change detected: `refs/sub-a
 15. Serena is read-only and advisory. Never call Serena code-mutation tools (`rename_symbol`, `replace_symbol_body`, `insert_*`, `safe_delete_symbol`). Code owner owns all edits.
 16. **Compliance first.** Before skipping any stage or step, load `refs/compliance-policy.md` and apply the compliance matrix. MANDATORY steps cannot be skipped. AUTO-SKIP requires the stated condition to be true and must be written to `skip-log.json`. CONFIRM-SKIP requires explicit human confirmation — implicit agreement is not enough.
 17. **Every skip is logged.** Write to `.project-orchestration/tasks/{task_id}/skip-log.json` on every auto-skip and confirm-skip. This log is never deleted.
-18. **Task isolation.** Write all task artifacts under `.project-orchestration/tasks/{task_id}/` and `docs/ai/tasks/{task_id}/`. Never read or overwrite another task's directory.
-19. **Decision changes need ADR-lite.** If a task touches a required decision trigger, create a Proposed ADR in Stage 2.5 and stop for human approval before Stage 3.
+18. **Task isolation.** Write all task artifacts under `.project-orchestration/tasks/{task_id}/` and `docs/ai/tasks/{task_id}/`. Never read or overwrite another task's directory. Exception: `docs/ai/decisions/` and `docs/ai/architecture/` are **global, task-attributed** paths — writable only by Stage 2.5/Stage 7 of the *currently active* task (never by Stage -1, and never on behalf of a different task_id).
+19. **Decision changes need ADR-lite.** If a task touches a required decision trigger, check the global ledger (`docs/ai/decisions/README.md`) for an existing covering ADR first; if none found, create a Proposed ADR in Stage 2.5 and stop for human approval before Stage 3.
 20. **Stage order is law.** Stages run -1 → 0 → 1 → [1.5] → 2 → 2.5 → 3 → 4 → 5 → 6 → 7. Any re-ordering or parallel shortcut not defined in this skill is a violation — stop and report to human.
 21. **`status.json` is always current.** Update `.project-orchestration/status.json` on every stage transition. Never leave it more than one stage behind. This is the project-level view — any developer can read it without opening individual task files.
 22. **`handoff.md` when code owner changes.** Generate `docs/ai/tasks/{task_id}/handoff.md` whenever `code_owner` is set (Stage 3) or when Stage 4 is interrupted. Regenerate whenever `assignee`, `branch`, or `pr_url` changes.
 23. **`branch` and `assignee` must be set before Implementation.** `session.json → branch` and `session.json → assignee` must be populated before Stage 4 begins. If unknown, ask the human before proceeding.
 24. **Mode gates artifact depth.** Fast mode artifacts must stay within `artifact_budget.fast` (see `refs/contracts-and-artifacts.md`). Never write a full design doc for a fast-mode task. Mode can only be upgraded (fast→standard, standard→governed), never downgraded, unless the human explicitly requests it.
+25. **ADR ledger is global and immutable.** Never edit an `Accepted` ADR's Decision/Consequences text in place. A changed decision gets a new ADR with `supersedes:`/`superseded_by:` cross-links; update only `status`, `superseded_by`, and the `docs/ai/decisions/README.md` index row on the superseded one.
+26. **Figma MCP availability is self-checked, not preflighted.** Figma MCP tool availability is checked by the agent's own tool list at Figma Reader activation time (Stage 1), never assumed or recorded from Stage -1 preflight — a bash script cannot detect MCP tool presence.
+27. **Kotlin/Android convention check recording is mandatory.** For every Stage 4 task with a non-empty `kotlin_convention_scope`, the check itself may degrade through the fallback tiers (`kotlin-reviewer` agent → companion skill docs → general knowledge), but recording which tier was used (`kotlin_convention_check`) in `execution.md` may never be omitted.
+28. **Regression and quality impact must be explicit.** Before requirements approval, record impacted user-facing features, regression zones, required retest scenarios, security concerns, performance concerns, and deferred follow-ups in `context-pack.json` for every code-touching task (§ Stage 1 definition). Stage 6 cannot close until every required regression/security/performance item is either verified with evidence or recorded as an explicit blocker/approved follow-up. In fast mode this scopes to the lite form (directly changed feature + signal-triggered `quality_gate_plan` categories only) — see `artifact_budget.fast`.
+29. **Kotlin/Android official-rule checklist is mandatory for Kotlin product code.** If any Kotlin product file is touched, Stage 3 must create `kotlin_android_rule_checklist` and Stage 5 must collect `kotlin_static_analysis_pass` evidence. Repo-native checks (`lint`, `ktlint`, `detekt`, `spotless`, formatter/check tasks) are used when present; missing tools are recorded, not silently ignored.
+30. **No general-knowledge-only Kotlin convention pass when official references are available.** When `kotlin_convention_scope` is non-empty, the reviewer must consult official Android/Kotlin docs or companion skill docs before falling back. A `general_knowledge` tier is allowed only as degraded evidence when references/tools are unavailable, and the degradation reason must appear in `execution.md`.
+31. **`commit_policy` defaults to `per_task`.** Changing it to `single_commit` or `no_commit` requires an explicit human request, recorded in `session.json` — never auto-derived from `workflow_mode`. `no_commit` requires a non-git refactor checkpoint (diff/stash snapshot) per Stage 4 step 7.
 
 ---
 
 ## Lanes
 
-### Lane A — AI DevKit
+### Lane A — Spec Kit
 Owns phase control, `docs/ai/**`, routing, synthesis, final requirements, planning, and review gates.
 
 ### Lane B — Android skills
@@ -275,11 +343,11 @@ Owns Android advisory memos, platform guidance, migration notes, API pitfalls, a
 ### Lane C — Android CLI
 Owns runtime evidence, screenshots, layout capture, device actions, official Android skill management, and verification commands.
 
-### Lane D — Graphify
-Owns graph build/query/update and architecture evidence.
+### Lane D — Architecture Map (Understand-Anything primary, Graphify fallback)
+Owns graph build/query/update and architecture evidence. Understand-Anything is checked first; Graphify is used only when Understand-Anything is unavailable.
 
 ### Lane E — Karpathy guidelines
-Owns code-touching behavior and diff review.
+Owns code-touching behavior, diff review, and Kotlin/Android convention verification (idiomatic patterns, Compose, coroutines, clean architecture) when `kotlin_convention_scope` is non-empty.
 
 v4.2 does **not** add a sixth lane. Stage -1 is a stage.
 
@@ -307,7 +375,7 @@ Sub-agents are internal workers activated by the parent orchestrator during Disc
 | 1 Discovery | graph_impact ≥ medium OR symbol named | `get_symbols_overview`, `find_symbol` | Agent |
 | 1.5 Clarification | Interface in change path / surprising connection | `find_implementations`, `find_referencing_symbols` | Agent |
 | 4 Implementation | Code owner needs usage context | `find_declaration` | Code owner request |
-| 5 Verify | graph_impact ≥ medium AND kotlin-ls stable | `get_diagnostics_for_file` | Agent |
+| 5 Verify | graph_impact ≥ medium AND `kotlin_lsp_support: confirmed` | `get_diagnostics_for_file` | Agent |
 | 6 QA | Scope discipline check | `find_referencing_symbols` | Agent (optional) |
 | JetBrains backend | Android Studio running | all above tools | Dev opt-in |
 
@@ -328,18 +396,18 @@ Run before Intake.
 
 Determine:
 - active provisioning mode,
-- whether AI DevKit exists,
-- whether `.ai-devkit.json` exists,
+- whether Spec Kit exists,
+- whether `.specify/` exists,
 - whether Android CLI exists,
 - whether Android skills can be listed/found/added,
-- whether Graphify exists,
-- whether `graphify-out/GRAPH_REPORT.md` and `graphify-out/graph.json` exist,
-- whether graph must be built, updated, or only read,
+- whether Understand-Anything is available (checked first — plugin/skill present and `.understand-anything/knowledge-graph.json` exists),
+- if Understand-Anything is unavailable, whether Graphify exists (fallback) — CLI/package present and `graphify-out/GRAPH_REPORT.md` + `graphify-out/graph.json` exist,
+- whether the active architecture-map tool's graph must be built, updated, or only read,
 - whether Karpathy guidelines exist as plugin, skill, or project instruction,
 - what actions are allowed,
 - what blockers prevent Stage 0.
 
-**Graphify time-based staleness check:** After the commit-hash check, also read `graph-stamp.json → built_at`. If `built_at` + 7 days < now → flag graph as `stale (time-based)` in `preflight.md`, regardless of whether commit hash matches. This catches projects where many small commits have landed without triggering a graph update. Record `graphify: stale-time` in `tooling-cache.json`; do not block Stage 0, but surface as a non-blocking gap.
+**Architecture-map time-based staleness check:** Applies to whichever tool is active. For Graphify: after the commit-hash check, also read `graph-stamp.json → built_at`. If `built_at` + 7 days < now → flag graph as `stale (time-based)` in `preflight.md`, regardless of whether commit hash matches. For Understand-Anything: check `.understand-anything/knowledge-graph.json` file mtime against the same 7-day window (it does not emit a separate stamp file). This catches projects where many small commits have landed without triggering a graph update. Record `architecture_map: stale-time` in `tooling-cache.json`; do not block Stage 0, but surface as a non-blocking gap.
 
 **Project status index:** Read `.project-orchestration/status.json`. If missing, create it with an empty `tasks: []` array. Check for any task entries with `stage_status: in_progress` and surface them alongside the resume check at Stage 0.
 
@@ -372,19 +440,28 @@ Intake must record:
 
 ### Stage 1 — Discovery
 
-Read `.project-orchestration/reports/preflight.md`, `graphify-out/GRAPH_REPORT.md` if present, docs in `docs/ai/inputs/` if present, and source material.
+Read `.project-orchestration/reports/preflight.md`; read the active architecture-map output — `.understand-anything/knowledge-graph.json` if Understand-Anything is active, otherwise `graphify-out/GRAPH_REPORT.md` if Graphify is active — docs in `docs/ai/inputs/` if present, and source material.
 
 If Task History Relevance Gate decided `full`, also read the matched task history before synthesis:
+- `docs/ai/tasks/{matched_task_id}/task-summary.md` first, if present (cheap continuity artifact)
 - `docs/ai/tasks/{matched_task_id}/requirements/*.md`
-- `docs/ai/tasks/{matched_task_id}/decisions/ADR-*.md`
+- any ADR in `docs/ai/decisions/` whose `task:` front-matter field matches `{matched_task_id}` (or is linked from the matched requirements/design docs)
 - `docs/ai/tasks/{matched_task_id}/design/*.md`
 - `.project-orchestration/tasks/{matched_task_id}/reports/execution.md`
 
-Derive `change_type` (initial estimate) from source material and Graphify output — record in `context-pack.json`.
+Derive `change_type` (initial estimate) from source material and architecture-map output — record in `context-pack.json`.
 
 If `graph_impact ≥ medium`: activate **Gradle Module Impact Analyzer** in parallel with other source readers. Output populates `context-pack.json → module_impact_chain`. Write `module_impact_chain_scope` to `session.json`.
 
-**Finalize workflow mode at end of Stage 1:** After all source reading and Graphify data are available, compute final `complexity_score` + `risk_score` → `workflow_mode`. Apply override rules (ADR trigger keyword → governed; Jira + Figma present → min standard). Write `workflow_mode`, `complexity_score`, `risk_score`, `mode_reasons` to `context-pack.json` and `session.json → workflow_mode`. Stage 1.5 reads this value — it does not re-compute.
+**Code-touching task (definition):** any task that proceeds past Stage 1 with intent to modify the repository — task types [E]–[J] per `docs/FLOW.md` (New feature, Edit feature, Bug fix, Migration, AGP upgrade, Unfamiliar codebase), equivalently any task for which `change_type` gets set (including `test_change` and `config_change`). Task types [A]–[D] (Analyze, Bootstrap, Update tools, Refresh graph) end after Stage -1 and are never code-touching — they never populate the Impact + Regression Plan below.
+
+If code-touching, derive the **Impact + Regression Plan** before Stage 2 (in fast mode, scope this to the lite form — see the Fast Mode table and `artifact_budget.fast`):
+- `impact_assessment`: direct and indirect user-facing features, modules, APIs, data/state surfaces, and release/runtime concerns affected by the change.
+- `regression_test_matrix`: features/scenarios that must be retested, why they are in scope, whether they are automated or manual, and the required evidence.
+- `quality_gate_plan`: security, privacy, performance, accessibility, and compatibility checks required for this task.
+- `follow_up_watchlist`: known limitations, partial mitigations, monitoring needs, or deferred work that is not solved by this task.
+
+**Finalize workflow mode at end of Stage 1:** After all source reading and architecture-map data are available, compute final `complexity_score` + `risk_score` → `workflow_mode`. Apply override rules (ADR trigger keyword → governed; Jira + Figma present → min standard). Write `workflow_mode`, `complexity_score`, `risk_score`, `mode_reasons` to `context-pack.json` and `session.json → workflow_mode`. Stage 1.5 reads this value — it does not re-compute.
 
 → **Load `refs/stage-contracts.md` § Stage 1** for typed input/output contract and interrupt state.
 
@@ -413,7 +490,7 @@ Source modes:
 
 ### Stage 2 — Requirements
 
-AI DevKit writes canonical requirements from synthesized context. Stop for human review.
+Spec Kit writes canonical requirements from synthesized context. Stop for human review.
 
 → **Load `refs/contracts-and-artifacts.md`** for `requirements/<task>.md` schema and Gate D criteria.
 
@@ -422,11 +499,12 @@ Requirements must include:
 - Affected Areas checklist,
 - facts and assumptions separated,
 - decision triggers observed,
-- acceptance criteria and required evidence.
+- acceptance criteria and required evidence,
+- Impact / Regression section listing impacted features, retest scope, security/performance notes, and deferred follow-ups from `context-pack.json`.
 
 ### Stage 2.5 — Decision Gate / ADR-lite
 
-AI DevKit decides whether an ADR-lite is required before design.
+Spec Kit decides whether an ADR-lite is required before design.
 
 Create an ADR-lite when the task touches any of:
 - module boundary,
@@ -440,26 +518,35 @@ Create an ADR-lite when the task touches any of:
 - background work, permissions, billing, auth, or notifications,
 - test strategy with broad impact.
 
-If ADR-lite is required:
-- create `docs/ai/tasks/{task_id}/decisions/ADR-NNNN-<slug>.md` from `docs/ai/decisions/0000-template.md`,
+If a trigger fires, first check the **global decision ledger** before creating anything new:
+- read `docs/ai/decisions/README.md` (the index only — not every ADR file); if the file does not exist yet, treat it as "no ADRs exist" and skip straight to creating one below. Otherwise check whether an existing `Accepted` ADR already covers this decision category.
+- If a covering `Accepted` ADR exists and is still valid → link to it, record `adr_required: false, reason: "covered by ADR-NNNN"` in `session.json` and `execution.md` — do not create a duplicate.
+- If a covering ADR exists but the decision has changed → create a new ADR with `supersedes: ADR-NNNN`; when this new ADR is later Accepted, flip the old ADR's `status: superseded` + `superseded_by:` and its index row.
+
+If ADR-lite is required (no covering ADR found):
+- determine the next number: list `docs/ai/decisions/ADR-*.md`, take the highest existing number, allocate `max + 1` zero-padded to 4 digits (start at `0001`; `0000` is reserved for the template),
+- create `docs/ai/decisions/ADR-NNNN-<slug>.md` (**global**, not per-task) from `docs/ai/decisions/0000-template.md`,
 - set status to `Proposed`,
 - record owner, task, alternatives, consequences, validation evidence plan, and related files/modules,
+- add/update the row for this ADR in `docs/ai/decisions/README.md` (auto-create the index file first if it does not yet exist),
 - stop for human approval before Stage 3.
 
 If ADR-lite is not required, record `adr_required: false` and the reason in `session.json` and `execution.md`.
+
+**Never edit an `Accepted` ADR's Decision/Consequences text in place** — a changed decision always gets a new ADR with `supersedes:`; only `status`, `superseded_by`, and the index row may be updated on the old one.
 
 → **Load `refs/contracts-and-artifacts.md`** for the ADR-lite schema and Decision Ownership matrix.
 
 ### Stage 3 — Design split + Executable Plan
 
-AI DevKit writes design/planning docs. Android skills write Android memo. No product-code changes. In **fast mode**: skip design doc entirely; produce `implementation-plan.md` only with ≤ 5 tasks. Write AUTO-SKIP for design doc to `skip-log.json`.
+Spec Kit writes design/planning docs. Android skills write Android memo. No product-code changes. In **fast mode**: skip design doc entirely; produce `implementation-plan.md` only with ≤ 5 tasks. Write AUTO-SKIP for design doc to `skip-log.json`.
 
 → **Load `refs/playbooks.md`** to select the correct workflow for the task type.
 
-**Executable implementation plan (MANDATORY):** After design is written, AI DevKit produces `docs/ai/tasks/{task_id}/planning/implementation-plan.md`. This is not a high-level outline — it is a step-by-step runnable checklist. Rules:
+**Executable implementation plan (MANDATORY):** After design is written, Spec Kit produces `docs/ai/tasks/{task_id}/planning/implementation-plan.md`. This is not a high-level outline — it is a step-by-step runnable checklist. Rules:
 
 - One task per acceptance criterion. Each task is 2–5 minutes of work.
-- Every task contains: exact file path(s), exact test command with expected output, RED step, GREEN step, refactor note, commit message.
+- Every task contains: exact file path(s), exact test command with expected output, RED step, GREEN step, refactor note, and commit/checkpoint instruction based on `commit_policy`.
 - No placeholders. No TBD. No "implement similar to Task N". Repeat the code if tasks may be read independently.
 - TDD mapping per change type must be stated explicitly:
 
@@ -474,7 +561,22 @@ AI DevKit writes design/planning docs. Android skills write Android memo. No pro
 | `test_change` | (tests are the artifact — verify they fail for right reason) |
 | `config_change` | Build variant success + manifest diff |
 
+Implementation plan must also include a **Quality gates** block for each task: required regression scenario(s), security check(s), performance check(s), and the evidence path that will prove them or the approved follow-up that tracks them.
+
+For any Kotlin product-code change, Stage 3 must write `kotlin_android_versions` and `kotlin_android_rule_checklist` into `context-pack.json`, then carry the same checklist into `implementation-plan.md`:
+- Android Kotlin style / Kotlin coding conventions: naming, formatting, file organization, imports, visibility, KDoc for public API.
+- Android architecture: UI/data/domain boundaries, ViewModel state ownership, repository responsibilities, unidirectional data flow.
+- Coroutines / Flow: structured concurrency, main-safety, cancellation, dispatcher injection/test dispatcher, lifecycle-aware collection.
+- Compose: state hoisting, side-effect APIs, recomposition safety, lazy keys, `remember` for expensive work, state restoration where relevant.
+- Tests: deterministic unit/UI/coroutine tests, no reliance on timing/flaky sleeps, regression scope from `regression_test_matrix`.
+- Interop/API: Java/Kotlin interop and binary/API compatibility when public/internal contracts change.
+- Static analysis: exact repo-native commands for `lint`, `ktlint`, `detekt`, `spotless`, formatter/check tasks, or an explicit unavailable-tool record.
+
 When `code_owner` is confirmed, generate `docs/ai/tasks/{task_id}/handoff.md` and update `session.json → assignee`, `branch`. Update `.project-orchestration/status.json`.
+
+**`commit_policy`** may be set alongside `branch`/`assignee`, human-request-only — default `per_task` (unchanged behavior), never auto-derived from `workflow_mode`. Values: `per_task` | `single_commit` | `no_commit` — see Stage 4 step 8 for behavior per value.
+
+**Kotlin/Android convention scope (computed once here, reused at Stage 4):** derive `kotlin_convention_scope[]` from the requirements' Affected Areas checklist + `change_type` (mapping in `refs/contracts-and-artifacts.md` § Kotlin/Android convention scope). If non-empty, Android Advisor consults the matching companion skill(s) (`kotlin-patterns`, `android-clean-architecture`, `compose-multiplatform-patterns`, `kotlin-coroutines-flows`, `kotlin-testing`) if available as reference, recording `convention_refs_consulted[]`. Write `kotlin_convention_scope` into `implementation-plan.md`'s header — Stage 4 reuses this list, it never recomputes it. If empty, AUTO-SKIP (write to skip-log).
 
 ### Stage 4 — Implementation Lock with Android TDD
 
@@ -492,13 +594,14 @@ Exactly one code owner edits code. All other lanes are advisory only.
 4. Write the minimum Android code to make the test pass. YAGNI strictly enforced.
 5. Run the same test — record GREEN output to `evidence/green-<task-id>.txt`. All affected module tests must also pass.
 6. Run `./gradlew :<module>:test` for modules in `module_impact_chain.test_scope_modules`. All must be green.
-7. Refactor only while tests remain green. No new behavior.
-8. Commit this task: `git commit -m "<type>(<scope>): <what and why>"`.
+7. Refactor only while tests remain green. No new behavior. If `commit_policy: no_commit`, save a diff/stash snapshot before refactor begins — a bad refactor must still be revertible without relying on git commit history.
+8. Commit per `session.json → commit_policy` (default `per_task`): `per_task` — commit this task now: `git commit -m "<type>(<scope>): <what and why>"`. `single_commit` — stage the change but do not commit; commit once at the end of Stage 4 with one aggregate message covering all tasks. `no_commit` — never commit; leave changes staged/unstaged and note in `handoff.md` that commit is a pending human action.
 9. Dispatch **spec-compliance reviewer**: verifies this task matches acceptance criteria exactly — nothing missing, nothing extra. Does not trust implementer's summary; reads actual code.
 10. If spec issues found → fix → re-review. Only when spec compliance is ✅ proceed.
-11. Dispatch **Karpathy/code-quality reviewer**: surgical changes, no over-engineering, scope discipline.
-12. If quality issues found → fix → re-review. Only when quality is ✅ mark task done.
-13. Move to next task in `implementation-plan.md`.
+11. Dispatch **Karpathy/code-quality reviewer**: surgical changes, no over-engineering, scope discipline. **If `kotlin_convention_scope` (from Stage 3) is non-empty, also run the Kotlin/Android convention check as part of this same dispatch:** use the `kotlin-reviewer` agent if available → else consult official Android/Kotlin docs or the matching companion skill(s) from `kotlin_convention_scope` → else apply general Kotlin/Android knowledge as a degraded fallback only. Record which tier was used as `kotlin_convention_check` in `execution.md` (`agent | official_docs | skill_docs | general_knowledge | not_applicable`) plus the references consulted and any degradation reason — **recording is mandatory even when the check degrades; never omit it.**
+12. Run the task's declared regression, security, and performance checks from `quality_gate_plan` when they apply to code touched by this task. Record pass/fail/deferred in `execution.md`.
+13. If quality issues found → fix → re-review. Only when quality is ✅ mark task done.
+14. Move to next task in `implementation-plan.md`.
 
 **Do not:**
 - Edit files not listed in the current task.
@@ -511,26 +614,39 @@ Exactly one code owner edits code. All other lanes are advisory only.
 
 ### Stage 5 — Verify
 
-Android CLI gathers runtime evidence. Graphify runs update after implementation if graph exists.
+Android CLI gathers runtime evidence. The active architecture-map tool runs an update after implementation if its graph exists — `/understand` for Understand-Anything, `/graphify . --update` for Graphify (fallback).
 
 **Evidence Gate Matrix:** Read `context-pack.json → change_type`. Look up required and optional evidence from the matrix in `refs/contracts-and-artifacts.md § Evidence Gate Matrix`. Run all required items. Gate F is not satisfied until all required items are present.
 
+**Kotlin static analysis:** If any Kotlin product-code file changed, collect `kotlin_static_analysis_pass`: run repo-native checks in this order when present: `./gradlew lint`, module-scoped `lint`, `ktlintCheck`, `detekt`, `spotlessCheck`, formatter/check tasks exposed by the project. If a tool is absent, record `unavailable` with detection evidence. If a configured tool fails, Gate F blocks until fixed or explicitly deferred by human confirmation.
+
 **Module-scoped builds:** If `module_impact_chain` is present, scope build commands to `module_impact_chain.build_order` rather than full project build.
 
-**Graphify skip condition:** If `context-pack.json → graph_impact` is `low`, skip `/graphify . --update`. Record skip reason in execution report. Run update only when `graph_impact` is `medium` or `high`.
+**Architecture-map skip condition:** If `context-pack.json → graph_impact` is `low`, skip the update (`/understand` or `/graphify . --update`, whichever tool is active). Record skip reason in execution report. Run update only when `graph_impact` is `medium` or `high`.
 
 → **Load `refs/stage-contracts.md` § Stage 5** for typed input/output contract and interrupt state.
 
 ### Stage 6 — QA gate
 
-AI DevKit + Karpathy review diff, evidence, graph update, acceptance coverage, and scope discipline.
+Spec Kit + Karpathy review diff, evidence, graph update, acceptance coverage, and scope discipline.
+
+QA Gate must verify:
+- every row in `regression_test_matrix` has evidence or an explicit blocker,
+- every required item in `quality_gate_plan` has pass/fail/deferred status,
+- deferred limitations in `follow_up_watchlist` are visible in `execution.md` and `task-summary.md`.
 
 ### Stage 7 — Docs / Decision Finalization
 
-AI DevKit finalizes governance artifacts after QA:
-- update ADR-lite from `Proposed` to `Accepted`, `Deferred`, or `Superseded`,
+Spec Kit finalizes governance artifacts after QA:
+- update this task's ADR-lite from `Proposed` to `Accepted` or `Deferred` (in `docs/ai/decisions/`, the global ledger); if `Accepted` and its front matter has `supersedes: ADR-NNNN` set, flip that old ADR's `status: superseded` + `superseded_by:` and update its index row too,
+- update `docs/ai/decisions/README.md` index row for this task's ADR (status + originating task),
+- **update the architecture knowledge base** if any of: `adr_required: true`, OR `module_impact_chain.estimated_build_scope` is `local-chain`/`full-project`, OR `change_type: architecture_change` — otherwise AUTO-SKIP (most tasks skip this):
+  - create-or-update the relevant `docs/ai/architecture/<domain>.md` file(s) using `templates/architecture-domain.md`,
+  - **section-level patch only** — rewrite only the `##` section(s) this task's Affected Areas actually touch; leave every other section byte-for-byte untouched; always append exactly one row to the trailing `## Change Log` table,
+  - update `docs/ai/architecture/README.md` index (auto-create if missing),
 - update `.project-orchestration/tasks/{task_id}/reports/execution.md` with Task Changelog,
-- run drift checks for skill refs/templates/version consistency,
+- write `docs/ai/tasks/{task_id}/task-summary.md` with a compact continuity summary for future tasks,
+- run Artifact Integrity Check (MANDATORY, always) covering task artifacts, ADR ledger, and evidence consistency; run Skill Drift Check (MANDATORY only if this task modified the orchestrator skill's own files — `SKILL.md`, `refs/**`, `templates/**`, `docs/FLOW.md`, `CHANGELOG.md` — otherwise AUTO-SKIP) covering README/CHANGELOG/refs version sync — see `refs/contracts-and-artifacts.md` § Drift Check,
 - record any missing evidence as a blocker instead of marking success.
 
 ---
@@ -542,7 +658,7 @@ AI DevKit finalizes governance artifacts after QA:
 | `audit` | Check readiness only | No |
 | `bootstrap` | Install missing approved tools and initialize missing project setup | Yes, missing only |
 | `update` | Update approved installed tools and reconcile project setup | Yes |
-| `refresh-graph` | Build/update Graphify output | Graph only |
+| `refresh-graph` | Build/update the active architecture-map output (Understand-Anything preferred, Graphify fallback) | Graph only |
 | `force-reinstall` | Clean reinstall/reset when explicitly requested | Yes |
 
 If unsure, choose `audit`.
@@ -551,11 +667,13 @@ If unsure, choose `audit`.
 
 ## Tool action rules
 
-### AI DevKit
+### Spec Kit
 - If CLI missing in `audit`, report missing.
-- If `.ai-devkit.json` missing and setup requested, run `ai-devkit init`.
-- If `.ai-devkit.json` exists and setup/update requested, prefer `ai-devkit install`.
-- Use `npx ai-devkit@latest ...` only as fallback or when global install is not desired.
+- Install command (bootstrap/update mode, if approved): `uv tool install specify-cli --from git+https://github.com/github/spec-kit.git@vX.Y.Z` (pin the tag; do not install `@main`). Use `uvx --from git+https://github.com/github/spec-kit.git specify ...` as an ephemeral fallback when a global install is not desired.
+- If `.specify/` missing and setup requested, run `specify init --here --integration <agent>`, matching the active coding agent (e.g. `claude`, `copilot`, `codex`).
+- If `.specify/` exists and an update is requested, run `specify self check` first; only run `specify self upgrade` if a newer release is confirmed. Never bump versions silently.
+- Never hand-edit `.specify/memory/constitution.md` — it is produced by `/speckit.constitution` and holds human-approved project principles.
+- Never overwrite `.specify/templates/**` with `specify init --here --force` unless the human explicitly asked for a template refresh.
 
 ### Android CLI
 - If CLI missing in `audit`, report missing.
@@ -569,7 +687,15 @@ If unsure, choose `audit`.
 - Use `android skills add --skill=<skill-name>` only when the skill name is confirmed.
 - Use `android skills add --all` only when explicitly requested.
 
-### Graphify
+### Understand-Anything
+- Checked **first** for the architecture-map lane. If the plugin/skill is present or `.understand-anything/knowledge-graph.json` exists, it is the active architecture-map tool — do not also check Graphify.
+- If missing in `audit`, report missing and fall through to check Graphify.
+- Install (bootstrap/update mode, if approved): `/plugin marketplace add Egonex-AI/Understand-Anything` (Claude Code native), or `curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/install.sh | bash` for other agents.
+- If graph is missing, build only in `bootstrap` or `refresh-graph` by running `/understand`.
+- If implementation changed code and the graph exists, refresh in Verify with `/understand`; use `/understand-diff` for impact analysis of the current change.
+- Never hand-edit `.understand-anything/knowledge-graph.json` or `.understand-anything/config.json`.
+
+### Graphify (fallback — only checked when Understand-Anything is unavailable)
 - If `graphify-out/` exists, read it in Discovery.
 - If graph is missing, build only in `bootstrap` or `refresh-graph`.
 - If implementation changed code and graph exists, update in Verify.
@@ -580,13 +706,14 @@ If unsure, choose `audit`.
 - If missing in `audit`, record the gap.
 - If code is touched, apply the principles even if the plugin is not installed, and record how the gate was applied.
 - Do not overwrite existing `CLAUDE.md` unless explicitly requested.
+- **Kotlin/Android convention check (part of the same Stage 4 dispatch, only when `kotlin_convention_scope` is non-empty):** fallback order — dispatch the `kotlin-reviewer` agent if available; else consult official Android/Kotlin docs or matching companion skill(s) (`kotlin-patterns`, `android-clean-architecture`, `compose-multiplatform-patterns`, `kotlin-coroutines-flows`, `kotlin-testing`) as reference; else apply general Kotlin/Android knowledge as degraded evidence. Whichever tier runs, record `kotlin_convention_check`, references consulted, and degradation reason in `execution.md`; never omit the record.
 
 ### Serena
 - Check `uv` presence and `uvx serena` availability in Stage -1 (non-blocking).
 - If missing: record `serena: not-configured`; never block Stage 0.
 - If ready: activate Code Analysis Worker automatically per stage conditions.
 - JetBrains backend is dev opt-in only — agent does not detect or start Android Studio.
-- Kotlin LS diagnostics are disabled until dev confirms `kotlin_ls_stable: true`.
+- Kotlin Language Server is JetBrains official Alpha; Android Gradle Plugin support is experimental. Use Kotlin LS diagnostics only when project support is confirmed (`kotlin_lsp_support: confirmed` or dev opt-in). If unknown, skip diagnostics and rely on Gradle/lint/static-analysis evidence.
 - Never call mutation tools: `rename_symbol`, `replace_symbol_body`, `insert_before_symbol`, `insert_after_symbol`, `safe_delete_symbol`, or any `jet_brains_*` refactoring tool.
 - Serena outputs feed `context-pack.json → dependencies`, `facts`, and may upgrade `graph_impact`.
 - Install command (bootstrap/update mode, if approved): `uv tool install oraios-serena`
@@ -629,8 +756,13 @@ The parent orchestrator must wait:
 
 docs/ai/
 ├── inputs/                                   ← GLOBAL: human-provided, never overwritten
-├── decisions/
-│   └── 0000-template.md                      ← GLOBAL ADR-lite template
+├── decisions/                                ← GLOBAL: project-wide ADR ledger (immutable once Accepted)
+│   ├── 0000-template.md                      ← GLOBAL ADR-lite template
+│   ├── README.md                             ← GLOBAL: index of every ADR (auto-created on first ADR)
+│   └── ADR-NNNN-<slug>.md                    ← sequential, project-wide numbering (not per-task)
+├── architecture/                             ← GLOBAL: living knowledge base, updated in place over time
+│   ├── README.md                             ← GLOBAL: index of domain files (auto-created on first write)
+│   └── <domain>.md                           ← e.g. networking.md, billing.md; agent-named per project
 └── tasks/
     └── {task_id}/
         ├── discovery/
@@ -638,16 +770,16 @@ docs/ai/
         │   ├── context-pack.json
         │   └── clarification-brief.md
         ├── requirements/
-        ├── decisions/
         ├── design/
         ├── planning/
         ├── testing/
         ├── android-memo/
         └── handoff.md                        ← generated at Stage 3; updated on interrupt
 
+.understand-anything/
 graphify-out/
 .skills/
-.ai-devkit.json
+.specify/
 .agent-auth.yaml                              ← gitignored; auto-created; contains all tokens
 ```
 
@@ -660,16 +792,16 @@ graphify-out/
 3. **Tooling Preflight** — run `bash templates/tooling-preflight.sh --json` → write `preflight.json`; run without flag → write `preflight.md`; write `tooling-cache.json`; init `tasks/{task_id}/session.json` and `tasks/{task_id}/skip-log.json`. Read `preflight.json → ready_for_stage_0` for the gate decision.
 4. **Intake** — collect links; derive source mode (A/B/C); resolve credential set; derive `task_id` (Jira key → slug → date-hash); write/update `tasks/{task_id}/session.json` with `task_id`, `source_mode`.
 5. **Determine ref tier + preliminary mode** — derive `preliminary_mode` from task description and link presence (fast/standard/governed); load only needed refs per tier (LIGHT/MEDIUM/HEAVY/FULL). Write `preliminary_mode` to `session.json`. Load `refs/stage-contracts.md` if resuming.
-6. **Discovery** — read Graphify if present; activate source readers in parallel; auto-follow Jira attachments (1 level). Derive `change_type` (initial). Activate Gradle Module Impact Analyzer if `graph_impact ≥ medium`. Write `module_impact_chain` and `change_type` to context-pack.
+6. **Discovery** — read the active architecture map if present (Understand-Anything first, Graphify fallback); activate source readers in parallel; auto-follow Jira attachments (1 level). Derive `change_type` (initial). Activate Gradle Module Impact Analyzer if `graph_impact ≥ medium`. Write `module_impact_chain` and `change_type` to context-pack.
 7. **Token check** — just before each source reader, verify its token; prompt user if missing.
-8. **Finalize workflow mode (end of Stage 1)** — after all sources read and Graphify data available, compute `complexity_score` + `risk_score` → `workflow_mode`; apply override rules; write `workflow_mode`, `complexity_score`, `risk_score`, `mode_reasons` to `context-pack.json` and `session.json`. **Clarification (Stage 1.5)** — read `workflow_mode` from session (do not re-score); if `fast` → AUTO-SKIP; if any trigger fires and mode ≠ fast, run workers in parallel; finalize `change_type` and `module_impact_chain`; parent synthesizes context-pack + brief (sparse format).
-9. **Requirements** — AI DevKit writes canonical doc with version header + Affected Areas; **stop for human approval**; update `session.json → requirements_approved: true`.
+8. **Finalize workflow mode (end of Stage 1)** — after all sources read and architecture-map data available, compute `complexity_score` + `risk_score` → `workflow_mode`; apply override rules; write `workflow_mode`, `complexity_score`, `risk_score`, `mode_reasons` to `context-pack.json` and `session.json`. **Clarification (Stage 1.5)** — read `workflow_mode` from session (do not re-score); if `fast` → AUTO-SKIP; if any trigger fires and mode ≠ fast, run workers in parallel; finalize `change_type` and `module_impact_chain`; parent synthesizes context-pack + brief (sparse format).
+9. **Requirements** — Spec Kit writes canonical doc with version header + Affected Areas; **stop for human approval**; update `session.json → requirements_approved: true`.
 10. **Decision Gate** — decide whether ADR-lite is required; create Proposed ADR and stop for approval if required; write `adr_required`, `adr_status`, and `decision_record` to `session.json`.
-11. **Design split** — AI DevKit + Android skills in parallel; produce `implementation-plan.md` with exact files, test commands, RED/GREEN/commit steps per acceptance criterion (no placeholders); select code owner; update `session.json → code_owner`, `session.json → assignee`; ask for `branch` if not yet set; generate `docs/ai/tasks/{task_id}/handoff.md`; update `.project-orchestration/status.json`.
+11. **Design split** — Spec Kit + Android skills in parallel; produce `implementation-plan.md` with exact files, test commands, RED/GREEN/commit steps per acceptance criterion (no placeholders); select code owner; update `session.json → code_owner`, `session.json → assignee`; ask for `branch` if not yet set; generate `docs/ai/tasks/{task_id}/handoff.md`; update `.project-orchestration/status.json`.
 12. **Implementation (per-task TDD loop)** — one owner per task in `implementation-plan.md`; write failing test → RED evidence → minimal code → GREEN evidence → refactor → commit → spec-compliance review ✅ → code-quality review ✅ → next task. Capture `screenshot_before` if `change_type` includes `ui_change`. On interrupt: update `handoff.md` and `status.json` before stopping.
-13. **Verify** — derive required evidence from Evidence Gate Matrix using `change_type`; Android CLI runs required commands scoped to `module_impact_chain.build_order` if present; Graphify updates graph only if `graph_impact ≥ medium`. Write `evidence_collected` to `session.json`.
-14. **QA gate** — AI DevKit + Karpathy review diff; verify Gate F (all required evidence present); keep code frozen.
-15. **Docs / decision finalization** — update ADR status, Task Changelog, gate log, and drift check result; mark `session.json → stage_status: complete`; update `docs/ai/tasks/{task_id}/handoff.md` with final status; update `.project-orchestration/status.json` entry to `stage_status: complete`.
+13. **Verify** — derive required evidence from Evidence Gate Matrix using `change_type`; Android CLI runs required commands scoped to `module_impact_chain.build_order` if present; run required regression/security/performance evidence from `quality_gate_plan`; the active architecture-map tool updates its graph only if `graph_impact ≥ medium`. Write `evidence_collected` to `session.json`.
+14. **QA gate** — Spec Kit + Karpathy review diff; verify Gate F (all required evidence present), regression matrix coverage, and security/performance outcomes; keep code frozen.
+15. **Docs / decision finalization** — update ADR status, Task Changelog, `task-summary.md`, gate log, Artifact Integrity Check result, and Skill Drift Check result only when applicable; mark `session.json → stage_status: complete`; update `docs/ai/tasks/{task_id}/handoff.md` with final status; update `.project-orchestration/status.json` entry to `stage_status: complete`.
 
 ---
 

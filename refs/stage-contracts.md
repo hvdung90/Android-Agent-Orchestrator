@@ -1,6 +1,6 @@
 # Stage Output Contracts
 
-_Skill version: 4.10.1 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 4.18.0 — update this when SKILL.md bumps a minor or major version._
 
 Each stage defines a typed contract: what it requires as input, what it must produce as output, and what state it writes to `session.json` on completion or interrupt.
 
@@ -29,7 +29,7 @@ output_produces:
   - .project-orchestration/status.json (initialized if missing)    ← GLOBAL
   - .project-orchestration/tasks/{task_id}/session.json (stage_reached: -1)
   - .project-orchestration/tasks/{task_id}/skip-log.json (initialized empty)
-  - context fields: tooling_readiness, auth_status, provisioning_mode, blockers, graphify_staleness
+  - context fields: tooling_readiness, auth_status, provisioning_mode, blockers, architecture_map_staleness
 
 state_on_complete:
   stage_reached: -1
@@ -108,14 +108,15 @@ input_requires:
   - matched task history docs only when session.json history_scan.decision = read_full
 
 guard_conditions:
-  - graphify-out/GRAPH_REPORT.md read if graph exists
+  - active architecture-map output read if graph exists (.understand-anything/knowledge-graph.json or graphify-out/GRAPH_REPORT.md)
   - source readers run per source_mode (A: Jira+Confluence+Figma; B: Doc Reader; C: user message only)
-  - if history_scan.decision = read_full: read matched task requirements, ADRs, design, and execution report before synthesis
+  - if history_scan.decision = read_full: read matched task task-summary.md first when present, then requirements, ADRs, design, and execution report only as needed before synthesis
   - if history_scan.decision = ask_human: block before Discovery until user confirms continuation vs independent task
 
 output_produces:
   - docs/ai/tasks/{task_id}/discovery/<task>.md  (raw discovery notes)
   - docs/ai/tasks/{task_id}/clarification/context-pack.json (partial — sources, graph_path, graph_impact, change_type, history_context if read)
+  - impact_assessment, regression_test_matrix, quality_gate_plan, follow_up_watchlist drafted in context-pack for code-touching tasks
   - module_impact_chain populated if graph_impact >= medium (Gradle Module Impact Analyzer)
   - .project-orchestration/tasks/{task_id}/skip-log.json appended if Gradle Module Impact Analyzer auto-skipped
   - workflow_mode (fast / standard / governed) finalized; complexity_score and risk_score computed after all sources read
@@ -159,6 +160,7 @@ output_produces:
   - docs/ai/tasks/{task_id}/clarification/context-pack.json (complete)
   - docs/ai/tasks/{task_id}/clarification/clarification-brief.md
   - clarity_score written to context-pack.json
+  - impact_assessment / regression_test_matrix / quality_gate_plan / follow_up_watchlist finalized or explicitly omitted as not_applicable
   - Serena outputs attached if triggered
   - module_impact_chain finalized (Gradle Module Impact Analyzer may refine graph_impact here)
   - change_type finalized
@@ -198,7 +200,7 @@ guard_conditions:
 
 output_produces:
   - docs/ai/tasks/{task_id}/requirements/<task>.md (canonical requirements doc)
-  - requirements artifact header, Affected Areas checklist, Decision Triggers section
+  - requirements artifact header, Affected Areas checklist, Decision Triggers section, Impact / Regression section
   - .project-orchestration/tasks/{task_id}/session.json: requirements_approved → false (pending)
 
 approval_gate:
@@ -231,17 +233,22 @@ input_requires:
   - docs/ai/tasks/{task_id}/requirements/<task>.md (requirements_approved: true)
   - docs/ai/tasks/{task_id}/clarification/context-pack.json
   - refs/contracts-and-artifacts.md: ADR trigger list + Decision Ownership matrix
+  - docs/ai/decisions/README.md (read for duplicate-ADR check; auto-create if missing and a trigger fires)
 
 guard_conditions:
   - evaluate ADR triggers: module boundary, navigation graph, public API/internal contract,
     persistence schema, DI graph, Gradle/AGP/Kotlin version, Compose/View migration,
     state ownership, background work, permissions, billing, auth, notifications,
     broad test strategy
-  - if any trigger fires: create Proposed ADR-lite and stop for human approval
+  - if any trigger fires: check docs/ai/decisions/README.md for an existing covering Accepted ADR first
+  - if a covering ADR exists and is still valid: link to it, adr_required: false, reason: "covered by ADR-NNNN"
+  - if a covering ADR exists but decision changed: create new ADR with supersedes: ADR-NNNN
+  - if no covering ADR: create Proposed ADR-lite (numbered per § 4c) and stop for human approval
   - if no trigger fires: record adr_required: false and reason
 
 output_produces:
-  - docs/ai/tasks/{task_id}/decisions/ADR-NNNN-<slug>.md (if required)
+  - docs/ai/decisions/ADR-NNNN-<slug>.md (GLOBAL, if required)
+  - docs/ai/decisions/README.md (index row added for the new ADR)
   - .project-orchestration/tasks/{task_id}/session.json:
       adr_required: true | false
       adr_status: "proposed | accepted | deferred | superseded | not_required"
@@ -264,7 +271,7 @@ state_on_interrupt:
   stage_status: in_progress
   blocker: "waiting for human approval/deferral of ADR-lite"
   partial_outputs:
-    - "docs/ai/tasks/{task_id}/decisions/ADR-NNNN-<slug>.md (Proposed)"
+    - "docs/ai/decisions/ADR-NNNN-<slug>.md (Proposed, GLOBAL)"
 
 resume_entry_point: "ADR decision already exists; re-present Proposed ADR and await approval/deferral"
 ```
@@ -287,12 +294,13 @@ guard_conditions:
   - no product-code changes allowed in this stage
 
 output_produces:
-  - docs/ai/tasks/{task_id}/design/<task>.md (AI DevKit design doc)
-  - docs/ai/tasks/{task_id}/planning/<task>.md (AI DevKit planning doc)
-  - docs/ai/tasks/{task_id}/planning/implementation-plan.md (executable TDD plan; MANDATORY — no placeholders)
+  - docs/ai/tasks/{task_id}/design/<task>.md (Spec Kit design doc)
+  - docs/ai/tasks/{task_id}/planning/<task>.md (Spec Kit planning doc)
+  - docs/ai/tasks/{task_id}/planning/implementation-plan.md (executable TDD plan; MANDATORY — no placeholders; includes regression/security/performance checks)
+  - kotlin_android_versions and kotlin_android_rule_checklist written to context-pack / implementation-plan when Kotlin product code is touched
   - docs/ai/tasks/{task_id}/android-memo/<task>.md (Android skills memo, if Android-specific — auto-skip written to skip-log if omitted)
   - docs/ai/tasks/{task_id}/handoff.md (generated when code_owner is confirmed; MANDATORY)
-  - .project-orchestration/tasks/{task_id}/session.json: code_owner, assignee, branch set
+  - .project-orchestration/tasks/{task_id}/session.json: code_owner, assignee, branch, commit_policy set (commit_policy defaults to per_task; human-request-only)
   - .project-orchestration/status.json: entry updated (stage_reached: 3, assignee, branch)
 
 state_on_complete:
@@ -342,6 +350,8 @@ output_produces:
   - evidence/green-<task-id>.txt per task (GREEN test run output — MANDATORY after implementation)
   - spec-compliance review record per task (in execution.md or inline comment)
   - quality review (Karpathy) record per task
+  - Kotlin / Android official-rule checklist review per task when Kotlin product code changed
+  - regression/security/performance check status per task when declared in quality_gate_plan
   - .project-orchestration/status.json: entry updated (stage_reached: 4)
 
 state_on_complete:
@@ -377,14 +387,17 @@ input_requires:
 
 guard_conditions:
   - derive required evidence from Evidence Gate Matrix using change_type
+  - derive required regression/security/performance evidence from context-pack regression_test_matrix and quality_gate_plan
+  - if Kotlin product code changed: derive kotlin_static_analysis_pass from repo-native checks
   - if module_impact_chain present: scope build commands to build_order modules
-  - if graph_impact >= medium: run /graphify . --update
-  - if graph_impact = low: skip graphify update (record skip reason in execution.md)
+  - if graph_impact >= medium: run the active architecture-map update (/understand or /graphify . --update)
+  - if graph_impact = low: skip architecture-map update (record skip reason in execution.md)
 
 output_produces:
   - .project-orchestration/tasks/{task_id}/evidence/* (all required evidence files)
-  - .project-orchestration/tasks/{task_id}/reports/execution.md (evidence manifest with Gate log)
-  - graphify-out/ updated (if graph_impact >= medium; skip written to skip-log if graph_impact = low)
+  - .project-orchestration/tasks/{task_id}/reports/execution.md (evidence manifest with Gate log and Impact Closure)
+  - kotlin_static_analysis_pass evidence or unavailable-tool records when Kotlin product code changed
+  - active architecture-map output updated (.understand-anything/ or graphify-out/, if graph_impact >= medium; skip written to skip-log if graph_impact = low)
   - .project-orchestration/tasks/{task_id}/session.json: stage_reached: 5, evidence_collected: [...]
   - .project-orchestration/status.json: entry updated (stage_reached: 5)
 
@@ -417,6 +430,8 @@ input_requires:
 
 guard_conditions:
   - all required evidence items from Evidence Gate Matrix must be present (Gate F)
+  - Kotlin static-analysis evidence must be present or explicitly deferred when Kotlin product code changed
+  - every required regression/security/performance row must be passed, blocked, or explicitly deferred
   - no new code changes allowed; QA gate is review only
 
 output_produces:
@@ -428,6 +443,7 @@ output_produces:
 approval_gate:
   - if Karpathy flags CRITICAL or HIGH issues → block and report to human
   - if acceptance criteria not fully covered → block and report to human
+  - if required regression/security/performance evidence is missing → block and report to human
 
 state_on_complete:
   stage_reached: 6
@@ -457,13 +473,22 @@ input_requires:
 guard_conditions:
   - no product-code changes allowed
   - if ADR exists: status must become Accepted, Deferred, or Superseded
+  - if architecture-doc trigger met (adr_required OR estimated_build_scope in {local-chain, full-project}
+    OR change_type: architecture_change): section-level patch only, never whole-file rewrite;
+    Change Log section always appended; otherwise AUTO-SKIP
   - Task Changelog must summarize behavior changes, not just file diffs
   - Drift Check must pass or list blockers
 
 output_produces:
-  - docs/ai/tasks/{task_id}/decisions/ADR-NNNN-<slug>.md updated with final status (if present)
+  - docs/ai/decisions/ADR-NNNN-<slug>.md updated with final status (GLOBAL, if present)
+  - docs/ai/decisions/README.md index row updated to match (GLOBAL)
+  - docs/ai/architecture/<domain>.md created-or-updated (GLOBAL, only if trigger condition met)
+  - docs/ai/architecture/README.md index updated (GLOBAL, only if trigger condition met)
   - .project-orchestration/tasks/{task_id}/reports/execution.md updated with Task Changelog
-  - .project-orchestration/tasks/{task_id}/reports/execution.md updated with Drift Check
+  - .project-orchestration/tasks/{task_id}/reports/execution.md updated with Kotlin / Android Rule Closure
+  - .project-orchestration/tasks/{task_id}/reports/execution.md updated with Impact Closure
+  - .project-orchestration/tasks/{task_id}/reports/execution.md updated with Drift Check: Artifact Integrity Check (always) + Skill Drift Check (only if this task modified the orchestrator skill's own files, else AUTO-SKIP)
+  - docs/ai/tasks/{task_id}/task-summary.md written with compact continuity summary
   - .project-orchestration/tasks/{task_id}/session.json: stage_status: complete
   - docs/ai/tasks/{task_id}/handoff.md: status set to complete; final summary written
   - .project-orchestration/status.json: entry updated (stage_reached: 7, stage_status: complete, pr_url if known)
@@ -476,9 +501,9 @@ state_on_complete:
 state_on_interrupt:
   stage_reached: 7
   stage_status: in_progress
-  blocker: "<ADR final status missing | task changelog incomplete | drift check failed>"
+  blocker: "<ADR final status missing | task changelog incomplete | impact closure incomplete | drift check failed>"
 
-resume_entry_point: "finish execution.md Task Changelog / Drift Check and finalize ADR status"
+resume_entry_point: "finish execution.md Task Changelog / Impact Closure / Drift Check, write task-summary.md, and finalize ADR status"
 ```
 
 ---
@@ -522,7 +547,7 @@ Any interrupt → stage_status: in_progress, blocker: "<reason>"
   "requirements_approved": false,
   "adr_required": false,
   "adr_status": "proposed | accepted | deferred | superseded | not_required | null",
-  "decision_record": "docs/ai/tasks/{task_id}/decisions/ADR-NNNN-slug.md | null",
+  "decision_record": "docs/ai/decisions/ADR-NNNN-slug.md | null",
   "workflow_mode": "fast | standard | governed | null",
   "preliminary_mode": "fast | standard | governed | null",
   "mode_override": "fast | standard | governed | null",
@@ -531,6 +556,8 @@ Any interrupt → stage_status: in_progress, blocker: "<reason>"
   "change_type": "ui_change | database_change | network_change | dependency_change | architecture_change | logic_change | test_change | config_change | multi | null",
   "module_impact_chain_scope": "single | local-chain | full-project | null",
   "evidence_collected": [],
+  "impact_closure_status": "not_started | partial | complete | blocked | null",
+  "follow_up_watchlist": [],
   "blocker": "null | <human-readable reason>",
   "partial_outputs": []
 }

@@ -13,7 +13,7 @@ Then tell the agent: "set up agents for this repo"
 
 The agent runs Stage -1 in `bootstrap` mode:
 - Creates `.agent-auth.yaml` (tokens requested on demand)
-- Installs missing tools (AI DevKit, Android CLI, Graphify if approved)
+- Installs missing tools (Spec Kit, Android CLI, Understand-Anything — or Graphify as fallback — if approved)
 - Writes `.project-orchestration/reports/preflight.md`
 
 ---
@@ -48,11 +48,18 @@ The agent stops at **Stage 2** and shows you the requirements doc. After approva
 
 ```
 docs/ai/tasks/{task_id}/requirements/<task>.md   ← review this
-docs/ai/tasks/{task_id}/decisions/ADR-*.md       ← review if Stage 2.5 requires ADR-lite
+docs/ai/decisions/ADR-*.md                       ← review if Stage 2.5 requires ADR-lite (GLOBAL, not per-task)
 ```
 
 Reply `approve` to continue to the decision gate, then design + implementation when no ADR is required or the ADR is approved/deferred.
 Reply with corrections to adjust requirements before coding starts.
+
+The requirements doc should also show:
+- which features/modules are directly affected,
+- which related features must be retested,
+- security/performance/accessibility checks required for the change,
+- known limitations or follow-ups that are not fully solved by this task,
+- Kotlin / Android rule and static-analysis checks when Kotlin product code will change.
 
 ---
 
@@ -89,6 +96,7 @@ Shows every task: stage, assignee, branch, PR, blocker — in one file.
 
 ```
 docs/ai/tasks/{task_id}/handoff.md        ← full task snapshot for incoming dev
+docs/ai/tasks/{task_id}/task-summary.md   ← compact completed-task memory for future tasks
 .project-orchestration/status.json        ← all tasks dashboard
 ```
 
@@ -117,7 +125,8 @@ The agent loads refs only when needed:
 .project-orchestration/tasks/{task_id}/       ← per-task state + evidence
 docs/ai/tasks/{task_id}/handoff.md            ← handoff snapshot for incoming dev
 docs/ai/                                      ← all agent-generated artifacts
-graphify-out/                                 ← architecture graph
+.understand-anything/                         ← architecture graph (primary tool)
+graphify-out/                                 ← architecture graph (fallback tool)
 ```
 
 ---
@@ -126,11 +135,12 @@ graphify-out/                                 ← architecture graph
 
 | Goal | Tell the agent |
 |---|---|
-| Rebuild architecture graph | "refresh the graph" |
+| Rebuild architecture graph (Understand-Anything, or Graphify fallback) | "refresh the graph" |
 | Update all tools | "update agents" |
 | Resume interrupted task | "resume task ANDROID-XX" |
 | Full clean reset | "force reinstall agents" |
 | Check tool readiness | "audit tools" |
 | Hand off to another dev | "dừng lại, bàn giao cho \<dev-name\>" |
+| Change commit behavior (default: commit every task) | "commit once at the end" / "don't commit yet" |
 | View all active tasks | Read `.project-orchestration/status.json` |
 | View task handoff state | Read `docs/ai/tasks/{task_id}/handoff.md` |
