@@ -1,6 +1,6 @@
 # Playbooks
 
-_Skill version: 4.16.0 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 4.17.0 — update this when SKILL.md bumps a minor or major version._
 
 Each playbook maps a task type to the correct provisioning mode, stage sequence, source mode, clarification workers, and architecture-map queries (Understand-Anything checked first, Graphify fallback).
 
@@ -78,7 +78,7 @@ Stage 3 — design + Android memo
 Stage 4 — one code owner implements
           [Serena: code-owner request] find_declaration / find_implementations advisory
 Stage 5 — Android CLI evidence + architecture-map update
-          [Serena: agent] get_diagnostics_for_file if graph_impact ≥ medium AND kotlin-ls stable
+          [Serena: agent] get_diagnostics_for_file if graph_impact ≥ medium AND `kotlin_lsp_support: confirmed`
 Stage 6 — Karpathy QA gate
           [Serena: optional] find_referencing_symbols scope check
 Stage 7 — finalize ADR status + Task Changelog + Drift Check
@@ -117,7 +117,7 @@ Stage 2.5 — evaluate ADR-lite triggers; STOP again if ADR approval/deferral re
 Stage 4 — surgical changes only
           [Serena: code-owner request] find_declaration for usage pattern
 Stage 5 — update graph and verify
-          [Serena: agent] get_diagnostics_for_file if kotlin-ls stable
+          [Serena: agent] get_diagnostics_for_file if `kotlin_lsp_support: confirmed`
 Stage 7 — finalize ADR status + Task Changelog + Drift Check
 ```
 
@@ -137,7 +137,7 @@ Stage 2.5 — evaluate ADR-lite triggers; usually not_required unless contract/s
 Stage 4 — smallest safe patch
           [Serena: code-owner request] find_declaration for context
 Stage 5 — runtime evidence + graph update if graph exists
-          [Serena: agent] get_diagnostics_for_file on patched file if kotlin-ls stable
+          [Serena: agent] get_diagnostics_for_file on patched file if `kotlin_lsp_support: confirmed`
 Stage 7 — finalize Task Changelog + Drift Check
 ```
 
@@ -172,7 +172,7 @@ Stage 2 — upgrade plan; STOP
 Stage 2.5 — ADR-lite required for AGP/Gradle/Kotlin version decision
 Stage 4 — controlled implementation
 Stage 5 — clean build + graph update
-          [Serena: agent] get_diagnostics_for_file on changed build files if kotlin-ls stable
+          [Serena: agent] get_diagnostics_for_file on changed build files if `kotlin_lsp_support: confirmed`
 Stage 7 — accept/defer ADR + Task Changelog + Drift Check
 ```
 

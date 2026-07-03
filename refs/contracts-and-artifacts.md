@@ -1,6 +1,6 @@
 # Contracts, Artifacts, and Gates
 
-_Skill version: 4.16.0 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 4.17.0 — update this when SKILL.md bumps a minor or major version._
 
 ---
 
@@ -181,6 +181,24 @@ Exception: always include `feature_id`, `clarity_score`, `outcome`, `blocked`, `
     "accessibility": [],
     "compatibility": []
   },
+  "kotlin_android_versions": {
+    "kotlin": "<version or unknown>",
+    "agp": "<version or unknown>",
+    "compose_bom": "<version or none>",
+    "compose_compiler": "<version or unknown>",
+    "coroutines": "<version or unknown>",
+    "min_sdk": "<api or unknown>",
+    "target_sdk": "<api or unknown>"
+  },
+  "kotlin_android_rule_checklist": [
+    {
+      "area": "android-kotlin-style | kotlin-coding-conventions | android-architecture | compose | coroutines-flow | testing | interop-api | static-analysis",
+      "required": true,
+      "references": [],
+      "checks": [],
+      "evidence": "<planned evidence path or review row>"
+    }
+  ],
   "follow_up_watchlist": [
     {
       "item": "<known limitation, deferred fix, or monitoring concern>",
@@ -282,6 +300,12 @@ Exception: always include `feature_id`, `clarity_score`, `outcome`, `blocked`, `
 // Fast mode: scope to the lite form — direct_features + a regression row for the changed feature itself only;
 // skip the indirect-feature sweep and any quality_gate_plan category with no obvious signal (auth/network/UI/
 // storage touch). See artifact_budget.fast below.
+
+// kotlin_android_versions / kotlin_android_rule_checklist guidance:
+// Populate when any Kotlin product-code file is in scope. Read Gradle, version catalogs, and build files when
+// available. The checklist must include static-analysis plus every applicable official-rule area:
+// android-kotlin-style, kotlin-coding-conventions, android-architecture, compose, coroutines-flow, testing,
+// interop-api. Omit only areas that are clearly not applicable and record why in facts[].
 
 // history_context guidance:
 // Omit when task_continuity = new and no metadata scan was needed.
@@ -417,6 +441,7 @@ owner: spec-kit
 status: draft | active | complete
 task: <task_id>
 kotlin_convention_scope: []   # computed once at Stage 3 — see § Kotlin/Android convention scope; omit if empty
+kotlin_android_rule_checklist: []   # computed once at Stage 3 when Kotlin product code is touched
 ```
 
 Required structure per task:
@@ -430,6 +455,7 @@ Required structure per task:
 
 **Regression scope:** <features/scenarios from context-pack.regression_test_matrix>
 **Security / performance scope:** <checks from context-pack.quality_gate_plan>
+**Kotlin / Android static checks:** <lint/ktlint/detekt/spotless/formatter commands or unavailable records>
 
 ---
 
@@ -467,6 +493,7 @@ Required structure per task:
 - [ ] **Spec review** ✅ — verify matches acceptance criterion, nothing extra
 - [ ] **Quality review** ✅ — Karpathy gate passed
 - [ ] **Regression / security / performance** ✅ — required checks recorded in execution.md
+- [ ] **Kotlin / Android rules** ✅ — checklist rows reviewed and static analysis evidence recorded
 
 ---
 
@@ -608,7 +635,20 @@ Required Impact Closure section:
 
 Every required row from `context-pack.json → regression_test_matrix` and every non-empty category in `quality_gate_plan` must appear here. If a row is not fully verified, status must be `blocked` or `deferred` with an explicit follow-up reference.
 
-If any completed task had a non-empty `kotlin_convention_scope`, also record its `kotlin_convention_check` tier (`agent | skill_docs | general_knowledge`) per task — e.g. as a row or inline note; this is mandatory whenever the scope is non-empty (see § Kotlin/Android convention scope).
+Required Kotlin / Android Rule Closure section when Kotlin product code changed:
+
+```markdown
+## Kotlin / Android Rule Closure
+
+| Area | Status | Evidence / references |
+|---|---|---|
+| android-kotlin-style | passed | <lint/formatter/review path> |
+| static-analysis | passed | <lint/ktlint/detekt/spotless evidence path> |
+```
+
+Every required row from `context-pack.json → kotlin_android_rule_checklist` must appear here. `static-analysis` is mandatory for Kotlin product-code changes. Missing repo tools must be recorded as `unavailable`; configured tool failures block Gate F.
+
+If any completed task had a non-empty `kotlin_convention_scope`, also record its `kotlin_convention_check` tier (`agent | official_docs | skill_docs | general_knowledge`) per task — e.g. as a row or inline note; this is mandatory whenever the scope is non-empty (see § Kotlin/Android convention scope).
 
 Required Drift Check section:
 
@@ -632,6 +672,7 @@ Required Drift Check section:
 - [ ] no Accepted ADR's Decision/Consequences text was hand-edited outside a supersede (status/superseded_by/index-row change only)
 - [ ] if docs/ai/architecture/ exists: docs/ai/architecture/README.md lists every domain file present, and no domain file is missing a Change Log entry for this task's changes when the § 4e trigger was met
 - [ ] every completed Stage 4 task with a non-empty `kotlin_convention_scope` has a recorded `kotlin_convention_check` tier — no silent omission
+- [ ] every Kotlin product-code change has Kotlin / Android Rule Closure with static-analysis evidence or explicit unavailable-tool records
 - [ ] every required regression/security/performance row from context-pack appears in Impact Closure with evidence, blocker, or deferred follow-up
 - [ ] docs/ai/tasks/{task_id}/task-summary.md exists and includes impact summary, evidence summary, and follow-up watchlist
 ```
@@ -869,6 +910,7 @@ TDD exemption (CONFIRM-SKIP only):
 
 Required:
 - All **required** evidence items for the task's `change_type` collected (see Evidence Gate Matrix below),
+- `kotlin_static_analysis_pass` collected for every Kotlin product-code change,
 - Active architecture-map tool update run if `graph_impact ≥ medium`,
 - acceptance coverage checked,
 - `module_impact_chain.build_order` modules all built successfully (if module_impact_chain present),
@@ -880,6 +922,7 @@ Required:
 - spec-compliance review ✅ for every completed task,
 - Karpathy/code-quality review ✅ for every completed task,
 - final execution report written,
+- Kotlin / Android Rule Closure completed for Kotlin product-code changes,
 - Impact Closure completed for regression/security/performance checks,
 - Task Changelog completed,
 - ADR-lite status finalized (`Accepted`, `Deferred`, or `Superseded`) if present, and `docs/ai/decisions/README.md` index row updated to match,
@@ -905,6 +948,15 @@ When `change_type` is `multi`, apply the union of required items for each applic
 | `logic_change` | unit_test_pass, coverage_report (≥ 80% on changed files) | integration_test_pass, scenario_trace_log |
 | `test_change` | test_pass (no product code changed) | coverage_delta_report |
 | `config_change` | build_success_release_variant, manifest_diff | lint_report, proguard_mapping_diff |
+
+### Kotlin static-analysis overlay
+
+Applied to every task that touches Kotlin product code (`src/main/**/*.kt`, Android library/app Kotlin source, or generated source checked into the repo).
+
+| Evidence item | Required behavior |
+|---|---|
+| `kotlin_static_analysis_pass` | Run repo-native checks in this order when present: Android lint (`./gradlew lint` or module-scoped lint), `ktlintCheck`, `detekt`, `spotlessCheck`, formatter/check tasks. Configured tool failures block Gate F. Missing tools are recorded as `unavailable` with detection evidence. |
+| `kotlin_rule_checklist_review` | Review required checklist areas against official Android/Kotlin guidance or companion skill docs. General-knowledge-only review is degraded evidence and must include reason. |
 
 ### Security / performance evidence overlays
 
@@ -940,6 +992,14 @@ evidence_commands:
   coverage_report:          "./gradlew :affected_module:jacocoTestReport"
   build_success_release_variant: "./gradlew assembleRelease"
   manifest_diff:            "git diff HEAD~1 -- '**/AndroidManifest.xml'"
+  kotlin_static_analysis_pass: |
+    # Detect and run repo-native checks; examples:
+    ./gradlew lint
+    ./gradlew :affected_module:lint
+    ./gradlew ktlintCheck
+    ./gradlew detekt
+    ./gradlew spotlessCheck
+    ./gradlew check
 ```
 
 ### Evidence derivation rule
@@ -950,7 +1010,8 @@ Android CLI derives required evidence at the start of Stage 5:
 2. Look up required evidence items from the matrix.
 3. If `module_impact_chain` present: replace single-module commands with `build_order`-scoped equivalents.
 4. Run required items; collect optional items when tooling is ready.
-5. Write collected evidence paths to `.project-orchestration/tasks/{task_id}/evidence/` and list them in `execution.md`.
+5. If Kotlin product code changed, run `kotlin_static_analysis_pass` and write unavailable-tool records for checks not configured.
+6. Write collected evidence paths to `.project-orchestration/tasks/{task_id}/evidence/` and list them in `execution.md`.
 
 ---
 
@@ -968,7 +1029,22 @@ Computed once at Stage 3 from the requirements' Affected Areas checklist + `chan
 
 If no Affected Area maps and no Kotlin file is in scope (e.g. a pure version-catalog bump), `kotlin_convention_scope` stays empty — Stage 3's Android Advisor consult and Stage 4's convention check both AUTO-SKIP (see `refs/compliance-policy.md`).
 
-**Check-tier fallback (Stage 4, per task with non-empty scope):** dispatch the `kotlin-reviewer` agent if available → else consult the matching companion skill(s) from the table above → else apply general Kotlin/Android knowledge. Record which tier was used as `kotlin_convention_check: agent | skill_docs | general_knowledge | not_applicable` in `execution.md` — **recording this is mandatory even when the check itself degrades to general knowledge; never omit it.**
+### Kotlin / Android rule checklist
+
+When Kotlin product code is touched, Stage 3 must create `kotlin_android_rule_checklist` with these areas:
+
+| Area | Required checks |
+|---|---|
+| `android-kotlin-style` | Android Kotlin style guide: source structure, naming, formatting, imports, visibility, documentation expectations. |
+| `kotlin-coding-conventions` | Kotlin coding conventions: idiomatic declarations, nullability, immutability where practical, expression clarity, KDoc for public API. |
+| `android-architecture` | UI/data/domain boundaries, ViewModel state ownership, repository responsibilities, unidirectional data flow, lifecycle-aware UI state. |
+| `compose` | State hoisting, side-effect APIs, recomposition safety, lazy item keys, `remember` for expensive work, state restoration. |
+| `coroutines-flow` | Structured concurrency, main-safety, cancellation, dispatcher injection, Flow error handling, lifecycle-aware collection. |
+| `testing` | Deterministic unit/UI/coroutine tests, test dispatcher usage, no flaky sleeps, regression rows covered. |
+| `interop-api` | Java/Kotlin interop, public/internal API compatibility, binary/source compatibility when contracts change. |
+| `static-analysis` | Android lint plus repo-native `ktlint`, `detekt`, `spotless`, formatter/check tasks when configured. |
+
+**Check-tier fallback (Stage 4, per task with non-empty scope):** dispatch the `kotlin-reviewer` agent if available → else consult official Android/Kotlin docs and/or matching companion skill(s) from the table above → else apply general Kotlin/Android knowledge as degraded evidence. Record which tier was used as `kotlin_convention_check: agent | official_docs | skill_docs | general_knowledge | not_applicable` in `execution.md`, with references consulted and degradation reason — **recording this is mandatory even when the check itself degrades; never omit it.**
 
 ---
 

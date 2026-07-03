@@ -1,6 +1,6 @@
 # Stage Output Contracts
 
-_Skill version: 4.16.0 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 4.17.0 — update this when SKILL.md bumps a minor or major version._
 
 Each stage defines a typed contract: what it requires as input, what it must produce as output, and what state it writes to `session.json` on completion or interrupt.
 
@@ -297,6 +297,7 @@ output_produces:
   - docs/ai/tasks/{task_id}/design/<task>.md (Spec Kit design doc)
   - docs/ai/tasks/{task_id}/planning/<task>.md (Spec Kit planning doc)
   - docs/ai/tasks/{task_id}/planning/implementation-plan.md (executable TDD plan; MANDATORY — no placeholders; includes regression/security/performance checks)
+  - kotlin_android_versions and kotlin_android_rule_checklist written to context-pack / implementation-plan when Kotlin product code is touched
   - docs/ai/tasks/{task_id}/android-memo/<task>.md (Android skills memo, if Android-specific — auto-skip written to skip-log if omitted)
   - docs/ai/tasks/{task_id}/handoff.md (generated when code_owner is confirmed; MANDATORY)
   - .project-orchestration/tasks/{task_id}/session.json: code_owner, assignee, branch set
@@ -349,6 +350,7 @@ output_produces:
   - evidence/green-<task-id>.txt per task (GREEN test run output — MANDATORY after implementation)
   - spec-compliance review record per task (in execution.md or inline comment)
   - quality review (Karpathy) record per task
+  - Kotlin / Android official-rule checklist review per task when Kotlin product code changed
   - regression/security/performance check status per task when declared in quality_gate_plan
   - .project-orchestration/status.json: entry updated (stage_reached: 4)
 
@@ -386,6 +388,7 @@ input_requires:
 guard_conditions:
   - derive required evidence from Evidence Gate Matrix using change_type
   - derive required regression/security/performance evidence from context-pack regression_test_matrix and quality_gate_plan
+  - if Kotlin product code changed: derive kotlin_static_analysis_pass from repo-native checks
   - if module_impact_chain present: scope build commands to build_order modules
   - if graph_impact >= medium: run the active architecture-map update (/understand or /graphify . --update)
   - if graph_impact = low: skip architecture-map update (record skip reason in execution.md)
@@ -393,6 +396,7 @@ guard_conditions:
 output_produces:
   - .project-orchestration/tasks/{task_id}/evidence/* (all required evidence files)
   - .project-orchestration/tasks/{task_id}/reports/execution.md (evidence manifest with Gate log and Impact Closure)
+  - kotlin_static_analysis_pass evidence or unavailable-tool records when Kotlin product code changed
   - active architecture-map output updated (.understand-anything/ or graphify-out/, if graph_impact >= medium; skip written to skip-log if graph_impact = low)
   - .project-orchestration/tasks/{task_id}/session.json: stage_reached: 5, evidence_collected: [...]
   - .project-orchestration/status.json: entry updated (stage_reached: 5)
@@ -426,6 +430,7 @@ input_requires:
 
 guard_conditions:
   - all required evidence items from Evidence Gate Matrix must be present (Gate F)
+  - Kotlin static-analysis evidence must be present or explicitly deferred when Kotlin product code changed
   - every required regression/security/performance row must be passed, blocked, or explicitly deferred
   - no new code changes allowed; QA gate is review only
 
@@ -480,6 +485,7 @@ output_produces:
   - docs/ai/architecture/<domain>.md created-or-updated (GLOBAL, only if trigger condition met)
   - docs/ai/architecture/README.md index updated (GLOBAL, only if trigger condition met)
   - .project-orchestration/tasks/{task_id}/reports/execution.md updated with Task Changelog
+  - .project-orchestration/tasks/{task_id}/reports/execution.md updated with Kotlin / Android Rule Closure
   - .project-orchestration/tasks/{task_id}/reports/execution.md updated with Impact Closure
   - .project-orchestration/tasks/{task_id}/reports/execution.md updated with Drift Check
   - docs/ai/tasks/{task_id}/task-summary.md written with compact continuity summary

@@ -54,7 +54,7 @@ Stage  2  Requirements          Write canonical requirements doc → STOP for hu
 Stage  2.5 Decision Gate        Check if ADR-lite is needed → STOP for human approval if yes
 Stage  3  Design                Write design + executable implementation plan (tasks with test commands)
 Stage  4  Implementation        TDD per task: RED → GREEN → spec review → quality review → commit
-Stage  5  Verify                Collect all required evidence (build, tests, screenshots)
+Stage  5  Verify                Collect all required evidence (build, tests, screenshots, Kotlin static analysis)
 Stage  6  QA Gate               Karpathy diff review + acceptance, regression, security/performance coverage
 Stage  7  Finalization          ADR status, impact closure, task summary, drift check, handoff finalized
 ```
@@ -87,6 +87,8 @@ Every task in the implementation plan follows this loop — no exceptions:
 5. Commit
 6. Spec-compliance review (does it meet acceptance criteria?)
 7. Quality review (Karpathy guidelines)
+
+For Kotlin product-code changes, the quality gate also requires the Kotlin / Android rule checklist and repo-native static analysis evidence (`lint`, `ktlint`, `detekt`, `spotless`, or the project's equivalent check tasks when configured).
 
 Product code cannot be written before RED evidence exists for that task.
 

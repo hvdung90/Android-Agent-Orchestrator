@@ -1,6 +1,6 @@
 # Sub-agent Catalog and Dependency Rules
 
-_Skill version: 4.16.0 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 4.17.0 — update this when SKILL.md bumps a minor or major version._
 
 ## Design principle
 
@@ -272,11 +272,25 @@ token_reuse_recommendation:
     propose_new_name: <suggested Android resource name, only if no match>
 kotlin_convention_scope: []       # e.g. [kotlin-patterns, android-clean-architecture, compose-multiplatform-patterns]
 convention_refs_consulted: []     # which of the above were actually loaded/read for this task
+kotlin_android_versions:
+  kotlin: <version or unknown>
+  agp: <version or unknown>
+  compose_bom: <version or none>
+  compose_compiler: <version or unknown>
+  coroutines: <version or unknown>
+  min_sdk: <api or unknown>
+  target_sdk: <api or unknown>
+kotlin_android_rule_checklist:
+  - area: android-kotlin-style | kotlin-coding-conventions | android-architecture | compose | coroutines-flow | testing | interop-api | static-analysis
+    required: true | false
+    references: []
+    checks: []
+    evidence: <planned evidence path or review row>
 ```
 
 `token_reuse_recommendation` is populated only when Figma Reader's `design_tokens[]` is non-empty and Android Advisor is activated with codebase read access (Stage 1.5 or Stage 3 memo) to check `res/values/colors.xml`, `dimens.xml`, or `Theme.kt` for an existing match.
 
-`kotlin_convention_scope[]` is computed **once at Stage 3** from the Affected Areas checklist + `change_type` (mapping table in `refs/contracts-and-artifacts.md` § Kotlin/Android convention scope) and written into `implementation-plan.md`'s header — Stage 4's per-task quality review reuses this list, it never recomputes it. Android Advisor consults the matching companion skill(s) (`kotlin-patterns`, `android-clean-architecture`, `compose-multiplatform-patterns`, `kotlin-coroutines-flows`, `kotlin-testing`) as reference when available, recording which were actually read in `convention_refs_consulted[]`.
+`kotlin_convention_scope[]` is computed **once at Stage 3** from the Affected Areas checklist + `change_type` (mapping table in `refs/contracts-and-artifacts.md` § Kotlin/Android convention scope) and written into `implementation-plan.md`'s header — Stage 4's per-task quality review reuses this list, it never recomputes it. Android Advisor consults official Android/Kotlin docs and/or matching companion skill(s) (`kotlin-patterns`, `android-clean-architecture`, `compose-multiplatform-patterns`, `kotlin-coroutines-flows`, `kotlin-testing`) as reference when available, recording which were actually read in `convention_refs_consulted[]`. For Kotlin product-code changes, Android Advisor also emits `kotlin_android_versions` and `kotlin_android_rule_checklist`.
 
 ### QA Scenario Advisor
 
@@ -339,7 +353,7 @@ Read-only and advisory. Never calls code-touching tools. Activated by parent orc
 | Surprising connection found by Graph Impact Reader | 1.5 Clarification | `find_referencing_symbols` |
 | Missing-info flags unknown implementation pattern | 1.5 Clarification | `find_referencing_symbols` |
 | Code owner needs usage pattern before editing | 4 Implementation (advisory) | `find_declaration` |
-| graph_impact ≥ medium AND Kotlin LS confirmed stable | 5 Verify | `get_diagnostics_for_file` |
+| graph_impact ≥ medium AND Kotlin LSP support confirmed | 5 Verify | `get_diagnostics_for_file` |
 | Scope discipline check at QA gate | 6 QA (optional) | `find_referencing_symbols` |
 
 #### Backend selection (dev-decided, not agent-decided)
@@ -351,11 +365,11 @@ Read-only and advisory. Never calls code-touching tools. Activated by parent orc
 
 Default is LSP. Agent does not start Android Studio. Dev configures JetBrains backend separately.
 
-#### Kotlin LS stability gate
+#### Kotlin LSP support gate
 
-Kotlin Language Server is pre-alpha. Before calling `get_diagnostics_for_file` or `get_diagnostics_for_symbol`:
-- If dev confirms Kotlin LS stable → proceed.
-- If stability unknown → skip diagnostics; note in report: `"serena diagnostics skipped: kotlin-ls pre-alpha"`.
+Kotlin Language Server is JetBrains official Alpha; Android Gradle Plugin support is experimental. Before calling `get_diagnostics_for_file` or `get_diagnostics_for_symbol`:
+- If project support is confirmed (`kotlin_lsp_support: confirmed`) or the developer opts in → proceed.
+- If support is unknown → skip diagnostics; note in report: `"serena diagnostics skipped: kotlin-lsp alpha / agp support unconfirmed"`.
 
 #### Tools NEVER called by agent (code owner only)
 
@@ -379,7 +393,7 @@ results:
 callers_count: <n>
 implementors_count: <n>
 diagnostics: []            # only when get_diagnostics_* called
-kotlin_ls_stable: true | false | unknown
+kotlin_lsp_support: confirmed | unsupported | unknown
 recommendation: <one-line impact note for parent orchestrator>
 ```
 
@@ -420,7 +434,7 @@ serena:
   uv_present: true | false
   mcp_configured: true | false
   backend: lsp | jetbrains | unknown
-  kotlin_ls_stable: true | false | unknown
+  kotlin_lsp_support: confirmed | unsupported | unknown
   action_recommended: none | install | configure
 blockers: []
 warnings: []

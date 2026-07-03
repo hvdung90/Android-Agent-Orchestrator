@@ -1,5 +1,14 @@
 # Changelog
 
+## v4.17.0
+
+### Added
+
+- **Kotlin/Android official-rule enforcement** (`SKILL.md`, `refs/contracts-and-artifacts.md`, `refs/compliance-policy.md`, `refs/stage-contracts.md`, `refs/sub-agents.md`): Kotlin product-code changes now require `kotlin_android_rule_checklist`, `kotlin_static_analysis_pass`, and Kotlin / Android Rule Closure evidence.
+- **Static-analysis overlay** (`refs/contracts-and-artifacts.md`): Stage 5 must run repo-native Android/Kotlin checks when configured: Android lint, module lint, `ktlintCheck`, `detekt`, `spotlessCheck`, formatter/check tasks. Configured tool failures block Gate F; missing tools are recorded as `unavailable`.
+- **Official-reference review tier** (`SKILL.md`, `refs/contracts-and-artifacts.md`): Kotlin convention review now records `agent | official_docs | skill_docs | general_knowledge | not_applicable`, and `general_knowledge` is degraded evidence only when official docs/companion skills are unavailable.
+- **Kotlin LSP wording update** (`SKILL.md`, `refs/sub-agents.md`, `refs/provisioning-preflight.md`, `refs/playbooks.md`): Kotlin Language Server is treated as JetBrains official Alpha with experimental AGP support; diagnostics run only when project support is confirmed or the developer opts in.
+
 ## v4.16.0
 
 ### Added

@@ -3,7 +3,7 @@ name: android-agent-orchestrator
 description: Use when starting, planning, analyzing, or implementing any Android task — new feature, bug fix, refactor, migration, AGP upgrade, architecture review, or repo setup. Use when user says start task, new feature, fix bug, analyze repo, migrate, upgrade, implement, review architecture, or set up agents for an Android project.
 license: MIT
 metadata:
-  version: 4.16.0
+  version: 4.17.0
   category: orchestration
   lanes:
     - spec-kit
@@ -26,7 +26,7 @@ metadata:
     - refs/playbooks.md
 ---
 
-# Android Agent Orchestrator v4.16.0
+# Android Agent Orchestrator v4.17.0
 
 ## Activation
 
@@ -134,6 +134,16 @@ otherwise                                   →  governed
 ```
 
 Write `preliminary_mode` to `session.json` at Stage 0. **Finalize at the end of Stage 1** — after reading all sources and Graphify — write `workflow_mode` (final) + `complexity_score` + `risk_score` + `mode_reasons` to `context-pack.json` and `session.json`. Stage 1.5 reads the mode that Stage 1 already wrote; it does not re-score.
+
+---
+
+## What changed in v4.17.0
+
+**v4.17.0** — Kotlin/Android official-rule enforcement.
+
+Turns the Kotlin/Android convention gate from a reviewer reminder into an evidence-backed rule set. Stage 3 now builds a `kotlin_android_rule_checklist` from official Android/Kotlin areas (Android Kotlin style, Kotlin coding conventions, Android architecture, Compose, coroutines/Flow, testing, interop/API, lint/static analysis) and records the project Kotlin/AGP/Compose versions when discoverable. Stage 4 may no longer fall through directly to general knowledge: official docs or companion skill references must be consulted when `kotlin_convention_scope` is non-empty; general knowledge is only a last-resort degraded tier and must be recorded as such. Stage 5 now requires `kotlin_static_analysis_pass` for every Kotlin product-code change, using repo-native checks first (`lint`, `ktlint`, `detekt`, `spotless`, formatter/check tasks) and recording unavailable checks explicitly.
+
+**Kotlin LSP note updated:** Kotlin Language Server is now treated as JetBrains official Alpha. Diagnostics remain optional because Android Gradle Plugin support is experimental; use them only when project support is confirmed, otherwise rely on Gradle/lint/static-analysis evidence.
 
 ---
 
@@ -300,6 +310,8 @@ Load when `graph_impact ≥ medium` or multi-module change detected: `refs/sub-a
 26. **Figma MCP availability is self-checked, not preflighted.** Figma MCP tool availability is checked by the agent's own tool list at Figma Reader activation time (Stage 1), never assumed or recorded from Stage -1 preflight — a bash script cannot detect MCP tool presence.
 27. **Kotlin/Android convention check recording is mandatory.** For every Stage 4 task with a non-empty `kotlin_convention_scope`, the check itself may degrade through the fallback tiers (`kotlin-reviewer` agent → companion skill docs → general knowledge), but recording which tier was used (`kotlin_convention_check`) in `execution.md` may never be omitted.
 28. **Regression and quality impact must be explicit.** Before requirements approval, record impacted user-facing features, regression zones, required retest scenarios, security concerns, performance concerns, and deferred follow-ups in `context-pack.json` for every code-touching task (§ Stage 1 definition). Stage 6 cannot close until every required regression/security/performance item is either verified with evidence or recorded as an explicit blocker/approved follow-up. In fast mode this scopes to the lite form (directly changed feature + signal-triggered `quality_gate_plan` categories only) — see `artifact_budget.fast`.
+29. **Kotlin/Android official-rule checklist is mandatory for Kotlin product code.** If any Kotlin product file is touched, Stage 3 must create `kotlin_android_rule_checklist` and Stage 5 must collect `kotlin_static_analysis_pass` evidence. Repo-native checks (`lint`, `ktlint`, `detekt`, `spotless`, formatter/check tasks) are used when present; missing tools are recorded, not silently ignored.
+30. **No general-knowledge-only Kotlin convention pass when official references are available.** When `kotlin_convention_scope` is non-empty, the reviewer must consult official Android/Kotlin docs or companion skill docs before falling back. A `general_knowledge` tier is allowed only as degraded evidence when references/tools are unavailable, and the degradation reason must appear in `execution.md`.
 
 ---
 
@@ -346,7 +358,7 @@ Sub-agents are internal workers activated by the parent orchestrator during Disc
 | 1 Discovery | graph_impact ≥ medium OR symbol named | `get_symbols_overview`, `find_symbol` | Agent |
 | 1.5 Clarification | Interface in change path / surprising connection | `find_implementations`, `find_referencing_symbols` | Agent |
 | 4 Implementation | Code owner needs usage context | `find_declaration` | Code owner request |
-| 5 Verify | graph_impact ≥ medium AND kotlin-ls stable | `get_diagnostics_for_file` | Agent |
+| 5 Verify | graph_impact ≥ medium AND `kotlin_lsp_support: confirmed` | `get_diagnostics_for_file` | Agent |
 | 6 QA | Scope discipline check | `find_referencing_symbols` | Agent (optional) |
 | JetBrains backend | Android Studio running | all above tools | Dev opt-in |
 
@@ -534,6 +546,15 @@ Spec Kit writes design/planning docs. Android skills write Android memo. No prod
 
 Implementation plan must also include a **Quality gates** block for each task: required regression scenario(s), security check(s), performance check(s), and the evidence path that will prove them or the approved follow-up that tracks them.
 
+For any Kotlin product-code change, Stage 3 must write `kotlin_android_versions` and `kotlin_android_rule_checklist` into `context-pack.json`, then carry the same checklist into `implementation-plan.md`:
+- Android Kotlin style / Kotlin coding conventions: naming, formatting, file organization, imports, visibility, KDoc for public API.
+- Android architecture: UI/data/domain boundaries, ViewModel state ownership, repository responsibilities, unidirectional data flow.
+- Coroutines / Flow: structured concurrency, main-safety, cancellation, dispatcher injection/test dispatcher, lifecycle-aware collection.
+- Compose: state hoisting, side-effect APIs, recomposition safety, lazy keys, `remember` for expensive work, state restoration where relevant.
+- Tests: deterministic unit/UI/coroutine tests, no reliance on timing/flaky sleeps, regression scope from `regression_test_matrix`.
+- Interop/API: Java/Kotlin interop and binary/API compatibility when public/internal contracts change.
+- Static analysis: exact repo-native commands for `lint`, `ktlint`, `detekt`, `spotless`, formatter/check tasks, or an explicit unavailable-tool record.
+
 When `code_owner` is confirmed, generate `docs/ai/tasks/{task_id}/handoff.md` and update `session.json → assignee`, `branch`. Update `.project-orchestration/status.json`.
 
 **Kotlin/Android convention scope (computed once here, reused at Stage 4):** derive `kotlin_convention_scope[]` from the requirements' Affected Areas checklist + `change_type` (mapping in `refs/contracts-and-artifacts.md` § Kotlin/Android convention scope). If non-empty, Android Advisor consults the matching companion skill(s) (`kotlin-patterns`, `android-clean-architecture`, `compose-multiplatform-patterns`, `kotlin-coroutines-flows`, `kotlin-testing`) if available as reference, recording `convention_refs_consulted[]`. Write `kotlin_convention_scope` into `implementation-plan.md`'s header — Stage 4 reuses this list, it never recomputes it. If empty, AUTO-SKIP (write to skip-log).
@@ -558,7 +579,7 @@ Exactly one code owner edits code. All other lanes are advisory only.
 8. Commit this task: `git commit -m "<type>(<scope>): <what and why>"`.
 9. Dispatch **spec-compliance reviewer**: verifies this task matches acceptance criteria exactly — nothing missing, nothing extra. Does not trust implementer's summary; reads actual code.
 10. If spec issues found → fix → re-review. Only when spec compliance is ✅ proceed.
-11. Dispatch **Karpathy/code-quality reviewer**: surgical changes, no over-engineering, scope discipline. **If `kotlin_convention_scope` (from Stage 3) is non-empty, also run the Kotlin/Android convention check as part of this same dispatch:** use the `kotlin-reviewer` agent if available → else consult the matching companion skill(s) from `kotlin_convention_scope` → else apply general Kotlin/Android knowledge. Record which tier was used as `kotlin_convention_check` in `execution.md` — **recording is mandatory even when the check degrades to general knowledge; never omit it.**
+11. Dispatch **Karpathy/code-quality reviewer**: surgical changes, no over-engineering, scope discipline. **If `kotlin_convention_scope` (from Stage 3) is non-empty, also run the Kotlin/Android convention check as part of this same dispatch:** use the `kotlin-reviewer` agent if available → else consult official Android/Kotlin docs or the matching companion skill(s) from `kotlin_convention_scope` → else apply general Kotlin/Android knowledge as a degraded fallback only. Record which tier was used as `kotlin_convention_check` in `execution.md` (`agent | official_docs | skill_docs | general_knowledge | not_applicable`) plus the references consulted and any degradation reason — **recording is mandatory even when the check degrades; never omit it.**
 12. Run the task's declared regression, security, and performance checks from `quality_gate_plan` when they apply to code touched by this task. Record pass/fail/deferred in `execution.md`.
 13. If quality issues found → fix → re-review. Only when quality is ✅ mark task done.
 14. Move to next task in `implementation-plan.md`.
@@ -577,6 +598,8 @@ Exactly one code owner edits code. All other lanes are advisory only.
 Android CLI gathers runtime evidence. The active architecture-map tool runs an update after implementation if its graph exists — `/understand` for Understand-Anything, `/graphify . --update` for Graphify (fallback).
 
 **Evidence Gate Matrix:** Read `context-pack.json → change_type`. Look up required and optional evidence from the matrix in `refs/contracts-and-artifacts.md § Evidence Gate Matrix`. Run all required items. Gate F is not satisfied until all required items are present.
+
+**Kotlin static analysis:** If any Kotlin product-code file changed, collect `kotlin_static_analysis_pass`: run repo-native checks in this order when present: `./gradlew lint`, module-scoped `lint`, `ktlintCheck`, `detekt`, `spotlessCheck`, formatter/check tasks exposed by the project. If a tool is absent, record `unavailable` with detection evidence. If a configured tool fails, Gate F blocks until fixed or explicitly deferred by human confirmation.
 
 **Module-scoped builds:** If `module_impact_chain` is present, scope build commands to `module_impact_chain.build_order` rather than full project build.
 
@@ -664,14 +687,14 @@ If unsure, choose `audit`.
 - If missing in `audit`, record the gap.
 - If code is touched, apply the principles even if the plugin is not installed, and record how the gate was applied.
 - Do not overwrite existing `CLAUDE.md` unless explicitly requested.
-- **Kotlin/Android convention check (part of the same Stage 4 dispatch, only when `kotlin_convention_scope` is non-empty):** three-tier fallback — dispatch the `kotlin-reviewer` agent if available; else consult the matching companion skill(s) (`kotlin-patterns`, `android-clean-architecture`, `compose-multiplatform-patterns`, `kotlin-coroutines-flows`, `kotlin-testing`) as reference; else apply general Kotlin/Android knowledge. Whichever tier runs, degrade gracefully — but always record `kotlin_convention_check` in `execution.md`; never omit the record even when the check itself falls through to general knowledge.
+- **Kotlin/Android convention check (part of the same Stage 4 dispatch, only when `kotlin_convention_scope` is non-empty):** fallback order — dispatch the `kotlin-reviewer` agent if available; else consult official Android/Kotlin docs or matching companion skill(s) (`kotlin-patterns`, `android-clean-architecture`, `compose-multiplatform-patterns`, `kotlin-coroutines-flows`, `kotlin-testing`) as reference; else apply general Kotlin/Android knowledge as degraded evidence. Whichever tier runs, record `kotlin_convention_check`, references consulted, and degradation reason in `execution.md`; never omit the record.
 
 ### Serena
 - Check `uv` presence and `uvx serena` availability in Stage -1 (non-blocking).
 - If missing: record `serena: not-configured`; never block Stage 0.
 - If ready: activate Code Analysis Worker automatically per stage conditions.
 - JetBrains backend is dev opt-in only — agent does not detect or start Android Studio.
-- Kotlin LS diagnostics are disabled until dev confirms `kotlin_ls_stable: true`.
+- Kotlin Language Server is JetBrains official Alpha; Android Gradle Plugin support is experimental. Use Kotlin LS diagnostics only when project support is confirmed (`kotlin_lsp_support: confirmed` or dev opt-in). If unknown, skip diagnostics and rely on Gradle/lint/static-analysis evidence.
 - Never call mutation tools: `rename_symbol`, `replace_symbol_body`, `insert_before_symbol`, `insert_after_symbol`, `safe_delete_symbol`, or any `jet_brains_*` refactoring tool.
 - Serena outputs feed `context-pack.json → dependencies`, `facts`, and may upgrade `graph_impact`.
 - Install command (bootstrap/update mode, if approved): `uv tool install oraios-serena`

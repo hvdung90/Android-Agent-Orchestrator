@@ -1,6 +1,6 @@
 # Provisioning Preflight
 
-_Skill version: 4.16.0 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 4.17.0 — update this when SKILL.md bumps a minor or major version._
 
 ## Purpose
 
@@ -229,7 +229,7 @@ Decision:
 
 **Backend note:** Default backend is LSP (no IDE required). JetBrains backend (Android Studio IDE engine) is opt-in by dev — agent does not start the IDE. Record backend as `unknown` unless dev specifies.
 
-**Kotlin LS stability note:** Kotlin Language Server is pre-alpha. Record `kotlin_ls_stable: unknown` unless dev confirms. Agent skips `get_diagnostics_*` calls when stability is unknown.
+**Kotlin LSP support note:** Kotlin Language Server is JetBrains official Alpha and Android Gradle Plugin support is experimental. Record `kotlin_lsp_support: unknown` unless project support is confirmed or the developer opts in. Agent skips `get_diagnostics_*` calls when support is unknown.
 
 **Blocking rule:** Serena missing is **never a blocker**. Always record as non-blocking gap.
 

@@ -58,7 +58,8 @@ The requirements doc should also show:
 - which features/modules are directly affected,
 - which related features must be retested,
 - security/performance/accessibility checks required for the change,
-- known limitations or follow-ups that are not fully solved by this task.
+- known limitations or follow-ups that are not fully solved by this task,
+- Kotlin / Android rule and static-analysis checks when Kotlin product code will change.
 
 ---
 
