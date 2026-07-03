@@ -1,6 +1,6 @@
 # Android Agent Orchestrator — Complete Flow
 
-_Reflects skill v4.17.0. Update when SKILL.md changes._
+_Reflects skill v4.18.0. Update when SKILL.md changes._
 
 ---
 

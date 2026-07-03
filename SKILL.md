@@ -3,7 +3,7 @@ name: android-agent-orchestrator
 description: Use when starting, planning, analyzing, or implementing any Android task — new feature, bug fix, refactor, migration, AGP upgrade, architecture review, or repo setup. Use when user says start task, new feature, fix bug, analyze repo, migrate, upgrade, implement, review architecture, or set up agents for an Android project.
 license: MIT
 metadata:
-  version: 4.17.0
+  version: 4.18.0
   category: orchestration
   lanes:
     - spec-kit
@@ -26,7 +26,7 @@ metadata:
     - refs/playbooks.md
 ---
 
-# Android Agent Orchestrator v4.17.0
+# Android Agent Orchestrator v4.18.0
 
 ## Activation
 
@@ -89,7 +89,7 @@ Three modes shape the stage sequence and artifact depth. Mode is derived automat
 | Stage 3 design doc + Android memo | AUTO-SKIP — Stage 3-lite: produce implementation-plan.md (≤ 5 tasks), code_owner, branch, minimal handoff.md only |
 | Stage 1/1.5 Impact + Regression Plan | Lite — `direct_features` + a regression row for the changed feature itself only (MANDATORY); indirect-feature sweep and any `quality_gate_plan` category with no obvious signal (auth/network/UI/storage touch) AUTO-SKIP |
 | Stage 6 full QA report | CONFIRM-SKIP — ask human; Karpathy diff review + Gate G close remain MANDATORY |
-| Stage 7 finalization | Lite — Task Changelog + Drift Check (both MANDATORY); no ADR status update when no ADR exists |
+| Stage 7 finalization | Lite — Task Changelog + Artifact Integrity Check are MANDATORY; Skill Drift Check runs only when skill files changed; no ADR status update when no ADR exists |
 | Stage 7 Impact Closure + `task-summary.md` | Lite — both stay MANDATORY but scoped to what Stage 1/1.5 actually populated; no exhaustive category sweep |
 
 **Override rules (applied before scoring, in priority order):**
@@ -107,6 +107,8 @@ Computed at Stage 0 from task description (preliminary). Refined and finalized a
 
 | Signal | Score |
 |---|---|
+| UI copy/pixel tweak, no layout/logic change | 1 |
+| Dependency patch/minor version bump, no code change, changelog reviewed | 1–2 |
 | 1–2 files, same module, same layer, additive-only change | 1–2 |
 | Multi-file, single module, same architectural layer | 3–4 |
 | Multi-file, multi-layer (e.g. ViewModel + Repository + tests) | 5–6 |
@@ -117,6 +119,8 @@ Computed at Stage 0 from task description (preliminary). Refined and finalized a
 
 | Signal | Score |
 |---|---|
+| UI copy/pixel tweak, no layout/logic change | 1 |
+| Dependency patch/minor version bump, no code change, changelog reviewed | 1 |
 | Isolated logic, no shared state, no ADR triggers | 1–2 |
 | Touches ViewModel state or shared Repository | 3–4 |
 | Touches auth, billing, permissions, or notifications | 5–6 |
@@ -136,6 +140,18 @@ otherwise                                   →  governed
 Write `preliminary_mode` to `session.json` at Stage 0. **Finalize at the end of Stage 1** — after reading all sources and Graphify — write `workflow_mode` (final) + `complexity_score` + `risk_score` + `mode_reasons` to `context-pack.json` and `session.json`. Stage 1.5 reads the mode that Stage 1 already wrote; it does not re-score.
 
 ---
+
+## What changed in v4.18.0
+
+**v4.18.0** — Low-friction execution defaults. Strips unnecessary ceremony from small/safe tasks without weakening governance for risky ones; no MANDATORY tier was loosened, only clarified/split where it was overloaded.
+
+- Stage 3 `implementation-plan.md` code snippets are now optional in `fast`/`standard` mode — exact file path, exact test method name, exact command, and exact expected output remain mandatory in all modes; full code bodies are required only in `governed` mode.
+- Stage 7 Drift Check split into **Artifact Integrity Check** (always MANDATORY — task artifacts, ADR ledger, evidence consistency) and **Skill Drift Check** (MANDATORY only when the task modified the orchestrator skill's own files — `SKILL.md`/`refs/**`/`templates/**`/`docs/FLOW.md`/`CHANGELOG.md`; AUTO-SKIP otherwise). Fixes a real bug where every product-repo task was forced through skill-repo-only version-sync checks.
+- Evidence Gate Matrix: the "repo-native first, record unavailable, don't block" pattern (previously Kotlin-static-analysis-only) now applies to every required evidence item. Tool absent/not configured → AUTO-record an Unavailable-tool record, no human ask. Tool present but check fails → still blocks Gate F, CONFIRM-SKIP to defer.
+- New Unavailable-tool record shape (tool, detection_command, detection_output, status, recorded_at) defined once in `refs/contracts-and-artifacts.md`, referenced everywhere a tool may be missing instead of ad hoc prose.
+- Two new low-signal scoring rows (UI copy/pixel tweak; dependency patch/minor bump, no code change) and two matching `refs/playbooks.md` Quick decision table rows, cross-referencing existing TDD-exemption and `dependency_change` mechanisms — no new playbook numbers, no risk-scoring changes for genuinely risky changes.
+- New `commit_policy: per_task | single_commit | no_commit` (default `per_task`, human-request-only, never auto-derived from `workflow_mode`). `no_commit` requires a non-git refactor checkpoint (diff/stash) since Stage 4's refactor step can no longer rely on a git commit as its safety net.
+- New "Autonomy policy" section in `refs/compliance-policy.md` names the existing AUTO-SKIP/CONFIRM-SKIP boundary for discoverability — documentation only, no tier changed.
 
 ## What changed in v4.17.0
 
@@ -312,6 +328,7 @@ Load when `graph_impact ≥ medium` or multi-module change detected: `refs/sub-a
 28. **Regression and quality impact must be explicit.** Before requirements approval, record impacted user-facing features, regression zones, required retest scenarios, security concerns, performance concerns, and deferred follow-ups in `context-pack.json` for every code-touching task (§ Stage 1 definition). Stage 6 cannot close until every required regression/security/performance item is either verified with evidence or recorded as an explicit blocker/approved follow-up. In fast mode this scopes to the lite form (directly changed feature + signal-triggered `quality_gate_plan` categories only) — see `artifact_budget.fast`.
 29. **Kotlin/Android official-rule checklist is mandatory for Kotlin product code.** If any Kotlin product file is touched, Stage 3 must create `kotlin_android_rule_checklist` and Stage 5 must collect `kotlin_static_analysis_pass` evidence. Repo-native checks (`lint`, `ktlint`, `detekt`, `spotless`, formatter/check tasks) are used when present; missing tools are recorded, not silently ignored.
 30. **No general-knowledge-only Kotlin convention pass when official references are available.** When `kotlin_convention_scope` is non-empty, the reviewer must consult official Android/Kotlin docs or companion skill docs before falling back. A `general_knowledge` tier is allowed only as degraded evidence when references/tools are unavailable, and the degradation reason must appear in `execution.md`.
+31. **`commit_policy` defaults to `per_task`.** Changing it to `single_commit` or `no_commit` requires an explicit human request, recorded in `session.json` — never auto-derived from `workflow_mode`. `no_commit` requires a non-git refactor checkpoint (diff/stash snapshot) per Stage 4 step 7.
 
 ---
 
@@ -529,7 +546,7 @@ Spec Kit writes design/planning docs. Android skills write Android memo. No prod
 **Executable implementation plan (MANDATORY):** After design is written, Spec Kit produces `docs/ai/tasks/{task_id}/planning/implementation-plan.md`. This is not a high-level outline — it is a step-by-step runnable checklist. Rules:
 
 - One task per acceptance criterion. Each task is 2–5 minutes of work.
-- Every task contains: exact file path(s), exact test command with expected output, RED step, GREEN step, refactor note, commit message.
+- Every task contains: exact file path(s), exact test command with expected output, RED step, GREEN step, refactor note, and commit/checkpoint instruction based on `commit_policy`.
 - No placeholders. No TBD. No "implement similar to Task N". Repeat the code if tasks may be read independently.
 - TDD mapping per change type must be stated explicitly:
 
@@ -557,6 +574,8 @@ For any Kotlin product-code change, Stage 3 must write `kotlin_android_versions`
 
 When `code_owner` is confirmed, generate `docs/ai/tasks/{task_id}/handoff.md` and update `session.json → assignee`, `branch`. Update `.project-orchestration/status.json`.
 
+**`commit_policy`** may be set alongside `branch`/`assignee`, human-request-only — default `per_task` (unchanged behavior), never auto-derived from `workflow_mode`. Values: `per_task` | `single_commit` | `no_commit` — see Stage 4 step 8 for behavior per value.
+
 **Kotlin/Android convention scope (computed once here, reused at Stage 4):** derive `kotlin_convention_scope[]` from the requirements' Affected Areas checklist + `change_type` (mapping in `refs/contracts-and-artifacts.md` § Kotlin/Android convention scope). If non-empty, Android Advisor consults the matching companion skill(s) (`kotlin-patterns`, `android-clean-architecture`, `compose-multiplatform-patterns`, `kotlin-coroutines-flows`, `kotlin-testing`) if available as reference, recording `convention_refs_consulted[]`. Write `kotlin_convention_scope` into `implementation-plan.md`'s header — Stage 4 reuses this list, it never recomputes it. If empty, AUTO-SKIP (write to skip-log).
 
 ### Stage 4 — Implementation Lock with Android TDD
@@ -575,8 +594,8 @@ Exactly one code owner edits code. All other lanes are advisory only.
 4. Write the minimum Android code to make the test pass. YAGNI strictly enforced.
 5. Run the same test — record GREEN output to `evidence/green-<task-id>.txt`. All affected module tests must also pass.
 6. Run `./gradlew :<module>:test` for modules in `module_impact_chain.test_scope_modules`. All must be green.
-7. Refactor only while tests remain green. No new behavior.
-8. Commit this task: `git commit -m "<type>(<scope>): <what and why>"`.
+7. Refactor only while tests remain green. No new behavior. If `commit_policy: no_commit`, save a diff/stash snapshot before refactor begins — a bad refactor must still be revertible without relying on git commit history.
+8. Commit per `session.json → commit_policy` (default `per_task`): `per_task` — commit this task now: `git commit -m "<type>(<scope>): <what and why>"`. `single_commit` — stage the change but do not commit; commit once at the end of Stage 4 with one aggregate message covering all tasks. `no_commit` — never commit; leave changes staged/unstaged and note in `handoff.md` that commit is a pending human action.
 9. Dispatch **spec-compliance reviewer**: verifies this task matches acceptance criteria exactly — nothing missing, nothing extra. Does not trust implementer's summary; reads actual code.
 10. If spec issues found → fix → re-review. Only when spec compliance is ✅ proceed.
 11. Dispatch **Karpathy/code-quality reviewer**: surgical changes, no over-engineering, scope discipline. **If `kotlin_convention_scope` (from Stage 3) is non-empty, also run the Kotlin/Android convention check as part of this same dispatch:** use the `kotlin-reviewer` agent if available → else consult official Android/Kotlin docs or the matching companion skill(s) from `kotlin_convention_scope` → else apply general Kotlin/Android knowledge as a degraded fallback only. Record which tier was used as `kotlin_convention_check` in `execution.md` (`agent | official_docs | skill_docs | general_knowledge | not_applicable`) plus the references consulted and any degradation reason — **recording is mandatory even when the check degrades; never omit it.**
@@ -627,7 +646,7 @@ Spec Kit finalizes governance artifacts after QA:
   - update `docs/ai/architecture/README.md` index (auto-create if missing),
 - update `.project-orchestration/tasks/{task_id}/reports/execution.md` with Task Changelog,
 - write `docs/ai/tasks/{task_id}/task-summary.md` with a compact continuity summary for future tasks,
-- run drift checks for skill refs/templates/version consistency,
+- run Artifact Integrity Check (MANDATORY, always) covering task artifacts, ADR ledger, and evidence consistency; run Skill Drift Check (MANDATORY only if this task modified the orchestrator skill's own files — `SKILL.md`, `refs/**`, `templates/**`, `docs/FLOW.md`, `CHANGELOG.md` — otherwise AUTO-SKIP) covering README/CHANGELOG/refs version sync — see `refs/contracts-and-artifacts.md` § Drift Check,
 - record any missing evidence as a blocker instead of marking success.
 
 ---
@@ -782,7 +801,7 @@ graphify-out/
 12. **Implementation (per-task TDD loop)** — one owner per task in `implementation-plan.md`; write failing test → RED evidence → minimal code → GREEN evidence → refactor → commit → spec-compliance review ✅ → code-quality review ✅ → next task. Capture `screenshot_before` if `change_type` includes `ui_change`. On interrupt: update `handoff.md` and `status.json` before stopping.
 13. **Verify** — derive required evidence from Evidence Gate Matrix using `change_type`; Android CLI runs required commands scoped to `module_impact_chain.build_order` if present; run required regression/security/performance evidence from `quality_gate_plan`; the active architecture-map tool updates its graph only if `graph_impact ≥ medium`. Write `evidence_collected` to `session.json`.
 14. **QA gate** — Spec Kit + Karpathy review diff; verify Gate F (all required evidence present), regression matrix coverage, and security/performance outcomes; keep code frozen.
-15. **Docs / decision finalization** — update ADR status, Task Changelog, `task-summary.md`, gate log, and drift check result; mark `session.json → stage_status: complete`; update `docs/ai/tasks/{task_id}/handoff.md` with final status; update `.project-orchestration/status.json` entry to `stage_status: complete`.
+15. **Docs / decision finalization** — update ADR status, Task Changelog, `task-summary.md`, gate log, Artifact Integrity Check result, and Skill Drift Check result only when applicable; mark `session.json → stage_status: complete`; update `docs/ai/tasks/{task_id}/handoff.md` with final status; update `.project-orchestration/status.json` entry to `stage_status: complete`.
 
 ---
 

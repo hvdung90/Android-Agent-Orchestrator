@@ -1,6 +1,6 @@
 # Stage Output Contracts
 
-_Skill version: 4.17.0 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 4.18.0 — update this when SKILL.md bumps a minor or major version._
 
 Each stage defines a typed contract: what it requires as input, what it must produce as output, and what state it writes to `session.json` on completion or interrupt.
 
@@ -300,7 +300,7 @@ output_produces:
   - kotlin_android_versions and kotlin_android_rule_checklist written to context-pack / implementation-plan when Kotlin product code is touched
   - docs/ai/tasks/{task_id}/android-memo/<task>.md (Android skills memo, if Android-specific — auto-skip written to skip-log if omitted)
   - docs/ai/tasks/{task_id}/handoff.md (generated when code_owner is confirmed; MANDATORY)
-  - .project-orchestration/tasks/{task_id}/session.json: code_owner, assignee, branch set
+  - .project-orchestration/tasks/{task_id}/session.json: code_owner, assignee, branch, commit_policy set (commit_policy defaults to per_task; human-request-only)
   - .project-orchestration/status.json: entry updated (stage_reached: 3, assignee, branch)
 
 state_on_complete:
@@ -487,7 +487,7 @@ output_produces:
   - .project-orchestration/tasks/{task_id}/reports/execution.md updated with Task Changelog
   - .project-orchestration/tasks/{task_id}/reports/execution.md updated with Kotlin / Android Rule Closure
   - .project-orchestration/tasks/{task_id}/reports/execution.md updated with Impact Closure
-  - .project-orchestration/tasks/{task_id}/reports/execution.md updated with Drift Check
+  - .project-orchestration/tasks/{task_id}/reports/execution.md updated with Drift Check: Artifact Integrity Check (always) + Skill Drift Check (only if this task modified the orchestrator skill's own files, else AUTO-SKIP)
   - docs/ai/tasks/{task_id}/task-summary.md written with compact continuity summary
   - .project-orchestration/tasks/{task_id}/session.json: stage_status: complete
   - docs/ai/tasks/{task_id}/handoff.md: status set to complete; final summary written

@@ -1,5 +1,17 @@
 # Changelog
 
+## v4.18.0
+
+### Added
+
+- **Fast/standard code-snippet relaxation** (`refs/contracts-and-artifacts.md`, `refs/compliance-policy.md`): `implementation-plan.md`'s RED/GREEN code bodies are optional outside `governed` mode; exact file path, test method name, command, and expected output remain mandatory in every mode.
+- **Drift Check split** (`refs/contracts-and-artifacts.md`, `refs/compliance-policy.md`, `SKILL.md`, `refs/stage-contracts.md`): Artifact Integrity Check (always MANDATORY) separated from Skill Drift Check (MANDATORY only when the task modified the orchestrator skill's own files, else AUTO-SKIP) — fixes product-repo tasks being forced through skill-repo-only version-sync checks.
+- **Evidence Gate Matrix absent-tool handling** (`refs/contracts-and-artifacts.md`, `refs/compliance-policy.md`): the Kotlin-static-analysis-only "record unavailable, don't block" pattern now applies to every required evidence item, gated on a literal detection-command output, not just an assertion.
+- **Unavailable-tool record** (`refs/contracts-and-artifacts.md`): shared JSON shape (tool, detection_command, detection_output, status, recorded_at) defined once, referenced by name everywhere a tool may be missing.
+- **Lightweight task-type scoring signals** (`SKILL.md`, `refs/playbooks.md`): new low-signal complexity/risk rows for UI copy/pixel tweaks and dependency patch/minor bumps, cross-referenced to existing TDD-exemption and `dependency_change` mechanisms.
+- **`commit_policy`** (`refs/contracts-and-artifacts.md`, `SKILL.md`): `per_task | single_commit | no_commit`, default `per_task`, human-request-only; `no_commit` requires a non-git refactor checkpoint.
+- **Autonomy policy** (`refs/compliance-policy.md`): documents the existing AUTO-SKIP/CONFIRM-SKIP boundary for discoverability — no tier changed.
+
 ## v4.17.0
 
 ### Added

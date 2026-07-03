@@ -1,6 +1,6 @@
 # Compliance Policy
 
-_Skill version: 4.17.0 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 4.18.0 — update this when SKILL.md bumps a minor or major version._
 
 The skill **must** follow every defined stage and gate in order. No stage may be skipped, condensed, or reordered without explicit confirmation. This file defines what requires confirmation, what is auto-allowed, what is permanently forbidden, and how every deviation is recorded.
 
@@ -26,7 +26,7 @@ Three tiers: **MANDATORY**, **AUTO-SKIP** (condition-gated, no human needed), **
 | Stage 2.5 ADR-lite creation | AUTO-SKIP when no ADR trigger fires, or when an existing Accepted ADR already covers it | all ADR trigger conditions false, or covering ADR found |
 | Stage 2.5 ADR-lite approval/deferral | **MANDATORY when ADR exists** | — |
 | Stage 3 Design doc | **MANDATORY** | — |
-| Stage 3 `implementation-plan.md` generation | **MANDATORY** — no placeholders | — |
+| Stage 3 `implementation-plan.md` generation | **MANDATORY** — no placeholders (exact test command/method/path always required; exact code body required only in `governed` mode) | — |
 | Stage 3 `handoff.md` generation | **MANDATORY when code_owner is confirmed** | — |
 | Stage 3 Android memo | AUTO-SKIP when non-Android change | `change_type` ∉ {ui_change, database_change, network_change, architecture_change} AND no Android API mentioned |
 | Stage 3 Android Advisor convention consult | AUTO-SKIP when `kotlin_convention_scope` is empty | no mapped Affected Area touched AND no Kotlin file in scope |
@@ -48,6 +48,7 @@ Three tiers: **MANDATORY**, **AUTO-SKIP** (condition-gated, no human needed), **
 | Stage 5 Kotlin static analysis evidence | **MANDATORY when Kotlin product code changed** | — |
 | Stage 5 required regression/security/performance evidence | **MANDATORY when declared in context-pack** | — |
 | Stage 5 Evidence Gate Matrix optional items | AUTO-SKIP (never required) | always optional |
+| Stage 5 required evidence item — tool/command absent or not configured | AUTO-SKIP | detection command confirms tool absent; record an Unavailable-tool record (see `refs/contracts-and-artifacts.md` § Unavailable-tool record) |
 | Stage 5 architecture-map update | AUTO-SKIP when `graph_impact = low` | `graph_impact = low` in context-pack |
 | Stage 5 Gradle Module Impact build scope | AUTO-SKIP when `module_impact_chain` absent | `module_impact_chain` not populated |
 | Stage 7 architecture-doc update | AUTO-SKIP when trigger condition false | `adr_required=false AND estimated_build_scope=single AND change_type≠architecture_change` |
@@ -59,7 +60,8 @@ Three tiers: **MANDATORY**, **AUTO-SKIP** (condition-gated, no human needed), **
 | Stage 7 Kotlin / Android Rule Closure | **MANDATORY when Kotlin product code changed** | — |
 | Stage 7 Impact Closure | **MANDATORY for code-touching tasks** | — |
 | Stage 7 `task-summary.md` | **MANDATORY for code-touching tasks** | — |
-| Stage 7 Drift Check | **MANDATORY** | — |
+| Stage 7 Artifact Integrity Check | **MANDATORY** | — |
+| Stage 7 Skill Drift Check | AUTO-SKIP when task did not touch skill's own files | task did not modify `SKILL.md`/`refs/**`/`templates/**`/`docs/FLOW.md`/`CHANGELOG.md` |
 | Write session.json state transitions | **MANDATORY — never skippable** | — |
 | Write skip-log.json on any skip | **MANDATORY — never skippable** | — |
 | Update status.json on every stage transition | **MANDATORY — never skippable** | — |
@@ -75,7 +77,7 @@ These steps are mandatory by default but a human may override them. Agent must *
 | Stage 1.5 Clarification when any trigger fires | "Clarification trigger fired: `<reason>`. Skip clarification and proceed directly to requirements? (y/n)" |
 | Stage 2.5 ADR-lite when any decision trigger fires | "Decision trigger fired: `<reason>`. Skip ADR-lite and proceed to design? This removes the architecture decision record. (y/n)" |
 | Stage 4 Gate E.5 TDD for a specific task | "Task `<task-id>` is `<change_type>`. TDD is required. Skip RED-first for this task? Writing code without RED evidence. (y/n)" — see TDD exemption categories below |
-| Stage 5 any required evidence item (tool unavailable) | "Required evidence `<item>` cannot be collected (`<reason>`). Skip and proceed without it? This will be recorded in skip-log.json. (y/n)" |
+| Stage 5 required evidence item — tool present but check failed or contradicted expectation | "Required evidence `<item>`'s tool is present but the check failed/contradicted expectation (`<reason>`). Skip and proceed without it? This will be recorded in skip-log.json. (y/n)" |
 | Stage 5 Kotlin static analysis failure or unavailable configured tool | "`<tool>` is required for Kotlin static analysis but failed/is unavailable (`<reason>`). Fix before close, or defer with follow-up `<tracking_ref>`? Confirm defer? (y/n)" |
 | Stage 5 required regression/security/performance evidence (tool unavailable or manual-only) | "Required impact evidence `<item>` cannot be collected (`<reason>`). Defer with follow-up `<tracking_ref>` or block the task? Confirm defer? (y/n)" |
 | Stage 6 Karpathy CRITICAL/HIGH finding | "Karpathy flagged `<issue>`. Proceed to close without fixing? This overrides the QA gate. (y/n)" |
@@ -115,6 +117,20 @@ These are the *only* cases where requesting a Gate E.5 CONFIRM-SKIP is reasonabl
 
 ---
 
+## Autonomy policy
+
+Names the boundary already defined by the tiers above — no tier changes here, documentation only. The agent runs every AUTO-SKIP condition automatically, without asking. It asks the human only for:
+
+1. Any CONFIRM-SKIP step per the tables above.
+2. Genuine scope ambiguity that blocks progress.
+3. An ADR-required decision needing approval or deferral.
+4. An evidence-collection failure needing a defer decision (tool present but check failed — not simple tool absence, which AUTO-records per § Unavailable-tool record).
+5. An implementation decision with more than one reasonable interpretation that produces materially different behavior.
+
+It does not ask "should I continue?" between routine steps — see `SKILL.md` Stage 4 "Do not:" list.
+
+---
+
 ## 2. Confirmation protocol
 
 When the skill needs to skip or bypass a step requiring confirmation:
@@ -145,7 +161,7 @@ These rules are absolute. No user instruction, no time pressure, no "just this o
 2. Human approval at Gate D (Requirements) — must be an explicit "approve" or equivalent.
 3. Decision Gate evaluation at Stage 2.5 — ADR triggers must always be checked.
 4. Karpathy review at Stage 6 — may report findings but cannot be silenced.
-5. Stage 7 Task Changelog and Drift Check — final status cannot be success without them.
+5. Stage 7 Task Changelog and Artifact Integrity Check — final status cannot be success without them. Skill Drift Check applies only when this task modified the orchestrator skill's own files.
 6. Writing `session.json` state on every stage transition and interrupt.
 7. Writing `skip-log.json` on every skip (auto or confirmed).
 8. One code owner at a time — no parallel code edits.

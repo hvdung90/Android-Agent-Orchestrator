@@ -1,6 +1,6 @@
 # Auth Bootstrap & Token Management
 
-_Skill version: 4.17.0 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 4.18.0 — update this when SKILL.md bumps a minor or major version._
 
 ## Principles
 

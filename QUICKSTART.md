@@ -141,5 +141,6 @@ graphify-out/                                 ← architecture graph (fallback t
 | Full clean reset | "force reinstall agents" |
 | Check tool readiness | "audit tools" |
 | Hand off to another dev | "dừng lại, bàn giao cho \<dev-name\>" |
+| Change commit behavior (default: commit every task) | "commit once at the end" / "don't commit yet" |
 | View all active tasks | Read `.project-orchestration/status.json` |
 | View task handoff state | Read `docs/ai/tasks/{task_id}/handoff.md` |

@@ -1,6 +1,6 @@
 # Contracts, Artifacts, and Gates
 
-_Skill version: 4.17.0 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 4.18.0 — update this when SKILL.md bumps a minor or major version._
 
 ---
 
@@ -444,7 +444,7 @@ kotlin_convention_scope: []   # computed once at Stage 3 — see § Kotlin/Andro
 kotlin_android_rule_checklist: []   # computed once at Stage 3 when Kotlin product code is touched
 ```
 
-Required structure per task:
+Required structure per task (**`governed` mode** — full example with exact code bodies):
 
 ```markdown
 # Implementation Plan — <task title>
@@ -455,7 +455,7 @@ Required structure per task:
 
 **Regression scope:** <features/scenarios from context-pack.regression_test_matrix>
 **Security / performance scope:** <checks from context-pack.quality_gate_plan>
-**Kotlin / Android static checks:** <lint/ktlint/detekt/spotless/formatter commands or unavailable records>
+**Kotlin / Android static checks:** <lint/ktlint/detekt/spotless/formatter commands or an Unavailable-tool record (see § Unavailable-tool record)>
 
 ---
 
@@ -500,10 +500,33 @@ Required structure per task:
 ### Task 2: ...
 ```
 
+**`fast` / `standard` mode variant** — the code block is optional (see `artifact_budget.implementation_plan_code_snippets: not_required`). Exact file path, exact test method name, exact command, and exact expected output/behavior remain mandatory — only the source-code body is dropped:
+
+```markdown
+### Task 1: <acceptance criterion name>
+
+**Files**
+- Modify: `app/src/main/java/com/example/LoginViewModel.kt`
+- Test:   `app/src/test/java/com/example/LoginViewModelTest.kt`
+
+- [ ] **RED** — `login emits error when credentials invalid` — write a test asserting LoginViewModel.login() emits an error state for invalid credentials.
+  Command: `./gradlew :feature-login:testDebugUnitTest --tests "*.LoginViewModelTest.login emits error*"`
+  Expected: FAIL — LoginViewModel.login() not yet implemented
+  Evidence: `evidence/red-task-1.txt`
+
+- [ ] **GREEN** — implement `LoginViewModel.login(email, password)` to emit the error state.
+  Command: `./gradlew :feature-login:testDebugUnitTest --tests "*.LoginViewModelTest.login emits error*"`
+  Expected: PASS
+  Evidence: `evidence/green-task-1.txt`
+
+(Module tests / Refactor / Commit / reviews rows unchanged from the governed example above.)
+```
+
 **Failure modes — any of these means the plan must be rewritten before Stage 4 starts:**
-- A task says "implement X" without showing the exact code.
-- A task says "write tests for the above" without the actual test code.
-- A task says "similar to Task N" — repeat the code; tasks may be read independently.
+- `governed` mode: a task says "implement X" without showing the exact code.
+- `fast` / `standard` mode: a task omits the exact file path, exact test method name, exact command, or exact expected output/behavior — a bare restatement of the acceptance criterion with no method name or command is still a placeholder and still triggers rewrite, even though the code body itself is optional.
+- A task says "write tests for the above" without naming the actual test method(s).
+- A task says "similar to Task N" — repeat the task's full content; tasks may be read independently.
 - A test command is missing or says "run tests".
 - An expected output is missing or says "should pass".
 
@@ -646,14 +669,30 @@ Required Kotlin / Android Rule Closure section when Kotlin product code changed:
 | static-analysis | passed | <lint/ktlint/detekt/spotless evidence path> |
 ```
 
-Every required row from `context-pack.json → kotlin_android_rule_checklist` must appear here. `static-analysis` is mandatory for Kotlin product-code changes. Missing repo tools must be recorded as `unavailable`; configured tool failures block Gate F.
+Every required row from `context-pack.json → kotlin_android_rule_checklist` must appear here. `static-analysis` is mandatory for Kotlin product-code changes. Missing repo tools must be recorded with an Unavailable-tool record (see § Unavailable-tool record); configured tool failures block Gate F.
 
 If any completed task had a non-empty `kotlin_convention_scope`, also record its `kotlin_convention_check` tier (`agent | official_docs | skill_docs | general_knowledge`) per task — e.g. as a row or inline note; this is mandatory whenever the scope is non-empty (see § Kotlin/Android convention scope).
 
-Required Drift Check section:
+Required Drift Check section — split into two parts with different applicability. Most tasks only run the first:
 
 ```markdown
 ## Drift Check
+
+### Artifact Integrity Check (always MANDATORY, every task)
+
+- [ ] .project-orchestration/status.json exists and task entry is current
+- [ ] docs/ai/tasks/{task_id}/handoff.md exists and status matches session.json stage_status
+- [ ] docs/ai/tasks/{task_id}/planning/implementation-plan.md has no placeholder (TBD/TODO/similar to Task N)
+- [ ] RED evidence exists for each completed Stage 4 task (unless TDD exemption recorded)
+- [ ] docs/ai/decisions/README.md exists and has exactly one row per ADR file present in docs/ai/decisions/ (no orphaned file, no orphaned row)
+- [ ] no Accepted ADR's Decision/Consequences text was hand-edited outside a supersede (status/superseded_by/index-row change only)
+- [ ] if docs/ai/architecture/ exists: docs/ai/architecture/README.md lists every domain file present, and no domain file is missing a Change Log entry for this task's changes when the § 4e trigger was met
+- [ ] every completed Stage 4 task with a non-empty `kotlin_convention_scope` has a recorded `kotlin_convention_check` tier — no silent omission
+- [ ] every Kotlin product-code change has Kotlin / Android Rule Closure with static-analysis evidence or an Unavailable-tool record (see § Unavailable-tool record)
+- [ ] every required regression/security/performance row from context-pack appears in Impact Closure with evidence, blocker, or deferred follow-up
+- [ ] docs/ai/tasks/{task_id}/task-summary.md exists and includes impact summary, evidence summary, and follow-up watchlist
+
+### Skill Drift Check (MANDATORY only when this task modified the orchestrator skill's own files — `SKILL.md`, `refs/**`, `templates/**`, `docs/FLOW.md`, or `CHANGELOG.md`; otherwise AUTO-SKIP — write the skip to `skip-log.json`)
 
 - [ ] README current version matches SKILL.md metadata.version
 - [ ] CHANGELOG latest version matches SKILL.md metadata.version
@@ -664,18 +703,9 @@ Required Drift Check section:
 - [ ] no stale stage names
 - [ ] no invented command names
 - [ ] public repo version sync checked against installed/local skill when applicable
-- [ ] .project-orchestration/status.json exists and task entry is current
-- [ ] docs/ai/tasks/{task_id}/handoff.md exists and status matches session.json stage_status
-- [ ] docs/ai/tasks/{task_id}/planning/implementation-plan.md has no placeholder (TBD/TODO/similar to Task N)
-- [ ] RED evidence exists for each completed Stage 4 task (unless TDD exemption recorded)
-- [ ] docs/ai/decisions/README.md exists and has exactly one row per ADR file present in docs/ai/decisions/ (no orphaned file, no orphaned row)
-- [ ] no Accepted ADR's Decision/Consequences text was hand-edited outside a supersede (status/superseded_by/index-row change only)
-- [ ] if docs/ai/architecture/ exists: docs/ai/architecture/README.md lists every domain file present, and no domain file is missing a Change Log entry for this task's changes when the § 4e trigger was met
-- [ ] every completed Stage 4 task with a non-empty `kotlin_convention_scope` has a recorded `kotlin_convention_check` tier — no silent omission
-- [ ] every Kotlin product-code change has Kotlin / Android Rule Closure with static-analysis evidence or explicit unavailable-tool records
-- [ ] every required regression/security/performance row from context-pack appears in Impact Closure with evidence, blocker, or deferred follow-up
-- [ ] docs/ai/tasks/{task_id}/task-summary.md exists and includes impact summary, evidence summary, and follow-up watchlist
 ```
+
+A normal Android product-repo task never touches this skill's own files, so Skill Drift Check AUTO-SKIPs for it — these ~9 checks only apply when the active task is editing the orchestrator skill itself (as opposed to using it).
 
 ### 6) `docs/ai/tasks/{task_id}/handoff.md`
 
@@ -916,6 +946,8 @@ Required:
 - `module_impact_chain.build_order` modules all built successfully (if module_impact_chain present),
 - all required rows from `regression_test_matrix` and `quality_gate_plan` have evidence or an explicit blocker/deferred follow-up.
 
+An Evidence Gate Matrix item recorded as `unavailable` with a valid Unavailable-tool record (see § Unavailable-tool record) counts as collected for Gate F. An item where the tool/command is present but the check failed, was skipped, or contradicted expectation does **not** count as collected — this scoping applies only to Evidence Gate Matrix items, never to Stage 4 Gate E.5 RED/GREEN evidence, which can never be substituted by an `unavailable` record.
+
 ### Gate G — Close ready
 
 Required:
@@ -955,8 +987,31 @@ Applied to every task that touches Kotlin product code (`src/main/**/*.kt`, Andr
 
 | Evidence item | Required behavior |
 |---|---|
-| `kotlin_static_analysis_pass` | Run repo-native checks in this order when present: Android lint (`./gradlew lint` or module-scoped lint), `ktlintCheck`, `detekt`, `spotlessCheck`, formatter/check tasks. Configured tool failures block Gate F. Missing tools are recorded as `unavailable` with detection evidence. |
+| `kotlin_static_analysis_pass` | Run repo-native checks in this order when present: Android lint (`./gradlew lint` or module-scoped lint), `ktlintCheck`, `detekt`, `spotlessCheck`, formatter/check tasks. Configured tool failures block Gate F. Missing tools are recorded with an Unavailable-tool record (see below). |
 | `kotlin_rule_checklist_review` | Review required checklist areas against official Android/Kotlin guidance or companion skill docs. General-knowledge-only review is degraded evidence and must include reason. |
+
+### Unavailable-tool record
+
+The shared shape for recording that a required tool/command is absent or not configured in this repo. Defined once here; referenced by name everywhere a tool may be missing (Kotlin static-analysis overlay above, Absent-tool handling below, Drift Check, Kotlin / Android Rule Closure) instead of each spot inventing its own wording.
+
+```json
+{
+  "tool": "jacoco",
+  "detection_command": "./gradlew tasks --all | grep -i jacoco",
+  "detection_output": "<literal command output showing absence, not just an assertion>",
+  "status": "unavailable",
+  "recorded_at": "<ISO timestamp>"
+}
+```
+
+`detection_output` must be the literal negative result of actually running `detection_command` — a claim of "not configured" without the command's real output is not a valid Unavailable-tool record and does not satisfy Gate F.
+
+### Absent-tool handling
+
+Applies to every required item in the Evidence Gate Matrix above, generalizing the pattern already used for Kotlin static analysis:
+
+- **Tool/command absent or not configured** in this repo → AUTO-record an Unavailable-tool record (see above); no human confirmation needed for absence alone.
+- **Tool/command present but the check fails or contradicts expectation** → this blocks Gate F; ask CONFIRM-SKIP per `refs/compliance-policy.md` before deferring — this is not a silent pass.
 
 ### Security / performance evidence overlays
 
@@ -1109,6 +1164,7 @@ In-progress task state — allows resume after an interruption.
   "assignee": "dev-name | agent-name | unassigned",
   "handoff_to": "dev-name | null",
   "branch": "feature/ANDROID-42-login | null",
+  "commit_policy": "per_task | single_commit | no_commit",  // default per_task; changed only by explicit human request, never auto-derived from workflow_mode
   "pr_url": "https://github.com/org/repo/pull/123 | null",
   "requirements_approved": false,
   "adr_required": false,
@@ -1202,12 +1258,14 @@ artifact_budget:
     quality_gate_plan: signal-only     # only categories with an obvious signal (auth/network/UI/storage touch), not a full 5-category sweep
     impact_closure: minimal            # same minimal-prose treatment as execution_report; scoped to what was actually populated
     task_summary_md: minimal           # already meant to be compact; fast mode keeps it to a few lines
+    implementation_plan_code_snippets: not_required   # see § 3b fast/standard variant — exact file/method/command/expected output still mandatory
 
   standard:
     requirements_max_lines: 120
     design_max_lines: 180
     implementation_plan_max_tasks: 15
     execution_report: standard
+    implementation_plan_code_snippets: not_required   # see § 3b fast/standard variant — exact file/method/command/expected output still mandatory
 
   governed:
     unrestricted: true

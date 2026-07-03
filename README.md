@@ -56,10 +56,12 @@ Stage  3  Design                Write design + executable implementation plan (t
 Stage  4  Implementation        TDD per task: RED → GREEN → spec review → quality review → commit
 Stage  5  Verify                Collect all required evidence (build, tests, screenshots, Kotlin static analysis)
 Stage  6  QA Gate               Karpathy diff review + acceptance, regression, security/performance coverage
-Stage  7  Finalization          ADR status, impact closure, task summary, drift check, handoff finalized
+Stage  7  Finalization          ADR status, impact closure, task summary, artifact integrity, handoff finalized
 ```
 
 The agent **stops at Stage 2 and Stage 2.5** and will not write code without your explicit approval.
+
+Stage 7 always runs the task artifact integrity check. The heavier skill drift check runs only when orchestration files such as `SKILL.md`, `refs/**`, `templates/**`, `docs/FLOW.md`, or `CHANGELOG.md` changed.
 
 ---
 

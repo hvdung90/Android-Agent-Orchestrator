@@ -1,6 +1,6 @@
 # Playbooks
 
-_Skill version: 4.17.0 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 4.18.0 — update this when SKILL.md bumps a minor or major version._
 
 Each playbook maps a task type to the correct provisioning mode, stage sequence, source mode, clarification workers, and architecture-map queries (Understand-Anything checked first, Graphify fallback).
 
@@ -197,6 +197,8 @@ Stage 2.5 — evaluate ADR-lite triggers; STOP again if ADR approval/deferral re
 
 | Situation | Provisioning mode | Source mode | Clarification |
 |---|---|---|---|
+| UI copy/pixel tweak (no layout/logic change) | audit | N/A | No — fast-eligible; see the pixel-tweak TDD exemption in `refs/compliance-policy.md` § TDD exemption categories |
+| Dependency patch/minor version bump (no code change) | audit | N/A | No — fast-eligible; see `dependency_change` in the Evidence Gate Matrix (`refs/contracts-and-artifacts.md`) |
 | Analyze repo | audit | N/A | No, unless task docs are analyzed |
 | Setup repo | bootstrap | N/A | No |
 | Update tools | update | N/A | No |
