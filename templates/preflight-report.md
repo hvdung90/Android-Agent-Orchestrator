@@ -19,11 +19,11 @@
 - Project overrides defined: <count>
 - Notes:
 
-## AI DevKit
+## Spec Kit
 
 - CLI present:
 - CLI evidence:
-- Project config `.ai-devkit.json`:
+- Project config `.specify/`:
 - Action allowed:
 - Action taken:
 - Notes:
@@ -46,8 +46,18 @@
 - Action taken:
 - Notes:
 
+## Understand-Anything
+
+- Plugin/skill present:
+- `.understand-anything/knowledge-graph.json`:
+- Active architecture-map tool: yes | no (fallback to Graphify)
+- Action allowed:
+- Action taken:
+- Notes:
+
 ## Graphify
 
+- Active architecture-map tool (only if Understand-Anything unavailable): yes | no
 - CLI present:
 - Package present:
 - `graphify-out/GRAPH_REPORT.md`:

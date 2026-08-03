@@ -1,8 +1,8 @@
 # Playbooks
 
-_Skill version: 4.10.1 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 4.18.0 — update this when SKILL.md bumps a minor or major version._
 
-Each playbook maps a task type to the correct provisioning mode, stage sequence, source mode, clarification workers, and Graphify queries.
+Each playbook maps a task type to the correct provisioning mode, stage sequence, source mode, clarification workers, and architecture-map queries (Understand-Anything checked first, Graphify fallback).
 
 ---
 
@@ -14,13 +14,13 @@ Use before every non-trivial task.
 
 ```text
 Stage -1 — Tooling Preflight
-  - Check AI DevKit command
-  - Check .ai-devkit.json
+  - Check Spec Kit command
+  - Check .specify/
   - Check Android CLI command
   - Check android info if available
   - Check android skills list if available
-  - Check Graphify command/package
-  - Check graphify-out/GRAPH_REPORT.md and graph.json
+  - Check Understand-Anything plugin/skill and .understand-anything/knowledge-graph.json (checked first)
+  - If Understand-Anything unavailable: check Graphify command/package and graphify-out/GRAPH_REPORT.md + graph.json (fallback)
   - Check Karpathy guidance/plugin signals
   - Write or report preflight summary
   - Do not install/update/rebuild
@@ -31,11 +31,11 @@ Stage -1 — Tooling Preflight
 ```text
 Stage -1 — Tooling Preflight
   - Install missing approved tools only
-  - Run ai-devkit init if .ai-devkit.json missing
-  - Run ai-devkit install if config exists and reconciliation needed
+  - Run `specify init --here --integration <agent>` if `.specify/` missing
+  - Run `specify self upgrade` if `.specify/` exists and a newer release is confirmed
   - Run android init if Android CLI exists and agent setup requested
   - Run android skills find/list before adding skills
-  - Build Graphify only if approved and useful for existing codebase
+  - Install/build Understand-Anything only if approved and useful for existing codebase; build Graphify instead only if Understand-Anything is unavailable
   - Write preflight report
 ```
 
@@ -46,7 +46,7 @@ Stage -1 — Tooling Preflight
   - Update approved installed tools
   - Reconcile project setup
   - Refresh skills list
-  - Update Graphify package if approved
+  - Update Understand-Anything if approved; update Graphify package instead only if Understand-Anything is unavailable
   - Update graph if requested or after implementation
   - Write preflight report
 ```
@@ -55,9 +55,9 @@ Stage -1 — Tooling Preflight
 
 ```text
 Stage -1 — Tooling Preflight
-  - Check Graphify
-  - If graph missing: /graphify .
-  - If graph exists: /graphify . --update
+  - Check Understand-Anything first; check Graphify only if Understand-Anything is unavailable
+  - Understand-Anything: run /understand (builds or rebuilds); /understand-diff for impact analysis
+  - Graphify (fallback): if graph missing, /graphify .; if graph exists, /graphify . --update
   - Do not touch product code
 ```
 
@@ -77,8 +77,8 @@ Stage 2.5 — evaluate ADR-lite triggers; STOP again if ADR approval/deferral re
 Stage 3 — design + Android memo
 Stage 4 — one code owner implements
           [Serena: code-owner request] find_declaration / find_implementations advisory
-Stage 5 — Android CLI evidence + Graphify update
-          [Serena: agent] get_diagnostics_for_file if graph_impact ≥ medium AND kotlin-ls stable
+Stage 5 — Android CLI evidence + architecture-map update
+          [Serena: agent] get_diagnostics_for_file if graph_impact ≥ medium AND `kotlin_lsp_support: confirmed`
 Stage 6 — Karpathy QA gate
           [Serena: optional] find_referencing_symbols scope check
 Stage 7 — finalize ADR status + Task Changelog + Drift Check
@@ -92,6 +92,8 @@ Stage 7 — finalize ADR status + Task Changelog + Drift Check
 Stage -1 — audit or setup based on user intent; check Serena (non-blocking)
 Stage 0 — collect Jira + Figma + linked docs
 Stage 1 — source readers in parallel
+          Figma Reader: self-check MCP tools first (get_metadata → scoped get_design_context);
+                        PAT+REST fallback only if MCP absent
           [Serena: agent] find_symbol for key components named in Jira ticket
 Stage 1.5 — Ambiguity + Conflict + Missing-info + State Extractor
             [Serena: agent] find_implementations for any interface flagged by Missing-info
@@ -105,8 +107,8 @@ Stages 3–7 — normal flow
 ## 3) Edit existing feature
 
 ```text
-Stage -1 — audit Graphify + Serena state
-Stage 1 — graphify query/path if graph exists
+Stage -1 — audit architecture map (Understand-Anything → Graphify fallback) + Serena state
+Stage 1 — query architecture map / path if graph exists
           [Serena: agent] find_referencing_symbols on the symbol being edited
 Stage 1.5 — Ambiguity + Missing-info + Dependency Impact
             [Serena: agent] find_implementations if abstract/interface involved
@@ -115,7 +117,7 @@ Stage 2.5 — evaluate ADR-lite triggers; STOP again if ADR approval/deferral re
 Stage 4 — surgical changes only
           [Serena: code-owner request] find_declaration for usage pattern
 Stage 5 — update graph and verify
-          [Serena: agent] get_diagnostics_for_file if kotlin-ls stable
+          [Serena: agent] get_diagnostics_for_file if `kotlin_lsp_support: confirmed`
 Stage 7 — finalize ADR status + Task Changelog + Drift Check
 ```
 
@@ -124,7 +126,7 @@ Stage 7 — finalize ADR status + Task Changelog + Drift Check
 ## 4) Bug investigation
 
 ```text
-Stage -1 — audit Android CLI and Graphify; check Serena (non-blocking)
+Stage -1 — audit Android CLI and architecture map (Understand-Anything → Graphify fallback); check Serena (non-blocking)
 Stage 0 — collect repro, device, version, expected behavior
 Stage 1 — graph path + runtime evidence if available
           [Serena: agent] find_symbol on crash site / reported component
@@ -135,7 +137,7 @@ Stage 2.5 — evaluate ADR-lite triggers; usually not_required unless contract/s
 Stage 4 — smallest safe patch
           [Serena: code-owner request] find_declaration for context
 Stage 5 — runtime evidence + graph update if graph exists
-          [Serena: agent] get_diagnostics_for_file on patched file if kotlin-ls stable
+          [Serena: agent] get_diagnostics_for_file on patched file if `kotlin_lsp_support: confirmed`
 Stage 7 — finalize Task Changelog + Drift Check
 ```
 
@@ -144,7 +146,7 @@ Stage 7 — finalize Task Changelog + Drift Check
 ## 5) XML → Compose migration
 
 ```text
-Stage -1 — check Android CLI, Android skills, Graphify, Serena
+Stage -1 — check Android CLI, Android skills, architecture map (Understand-Anything → Graphify fallback), Serena
 Stage 1 — query "xml layout view fragment" if graph exists; android skills find "compose"
           [Serena: agent] get_symbols_overview on XML-bound view layer
           [Serena: agent] find_referencing_symbols on Fragment/Activity being migrated
@@ -162,15 +164,15 @@ Stage 7 — accept/defer ADR + Task Changelog + Drift Check
 ## 6) AGP / build modernization
 
 ```text
-Stage -1 — check AI DevKit, Android CLI, Android skills, Gradle wrapper, Graphify, Serena
-Stage 1 — graphify query "gradle build agp"; android skills find "agp"
+Stage -1 — check Spec Kit, Android CLI, Android skills, Gradle wrapper, architecture map (Understand-Anything → Graphify fallback), Serena
+Stage 1 — query architecture map "gradle build agp"; android skills find "agp"
           [Serena: agent] find_symbol for build-related symbols if Kotlin DSL in use
 Stage 1.5 — Dependency Impact + Rollout/Risk + Android Advisor
 Stage 2 — upgrade plan; STOP
 Stage 2.5 — ADR-lite required for AGP/Gradle/Kotlin version decision
 Stage 4 — controlled implementation
 Stage 5 — clean build + graph update
-          [Serena: agent] get_diagnostics_for_file on changed build files if kotlin-ls stable
+          [Serena: agent] get_diagnostics_for_file on changed build files if `kotlin_lsp_support: confirmed`
 Stage 7 — accept/defer ADR + Task Changelog + Drift Check
 ```
 
@@ -195,6 +197,8 @@ Stage 2.5 — evaluate ADR-lite triggers; STOP again if ADR approval/deferral re
 
 | Situation | Provisioning mode | Source mode | Clarification |
 |---|---|---|---|
+| UI copy/pixel tweak (no layout/logic change) | audit | N/A | No — fast-eligible; see the pixel-tweak TDD exemption in `refs/compliance-policy.md` § TDD exemption categories |
+| Dependency patch/minor version bump (no code change) | audit | N/A | No — fast-eligible; see `dependency_change` in the Evidence Gate Matrix (`refs/contracts-and-artifacts.md`) |
 | Analyze repo | audit | N/A | No, unless task docs are analyzed |
 | Setup repo | bootstrap | N/A | No |
 | Update tools | update | N/A | No |

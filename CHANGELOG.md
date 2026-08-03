@@ -30,6 +30,103 @@
 
 ---
 
+---
+
+## v4.18.0
+
+### Added
+
+- **Fast/standard code-snippet relaxation** (`refs/contracts-and-artifacts.md`, `refs/compliance-policy.md`): `implementation-plan.md`'s RED/GREEN code bodies are optional outside `governed` mode; exact file path, test method name, command, and expected output remain mandatory in every mode.
+- **Drift Check split** (`refs/contracts-and-artifacts.md`, `refs/compliance-policy.md`, `SKILL.md`, `refs/stage-contracts.md`): Artifact Integrity Check (always MANDATORY) separated from Skill Drift Check (MANDATORY only when the task modified the orchestrator skill's own files, else AUTO-SKIP) — fixes product-repo tasks being forced through skill-repo-only version-sync checks.
+- **Evidence Gate Matrix absent-tool handling** (`refs/contracts-and-artifacts.md`, `refs/compliance-policy.md`): the Kotlin-static-analysis-only "record unavailable, don't block" pattern now applies to every required evidence item, gated on a literal detection-command output, not just an assertion.
+- **Unavailable-tool record** (`refs/contracts-and-artifacts.md`): shared JSON shape (tool, detection_command, detection_output, status, recorded_at) defined once, referenced by name everywhere a tool may be missing.
+- **Lightweight task-type scoring signals** (`SKILL.md`, `refs/playbooks.md`): new low-signal complexity/risk rows for UI copy/pixel tweaks and dependency patch/minor bumps, cross-referenced to existing TDD-exemption and `dependency_change` mechanisms.
+- **`commit_policy`** (`refs/contracts-and-artifacts.md`, `SKILL.md`): `per_task | single_commit | no_commit`, default `per_task`, human-request-only; `no_commit` requires a non-git refactor checkpoint.
+- **Autonomy policy** (`refs/compliance-policy.md`): documents the existing AUTO-SKIP/CONFIRM-SKIP boundary for discoverability — no tier changed.
+
+## v4.17.0
+
+### Added
+
+- **Kotlin/Android official-rule enforcement** (`SKILL.md`, `refs/contracts-and-artifacts.md`, `refs/compliance-policy.md`, `refs/stage-contracts.md`, `refs/sub-agents.md`): Kotlin product-code changes now require `kotlin_android_rule_checklist`, `kotlin_static_analysis_pass`, and Kotlin / Android Rule Closure evidence.
+- **Static-analysis overlay** (`refs/contracts-and-artifacts.md`): Stage 5 must run repo-native Android/Kotlin checks when configured: Android lint, module lint, `ktlintCheck`, `detekt`, `spotlessCheck`, formatter/check tasks. Configured tool failures block Gate F; missing tools are recorded as `unavailable`.
+- **Official-reference review tier** (`SKILL.md`, `refs/contracts-and-artifacts.md`): Kotlin convention review now records `agent | official_docs | skill_docs | general_knowledge | not_applicable`, and `general_knowledge` is degraded evidence only when official docs/companion skills are unavailable.
+- **Kotlin LSP wording update** (`SKILL.md`, `refs/sub-agents.md`, `refs/provisioning-preflight.md`, `refs/playbooks.md`): Kotlin Language Server is treated as JetBrains official Alpha with experimental AGP support; diagnostics run only when project support is confirmed or the developer opts in.
+
+## v4.16.0
+
+### Added
+
+- **Impact + regression planning layer** (`SKILL.md`, `refs/contracts-and-artifacts.md`, `refs/stage-contracts.md`, `refs/sub-agents.md`, `refs/compliance-policy.md`): `context-pack.json` now records `impact_assessment`, `regression_test_matrix`, `quality_gate_plan`, and `follow_up_watchlist` for code-touching tasks. This makes the agent explicitly answer: which features are affected, which features must be retested, which security/performance/accessibility checks apply, and which limitations are deferred.
+- **Impact Closure** (`refs/contracts-and-artifacts.md`, `refs/stage-contracts.md`, `refs/compliance-policy.md`): `execution.md` must close every required regression/security/performance row with evidence, blocker, or deferred follow-up before Gate G can pass.
+- **`task-summary.md` continuity artifact** (`refs/contracts-and-artifacts.md`, `SKILL.md`, `README.md`, `QUICKSTART.md`): Stage 7 writes a compact completed-task summary so future overlapping tasks can load a cheap memory artifact before reading full requirements/design/execution history.
+- **Compliance hardening** (`refs/compliance-policy.md`): new mandatory rows for impact/regression planning, required regression/security/performance evidence, Impact Closure, and task-summary generation. New hard rule #28 prevents code-touching tasks from closing without explicit impact and quality outcomes.
+- **"Code-touching task" definition** (`SKILL.md` § Stage 1, `refs/contracts-and-artifacts.md`): precisely defined as task types [E]-[J] per `docs/FLOW.md` / any task where `change_type` gets set, as opposed to [A]-[D] (Analyze, Bootstrap, Update, Refresh-graph) which end after Stage -1 — replaces the earlier ambiguous "analysis-only or tooling-only" phrasing with a term cross-referenced to the existing task-type taxonomy.
+- **Fast-mode lite scope for the impact/regression layer** (`SKILL.md` Fast Mode table + hard rule #28, `refs/contracts-and-artifacts.md` `artifact_budget.fast`): Impact + Regression Plan, Impact Closure, and `task-summary.md` stay MANDATORY for code-touching tasks but scope to the directly changed feature + signal-triggered `quality_gate_plan` categories only in fast mode — matching every other fast-mode artifact reduction already in this skill. A fast-mode task whose regression/impact data reveals indirect impact auto-upgrades to `standard` (same shape as the existing >5-ACs rule).
+
+### Changed
+
+- Stage 2 requirements now include an Impact / Regression section.
+- Stage 3 implementation plans now include per-task regression/security/performance checks and evidence paths.
+- Stage 6 QA now verifies regression matrix coverage and security/performance outcomes in addition to acceptance coverage and Karpathy review.
+
+## v4.15.0
+
+### Added
+
+- **Kotlin/Android convention verification** (`refs/sub-agents.md`, `refs/contracts-and-artifacts.md`, `SKILL.md`, `refs/compliance-policy.md`, `refs/provisioning-preflight.md`, `docs/FLOW.md`): the only prior checks (Karpathy: "surgical, no over-engineering") were generic — zero reference anywhere to Kotlin coding conventions, Jetpack/Compose best practices, or clean architecture. Stage 3 now computes `kotlin_convention_scope[]` **once** from the requirements' Affected Areas + `change_type` (mapping table in `refs/contracts-and-artifacts.md` § Kotlin/Android convention scope: Compose UI → `compose-multiplatform-patterns`, ViewModel/Repository/Navigation/DI → `android-clean-architecture`, coroutines/Flow → `kotlin-coroutines-flows`, tests → `kotlin-testing`, any Kotlin file → `kotlin-patterns`), written into `implementation-plan.md`'s header — Stage 4 reuses it, never recomputes. Android Advisor consults the matching companion skill(s) as design-time reference (`convention_refs_consulted[]`).
+- **Stage 4 step 11's existing Karpathy dispatch widens** to also run the convention check when `kotlin_convention_scope` is non-empty — no new mandatory reviewer step. Three-tier fallback: `kotlin-reviewer` agent (active diff inspection) → companion skill docs (reference) → general Kotlin/Android knowledge — mirrors Karpathy's own existing degrade-gracefully pattern. **The check may degrade through these tiers, but recording which tier was used (`kotlin_convention_check: agent | skill_docs | general_knowledge | not_applicable`) in `execution.md` is never optional** — new hard rule #27, new item in compliance-policy.md §3 "What can never be bypassed", new Drift Check item.
+- `refs/compliance-policy.md`: new row "Stage 3 Android Advisor convention consult" (AUTO-SKIP when scope empty). Existing "Stage 4 quality review (Karpathy) per task" row's *description* widens to "Karpathy + Kotlin/Android convention" — its **tier stays MANDATORY — never skippable, unchanged**, so historical `skip-log.json` entries keep their meaning under the append-only audit rule.
+- `refs/contracts-and-artifacts.md`: Decision Ownership table gains a "Kotlin/Android idiom & convention compliance" row. **Deliberate non-change:** no new `preflight.json` field — same reasoning as Figma MCP tool detection, a bash script cannot introspect which agents/skills the AI itself has loaded.
+- Lane E ("Karpathy guidelines") description extended to mention Kotlin/Android convention verification. Lane B ("Android skills" — the external `android` CLI tool) is unchanged; it is a distinct concept from the Claude Code companion skills this feature uses.
+
+## v4.14.0
+
+### Added
+
+- **Figma MCP-first, PAT fallback** (`refs/clarification-workflow.md`, `refs/auth-bootstrap.md`, `SKILL.md`): Figma Reader now self-checks the agent's own tool list at Stage 1 activation for Figma Dev Mode MCP tools (`get_metadata`, `get_design_context`, `get_variable_defs`, `get_screenshot`, `get_code_connect_suggestions`, `search_design_system`, `download_assets`) — no token needed on this path, auth handled by the MCP server via the developer's logged-in Figma desktop app. `figma.personal_access_token` + REST API is now explicitly the fallback, used only when MCP tools are absent. Ordered tool-call procedure added: `get_metadata` first (never call `get_design_context` unscoped on a whole-file link), then scoped `get_design_context`, `get_variable_defs` once per file, `get_screenshot` on the top-level frame. New hard rule #26: MCP availability is self-checked by the agent, never assumed from Stage -1 preflight (a bash script cannot detect MCP tool presence) — **deliberate non-change:** no new field added to `preflight.json` for this.
+- **Figma Reader extended output** (`refs/sub-agents.md`): gains `design_tokens[]` (raw colors/spacing/typography from `get_variable_defs`), `component_reuse[]` (from `get_code_connect_suggestions`/`search_design_system`), `assets_exported[]`, `screenshot_ref`, `node_id`, `candidate_frames[]`, `access_mode: mcp|rest_api`. These are raw Figma-side findings only — Figma Reader never checks the target codebase for existing resources.
+- **Scope disambiguation before extraction** (`refs/clarification-workflow.md`, `refs/sub-agents.md`): a Figma page/section/frame can contain multiple distinct layouts (different screens, or multiple states/variants of one screen). Figma Reader must inspect `get_metadata`'s node tree before calling `get_design_context`/`get_variable_defs`/`get_screenshot` — if more than one plausible screen-level frame is found, match against the task description first; if ambiguous, stop and ask the developer which frame(s) are in scope rather than guessing or processing all of them. Unselected frames are recorded in `candidate_frames[]` for transparency.
+- **Android Advisor gains `token_reuse_recommendation[]`** (`refs/sub-agents.md`): resolves Figma Reader's raw `design_tokens[]` against existing `colors.xml`/`dimens.xml`/`Theme.kt` when Android Advisor has codebase read access (Stage 1.5 or Stage 3 memo). Same "reader observes, advisor recommends" split already used by Graph Impact Reader vs. Android Advisor's existing `recommended_api_or_pattern`.
+- **Figma reference screenshot formalized as a Stage 1 Discovery artifact** (`refs/contracts-and-artifacts.md`): `get_screenshot` output saves to `docs/ai/tasks/{task_id}/discovery/figma/<screen>.png` — explicitly a distinct artifact from `screenshot_before`/`screenshot_after` (ADB device captures, Gate F evidence at Stage 4/5). No change to the Evidence Gate Matrix's required/optional evidence lists.
+- `refs/contracts-and-artifacts.md`: `context-pack.json` gains top-level `design_tokens: []` / `component_reuse: []` (sparse-rule-compliant, next to `screens`/`states`). Decision Ownership table gains a "Design tokens / component reuse" row. `## MCP mapping` table in `refs/auth-bootstrap.md` splits the old single "Figma REST API" row into MCP tools (no token) + REST fallback (PAT).
+- `refs/playbooks.md`: playbook 2 ("Weak Jira + partial Figma") gains the MCP-first self-check step.
+
+## v4.13.0
+
+### Added
+
+- **Global ADR ledger** (`SKILL.md`, `refs/contracts-and-artifacts.md`, `refs/stage-contracts.md`, `refs/compliance-policy.md`, `docs/ai/decisions/0000-template.md`, `docs/FLOW.md`, `README.md`): ADRs move from per-task `docs/ai/tasks/{task_id}/decisions/ADR-NNNN-<slug>.md` to a **global, sequentially-numbered, immutable** ledger at `docs/ai/decisions/ADR-NNNN-<slug>.md`, with a new auto-created `docs/ai/decisions/README.md` index (same lazy-create pattern as `status.json`). Stage 2.5 now checks the index for an existing covering `Accepted` ADR before creating a new one — link to it (`adr_required: false, reason: "covered by ADR-NNNN"`) or supersede it (`supersedes:`/`superseded_by:`) instead of duplicating. Numbering is derived by reading the highest existing `ADR-NNNN` and incrementing (no counter file). An `Accepted` ADR is never hand-edited in place — new hard rule #25 and compliance-policy §3 item 15 make this explicit.
+- **Persistent architecture knowledge base** (`SKILL.md`, `refs/contracts-and-artifacts.md`, `refs/stage-contracts.md`, `refs/compliance-policy.md`, `templates/architecture-domain.md` (new file), `docs/FLOW.md`, `README.md`): new global, domain-organized, **updated-in-place** folder `docs/ai/architecture/<domain>.md` (+ auto-created `README.md` index) — unlike everything else under `docs/ai/tasks/`, this is not a per-task snapshot. Domain names are project-specific (e.g. `networking.md`, `billing.md`), not fixed by the skill. Stage 7 creates-or-updates a domain file **iff** `adr_required: true` OR `module_impact_chain.estimated_build_scope` is `local-chain`/`full-project` OR `change_type: architecture_change` — otherwise AUTO-SKIP (most tasks never touch it; `workflow_mode` is deliberately not part of the trigger). Updates are **section-level patches** (rewrite only the affected `##` section(s), append one row to a trailing `## Change Log`), never a whole-file rewrite.
+- `refs/contracts-and-artifacts.md`: new §§ 4b (decisions/README.md schema), 4c (numbering allocation rule), 4d (duplicate-ADR detection procedure), 4e (architecture-domain schema + trigger), 4f (architecture/README.md schema). Ownership rules table gains 4 new global-path rows. Gate D.5 and Gate G gain required items for the two new checks so a task cannot close Stage 7 without evaluating them.
+- `refs/compliance-policy.md`: Stage compliance matrix gains "Stage 2.5 duplicate-ADR check" (MANDATORY) and "Stage 7 architecture-doc update" (AUTO-SKIP, condition given). §6 Task isolation rule gains a second "shared global paths" category — writable only by Stage 2.5/Stage 7 of the *active* task (not Stage-(-1)-only like the existing global paths), explicitly patching the wording that would otherwise forbid these writes under hard rule #18.
+
+### Migration note
+
+Projects with pre-existing per-task ADRs from before v4.13.0 should be offered a one-time migration into the global ledger the next time Stage 2.5 or Drift Check runs — ask first (CONFIRM-SKIP style), never migrate silently.
+
+## v4.12.0
+
+### Added
+
+- **Understand-Anything as primary architecture map** (`SKILL.md`, `refs/*.md`, `templates/*`, `docs/FLOW.md`, `.gitignore`): [Understand-Anything](https://github.com/Egonex-AI/Understand-Anything) (`/understand`, `.understand-anything/knowledge-graph.json`) is now checked **first** at Stage -1 for the architecture-map lane. Graphify becomes the **fallback** — only checked/used when Understand-Anything's plugin/skill is not installed and `.understand-anything/knowledge-graph.json` does not exist. Lane D renamed from "Graphify" to "Architecture Map (Understand-Anything primary, Graphify fallback)".
+- `templates/tooling-preflight.sh`: new Understand-Anything detection block (plugin search under `.claude/plugins`, `.understand-anything/knowledge-graph.json` presence) in both `--json` and markdown modes. `preflight.json` gains `tools.understand_anything` and a new `architecture_map` object (`active_tool`, `understand_anything_graph_present`, `graphify_report_present`, `graphify_json_present`) replacing the old Graphify-only `graph` object. Non-blocking gap renamed `graphify_missing`/`graph_report_missing` → `architecture_map_missing`/`architecture_map_graph_missing`.
+- `refs/contracts-and-artifacts.md`: `context-pack.json → tooling_readiness.graphify` replaced with `tooling_readiness.architecture_map { active_tool, state }`. `owner:` enum gains `understand-anything`. Decision Ownership and stage-trigger tables updated to show Understand-Anything as primary owner of architecture impact.
+- `refs/sub-agents.md`: Tooling Preflight Auditor YAML contract gains `architecture_map { active_tool, understand_anything, graphify }` replacing the flat `graphify:` block. Graph Impact Reader `source_type` generalized from `graphify` to `architecture-map` with a `tool` field.
+
+### Changed
+
+- All prose referring to "Graphify" as *the* architecture-map check (Stage -1 determine list, Discovery reads, Verify updates, staleness checks, playbooks, `docs/FLOW.md` diagrams) now describes the priority-checked pair: Understand-Anything first, Graphify fallback. Graphify's own behavior when it is the active tool is unchanged.
+
+## v4.11.0
+
+### Changed
+
+- **Replaced AI DevKit with Spec Kit as Lane A** (`SKILL.md`, `refs/*.md`, `templates/*`, `docs/FLOW.md`, `docs/ai/decisions/0000-template.md`, `.gitignore`): Lane A conductor is now [Spec Kit](https://github.com/github/spec-kit) (`specify` CLI). Tooling check switched from `command -v ai-devkit` + `.ai-devkit.json` (file) to `command -v specify` + `.specify/` (directory, produced by `specify init`). Install/update rules now use the real Spec Kit commands: `uv tool install specify-cli --from git+https://github.com/github/spec-kit.git@vX.Y.Z` (or ephemeral `uvx --from git+https://github.com/github/spec-kit.git specify ...`) to install, `specify init --here --integration <agent>` to bootstrap, and `specify self check` / `specify self upgrade` to update. `.specify/memory/constitution.md` (produced by `/speckit.constitution`) is treated as human-approved and must never be hand-edited or silently overwritten.
+- All `owner: ai-devkit` artifact-contract fields renamed to `owner: spec-kit`; the `Tooling Preflight Auditor` output contract in `refs/sub-agents.md` renamed `ai_devkit` → `spec_kit`.
+- Orchestrator's own `docs/ai/**` artifact contract (requirements, design, planning, ADRs) is unchanged — Spec Kit's native `/speckit.specify`, `/speckit.plan`, `/speckit.tasks`, and `/speckit.clarify` commands may be used as the underlying mechanism for those stages, but the canonical human-reviewed artifact still lives under `docs/ai/tasks/{task_id}/**`.
+
+
 ## v4.10.1
 
 ### Added
@@ -346,7 +443,7 @@
 
 - Stage -1 Tooling Preflight before Stage 0 Intake.
 - Provisioning modes: `audit`, `bootstrap`, `update`, `refresh-graph`, `force-reinstall`.
-- Install/update decision rules for AI DevKit, Android CLI, Android skills, Graphify, and Karpathy guidelines.
+- Install/update decision rules for Spec Kit, Android CLI, Android skills, Graphify, and Karpathy guidelines.
 - `refs/provisioning-preflight.md`.
 - `templates/preflight-report.md`.
 - `templates/tooling-preflight.sh`.

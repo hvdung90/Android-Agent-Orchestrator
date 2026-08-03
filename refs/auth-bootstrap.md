@@ -1,6 +1,6 @@
 # Auth Bootstrap & Token Management
 
-_Skill version: 4.10.1 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 4.18.0 — update this when SKILL.md bumps a minor or major version._
 
 ## Principles
 
@@ -63,18 +63,21 @@ Receive token → save to .agent-auth.yaml → run Jira Reader
 
 Same token as Jira (`atlassian.*`). If Jira has already authenticated → Confluence reuses it and does not ask again.
 
-### Figma Reader
+### Figma Reader — MCP-first, PAT fallback
 
-Required: `figma.personal_access_token`
+If Figma MCP tools are available in the agent's own tool list (checked at Stage 1 activation time, per `refs/clarification-workflow.md` § Figma) → **no token needed here**. Auth is handled by the MCP server via the developer's logged-in Figma desktop app. Skip this section.
+
+Only if Figma MCP tools are **not** available → fall back to REST API + PAT:
 
 ```
 figma.personal_access_token → empty? → ask:
-  "A Figma Personal Access Token is required to read designs.
+  "A Figma Personal Access Token is required to read designs via the REST API
+   (no Figma Dev Mode MCP server detected in this environment).
    Get one at: Figma → Account Settings → Security → Personal access tokens → Generate new token
    Required permission: File content (read-only)
    Paste the token here:"
 
-Receive token → save to .agent-auth.yaml → run Figma Reader
+Receive token → save to .agent-auth.yaml → run Figma Reader (access_mode: rest_api)
 ```
 
 ### GitHub (optional)
@@ -138,7 +141,8 @@ MCP tools used in Claude Code and their corresponding token source in `.agent-au
 | MCP Tool                        | Auth source in .agent-auth.yaml        |
 |---------------------------------|----------------------------------------|
 | `mcp__claude_ai_Atlassian__*`   | `atlassian.domain` + `atlassian.email` + `atlassian.api_token` |
-| Figma REST API                  | `figma.personal_access_token`          |
+| Figma Dev Mode MCP tools (`get_metadata`, `get_design_context`, `get_variable_defs`, `get_screenshot`, `get_code_connect_suggestions`, `search_design_system`, `download_assets`, `whoami`) | none — MCP server handles auth via Figma desktop app login |
+| Figma REST API (fallback only, when MCP tools absent) | `figma.personal_access_token` |
 | `mcp__plugin_*_github__*`       | `github.personal_access_token`         |
 
 When an MCP tool requires authentication, use the corresponding token from `.agent-auth.yaml`.

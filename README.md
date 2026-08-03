@@ -46,7 +46,7 @@ The short version:
 The skill runs through numbered stages. Each stage has a defined input, output, and gate:
 
 ```
-Stage -1  Tooling Preflight     Audit tools, check auth, read architecture graph
+Stage -1  Tooling Preflight     Audit tools, check auth, read architecture graph (Understand-Anything, or Graphify fallback)
 Stage  0  Intake                Classify task, derive source mode (Jira / Figma / plain text)
 Stage  1  Discovery             Run source readers, graph impact analysis
 Stage  1.5 Clarification        Resolve ambiguities, conflicts, missing info (auto-skipped if clear)
@@ -54,12 +54,14 @@ Stage  2  Requirements          Write canonical requirements doc → STOP for hu
 Stage  2.5 Decision Gate        Check if ADR-lite is needed → STOP for human approval if yes
 Stage  3  Design                Write design + executable implementation plan (tasks with test commands)
 Stage  4  Implementation        TDD per task: RED → GREEN → spec review → quality review → commit
-Stage  5  Verify                Collect all required evidence (build, tests, screenshots)
-Stage  6  QA Gate               Karpathy diff review + acceptance coverage check
-Stage  7  Finalization          ADR status, task changelog, drift check, handoff finalized
+Stage  5  Verify                Collect all required evidence (build, tests, screenshots, Kotlin static analysis)
+Stage  6  QA Gate               Karpathy diff review + acceptance, regression, security/performance coverage
+Stage  7  Finalization          ADR status, impact closure, task summary, artifact integrity, handoff finalized
 ```
 
 The agent **stops at Stage 2 and Stage 2.5** and will not write code without your explicit approval.
+
+Stage 7 always runs the task artifact integrity check. The heavier skill drift check runs only when orchestration files such as `SKILL.md`, `refs/**`, `templates/**`, `docs/FLOW.md`, or `CHANGELOG.md` changed.
 
 ---
 
@@ -87,6 +89,8 @@ Every task in the implementation plan follows this loop — no exceptions:
 5. Commit
 6. Spec-compliance review (does it meet acceptance criteria?)
 7. Quality review (Karpathy guidelines)
+
+For Kotlin product-code changes, the quality gate also requires the Kotlin / Android rule checklist and repo-native static analysis evidence (`lint`, `ktlint`, `detekt`, `spotless`, or the project's equivalent check tasks when configured).
 
 Product code cannot be written before RED evidence exists for that task.
 
@@ -127,6 +131,7 @@ refs/
 └── playbooks.md                  ← task-type → workflow mapping
 templates/
 ├── agent-auth.example.yaml       ← auth file template (Level 1/2/3)
+├── architecture-domain.md        ← docs/ai/architecture/<domain>.md template
 ├── preflight-report.md           ← preflight output template
 ├── start-task-prompts.md         ← copy/paste prompts for starting tasks
 └── tooling-preflight.sh          ← parallel audit script
@@ -135,8 +140,13 @@ examples/
 docs/
 ├── FLOW.md                       ← complete flow diagram, all use cases
 └── ai/
-    └── decisions/
-        └── 0000-template.md      ← ADR-lite template
+    ├── decisions/                ← GLOBAL: project-wide ADR ledger (immutable once Accepted)
+    │   ├── 0000-template.md      ← ADR-lite template
+    │   ├── README.md             ← index of every decision made (auto-created)
+    │   └── ADR-NNNN-*.md         ← sequential, project-wide numbering
+    └── architecture/             ← GLOBAL: living knowledge base, updated in place over time
+        ├── README.md             ← index of domain files (auto-created)
+        └── <domain>.md           ← e.g. networking.md, billing.md
 .project-orchestration/           ← runtime state (gitignored)
 ├── status.json                   ← all active tasks dashboard
 ├── memory/
@@ -153,8 +163,11 @@ docs/ai/tasks/{task_id}/
 ├── requirements/<task>.md        ← canonical requirements (human-approved)
 ├── design/<task>.md              ← design doc
 ├── planning/implementation-plan.md  ← executable TDD plan (exact files + test commands)
-├── decisions/ADR-NNNN-*.md      ← architecture decisions (if triggered)
-└── handoff.md                    ← current task snapshot for incoming dev
+├── handoff.md                    ← current task snapshot for incoming dev
+└── task-summary.md               ← compact continuity summary for future tasks
+
+docs/ai/decisions/                ← GLOBAL, not per-task — see File structure above
+docs/ai/architecture/             ← GLOBAL, not per-task — see File structure above
 
 .project-orchestration/tasks/{task_id}/
 ├── session.json                  ← stage state, assignee, branch, blocker

@@ -1,6 +1,6 @@
 # Android Agent Orchestrator — Complete Flow
 
-_Reflects skill v4.10.1. Update when SKILL.md changes._
+_Reflects skill v4.18.0. Update when SKILL.md changes._
 
 ---
 
@@ -72,13 +72,15 @@ All task types start with Stage -1.
                             │
                             ▼
     ┌───────────────────────────────────────────────────────┐
-    │  Graphify time-based staleness check:                 │
-    │  (independent of cache + commit check)                │
+    │  Architecture-map staleness check (active tool;       │
+    │  independent of cache + commit check):                │
     │                                                       │
-    │  graph-stamp.json → built_at + stale_after_days > now?│
+    │  Graphify: graph-stamp.json built_at + 7d > now?      │
+    │  Understand-Anything: knowledge-graph.json mtime      │
+    │                       + 7d > now? (no stamp file)     │
     │    Yes → graph is fresh (time)                        │
-    │    No  → flag graphify: stale-time (non-blocking)    │
-    │          surface as warning in preflight.md           │
+    │    No  → flag architecture_map: stale-time            │
+    │          (non-blocking); warn in preflight.md         │
     └───────────────────────────────────────────────────────┘
                             │
     ┌───────────────────────┴───────────────────────────────┐
@@ -120,13 +122,15 @@ All task types start with Stage -1.
     ┌───────────────────────────────────────────────────────┐
     │  Parallel checks (read-only, all modes):              │
     │                                                       │
-    │  ① AI DevKit    — CLI present? .ai-devkit.json?       │
-    │  ② Android CLI  — present? android info?             │
+    │  ① Spec Kit    — CLI present? .specify/?              │
+    │  ② Android CLI  — present? android info?              │
     │  ③ Android skills — list available?                   │
-    │  ④ Graphify     — CLI/package? GRAPH_REPORT.md?       │
-    │                   graph.json?                         │
-    │  ⑤ Karpathy     — plugin / skill / CLAUDE.md?         │
-    │  ⑥ Auth status  — tokens set / empty (from Step 1)    │
+    │  ④ Understand-Anything — plugin/skill present?        │
+    │                   knowledge-graph.json present?       │
+    │  ⑤ Graphify (fallback) — CLI/package present?         │
+    │                   GRAPH_REPORT.md? graph.json?        │
+    │  ⑥ Karpathy     — plugin / skill / CLAUDE.md?         │
+    │  ⑦ Auth status  — tokens set / empty (from Step 1)    │
     └───────────────────────────────────────────────────────┘
                             │
             ┌───────────────┴───────────────┐
@@ -145,8 +149,8 @@ All task types start with Stage -1.
     │                                                       │
     │  Record:                                              │
     │  - provisioning mode                                  │
-    │  - tool readiness (①–⑤)                              │
-    │  - auth readiness (⑥)                                 │
+    │  - tool readiness (①–⑥)                              │
+    │  - auth readiness (⑦)                                 │
     │  - blockers / warnings                                │
     │  - proceed to Stage 0: yes / no                      │
     └───────────────────────────────────────────────────────┘
@@ -272,7 +276,7 @@ All task types start with Stage -1.
         │           Parallel reads              │
         │                                       │
         ▼                                       ▼
-  graphify-out/ present?               Source material
+  architecture-map graph present?      Source material
         │                                       │
    ┌────┴────┐                      ┌───────────┴───────────┐
   Yes        No                  Mode A                  Mode B
@@ -306,9 +310,9 @@ All task types start with Stage -1.
        Read matched task history   Skip old task docs
        before synthesis:
        - requirements/*.md
-       - decisions/ADR-*.md
        - design/*.md
        - reports/execution.md
+       - docs/ai/decisions/*.md   (global ledger; match by task: field)
                             │
                             ▼
                   Store → docs/ai/tasks/{task_id}/discovery/
@@ -349,8 +353,8 @@ All task types start with Stage -1.
     │                                                     │
     │  Mode A ─► Jira Reader          ┐                   │
     │            Confluence Reader    │ parallel          │
-    │            Figma Reader         │ (credentials from │
-    │            Graph Impact Reader  ┘  .agent-auth.yaml)│
+    │            Figma Reader         │ Figma: MCP-first, │
+    │            Graph Impact Reader  ┘  else .agent-auth │
     │            ─────────────────────────────────────    │
     │            Ambiguity Detector   ┐                   │
     │            Conflict Detector    │ parallel          │
@@ -408,7 +412,7 @@ All task types start with Stage -1.
 └─────────────────────────────────────────────────────────────────┘
         │
         ▼
-  AI DevKit writes docs/ai/tasks/{task_id}/requirements/<task>.md
+  Spec Kit writes docs/ai/tasks/{task_id}/requirements/<task>.md
   with artifact header + Affected Areas + Decision Triggers
         │
         ▼
@@ -434,16 +438,26 @@ All task types start with Stage -1.
   Yes        No
    │          │
    ▼          ▼
-  Create     Record adr_required=false
-  Proposed   + reason in session.json
-  ADR-lite
-   │
-   ▼
-  ██████████████████████████████████████████████
-  █  MANDATORY STOP — Human approve/defer ADR  █
-  ██████████████████████████████████████████████
+  Check docs/ai/decisions/README.md   Record adr_required=false
+  for existing Accepted ADR that       + reason in session.json
+  already covers this decision
         │
-        ▼
+   ┌────┴─────────────┐
+  Covers it, valid    No match / decision changed
+   │                   │
+   ▼                   ▼
+  Link to it;         Create Proposed ADR-lite
+  adr_required=false  (docs/ai/decisions/, GLOBAL;
+  reason: "covered     number = max existing + 1;
+  by ADR-NNNN"         supersedes: <old ADR> if changed)
+   │                   │
+   │                   ▼
+   │  ██████████████████████████████████████████████
+   │  █  MANDATORY STOP — Human approve/defer ADR  █
+   │  ██████████████████████████████████████████████
+   │                   │
+   └─────────┬─────────┘
+             ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │  STAGE 3: DESIGN SPLIT                                          │
 │  Ref: refs/playbooks.md                                         │
@@ -452,7 +466,7 @@ All task types start with Stage -1.
         ▼
   Parallel (no code changes):
   ┌────────────────────────┬──────────────────────────────┐
-  │  AI DevKit             │  Android skills              │
+  │  Spec Kit              │  Android skills              │
   │  docs/ai/tasks/...     │  docs/ai/tasks/...           │
   │  design/ + planning/   │  android-memo/<task>.md      │
   └────────────────────────┴──────────────────────────────┘
@@ -461,6 +475,11 @@ All task types start with Stage -1.
   Single code owner selected + recorded in session.json
   Ask developer: branch name? assignee?
   session.json → code_owner, assignee, branch set
+        │
+        ▼
+  Compute kotlin_convention_scope[] once (Affected Areas + change_type)
+  → written into implementation-plan.md header; Stage 4 reuses it
+  → Android Advisor consults matching companion skill(s) if available
         │
         ▼
   ┌───────────────────────────────────────────────────────┐
@@ -500,6 +519,7 @@ All task types start with Stage -1.
   │                                                               │
   │  ⑥ Spec-compliance review ✅  (FIRST — does it meet AC?)     │
   │  ⑦ Quality/Karpathy review ✅ (SECOND — is it clean code?)   │
+  │  ⑧ Kotlin/Android convention ✅ (same dispatch, if in scope) │
   │                                                               │
   │  → Next task                                                  │
   └───────────────────────────────────────────────────────────────┘
@@ -531,11 +551,11 @@ All task types start with Stage -1.
         ▼
   Parallel:
   ┌──────────────────────────┬───────────────────────────────┐
-  │  Android CLI             │  Graphify (if graph exists)   │
-  │  build + device tests    │  /graphify . --update         │
-  │  screenshots + logs  →   │  graphify-out/ updated        │
-  │  .project-orchestration/ │                               │
-  │  evidence/               │                               │
+  │  Android CLI             │  Architecture map (if exists) │
+  │  build + device tests    │  /understand or /graphify     │
+  │  screenshots + logs  →   │  --update                     │
+  │  .project-orchestration/ │  .understand-anything/ or     │
+  │  evidence/               │  graphify-out/ updated        │
   └──────────────────────────┴───────────────────────────────┘
         │
         ▼
@@ -546,7 +566,7 @@ All task types start with Stage -1.
         ▼
   Parallel review:
   ┌──────────────────────────┬───────────────────────────────┐
-  │  AI DevKit               │  Karpathy guidelines          │
+  │  Spec Kit                │  Karpathy guidelines          │
   │  - diff review           │  - surgical changes           │
   │  - acceptance coverage   │  - no over-engineering        │
   │  - scope discipline      │  - explicit assumptions       │
@@ -561,9 +581,22 @@ All task types start with Stage -1.
 └─────────────────────────────────────────────────────────────────┘
         │
         ▼
-  Finalize ADR status, Task Changelog, Gate log, Drift Check.
-  No product-code changes.
+  Finalize ADR status (docs/ai/decisions/, update README.md index row),
+  Task Changelog, Gate log, Drift Check. No product-code changes.
         │
+        ▼
+  adr_required OR estimated_build_scope∈{local-chain,full-project}
+  OR change_type=architecture_change ?
+        │
+   ┌────┴────┐
+  Yes        No
+   │          │
+   ▼          ▼
+  Patch      AUTO-SKIP
+  docs/ai/architecture/<domain>.md
+  (section-level only) + README.md index
+   │          │
+   └────┬─────┘
         ▼
   ┌───────────────────────────────────────────────────────┐
   │  Handoff + Status finalization (MANDATORY):           │
@@ -646,7 +679,7 @@ Do not run Stage 0–7 unless task docs are also analyzed
 ```
 Stage -1 (bootstrap)
   → Install missing tools
-  → ai-devkit init / android init
+  → specify init --here --integration <agent> / android init
   → Build graph if codebase exists + approved
   → Write preflight.md
 → DONE
@@ -655,9 +688,9 @@ Stage -1 (bootstrap)
 ### [C] Update tools
 ```
 Stage -1 (update)
-  → android update / ai-devkit install
+  → android update / specify self upgrade
   → Refresh skills list
-  → Update Graphify package if approved
+  → Update Understand-Anything if approved; update Graphify package instead only if unavailable
   → Write preflight.md
 → DONE
 ```
@@ -665,8 +698,10 @@ Stage -1 (update)
 ### [D] Refresh graph
 ```
 Stage -1 (refresh-graph)
-  → /graphify .          (graph missing)
-  → /graphify . --update (graph exists)
+  → Understand-Anything checked first: /understand (build or rebuild)
+  → Graphify (fallback, only if Understand-Anything unavailable):
+      /graphify .          (graph missing)
+      /graphify . --update (graph exists)
   → Do not touch product code
 → DONE
 ```
@@ -691,7 +726,7 @@ Stage -1 (refresh-graph)
 ```
 -1 (audit + auth check + status.json init)
 → 0 (collect links)
-→ 1 (graphify path query if graph exists + source readers)
+→ 1 (architecture-map path query if graph exists + source readers)
 → 1.5 (Ambiguity + Missing-info + Dependency Impact)
 → 2 (requirements: graph path + out-of-scope list) → STOP
 → 3 (design delta + Android memo if Android-specific)
@@ -705,7 +740,7 @@ Stage -1 (refresh-graph)
 
 ### [G] Bug fix
 ```
--1 (audit Android CLI + Graphify + auth check + status.json init)
+-1 (audit Android CLI + architecture map (Understand-Anything → Graphify fallback) + auth check + status.json init)
 → 0 (collect: repro steps, device, version, expected behavior)
 → 1 (graph path + runtime evidence if available)
 → 1.5 (clarify only when repro is unclear)
@@ -721,9 +756,9 @@ Stage -1 (refresh-graph)
 
 ### [H] XML → Compose migration
 ```
--1 (check Android CLI + Android skills + Graphify + auth + status.json init)
+-1 (check Android CLI + Android skills + architecture map (Understand-Anything → Graphify fallback) + auth + status.json init)
 → 0 (collect migration target, sources, constraints)
-→ 1 (graphify query "xml layout view fragment"
+→ 1 (architecture-map query "xml layout view fragment"
       android skills find "compose")
 → 1.5 (Android Advisor + Dependency Impact + Rollout/Risk)
 → 2 (migration plan) → STOP
@@ -738,10 +773,10 @@ Stage -1 (refresh-graph)
 
 ### [I] AGP / Build modernization
 ```
--1 (check AI DevKit + Android CLI + Android skills
-     + Gradle wrapper + Graphify + auth + status.json init)
+-1 (check Spec Kit + Android CLI + Android skills
+     + Gradle wrapper + architecture map (Understand-Anything → Graphify fallback) + auth + status.json init)
 → 0 (collect upgrade target, constraints, source docs)
-→ 1 (graphify query "gradle build agp"
+→ 1 (architecture-map query "gradle build agp"
       android skills find "agp")
 → 1.5 (Dependency Impact + Rollout/Risk + Android Advisor)
 → 2 (upgrade plan) → STOP
@@ -797,19 +832,21 @@ Rollout/Risk Adv.       on demand        on demand        –
 
 ---
 
-## 10. Graphify trigger map
+## 10. Architecture-map trigger map
+
+Understand-Anything is checked first; Graphify is the fallback only if Understand-Anything is unavailable.
 
 ```
-Stage -1   → check CLI + graph files + freshness (2 checks):
-              ① commit check: graph_commit == git rev-parse HEAD?
-              ② time check:   built_at + stale_after_days (7) > now?
+Stage -1   → check active tool + graph files + freshness (2 checks):
+              ① commit check (Graphify only): graph_commit == git rev-parse HEAD?
+              ② time check:   built_at/mtime + stale_after_days (7) > now?
               Either fails → flag stale (non-blocking, surface in preflight.md)
-Stage 0    → note graph present / absent + staleness flag from -1
-Stage 1    → READ GRAPH_REPORT.md (if present)
+Stage 0    → note graph present / absent + which tool + staleness flag from -1
+Stage 1    → READ active output (knowledge-graph.json or GRAPH_REPORT.md) if present
 Stage 1.5  → Graph Impact Reader feeds context-pack
 Stage 3    → use graph rationale for design decisions
 Stage 4    → DO NOT query graph while coding
-Stage 5    → /graphify . --update (if graph_impact >= medium)
+Stage 5    → /understand or /graphify . --update (if graph_impact >= medium)
               skip if graph_impact = low (write to skip-log)
 Stage 6    → optional before/after compare; check god nodes
 Stage 7    → finalize ADR status + task changelog + drift check
@@ -830,9 +867,9 @@ Analysis workers (Stage 1.5)         Parent synthesis
 Advisory workers (Stage 1.5)         Requirements → human approval
 Decision review (Stage 2.5)          ADR approval when trigger fires
 Lane reads in Discovery              Code ownership (1 owner only)
-Design split (AI DevKit + Android)   Stage gates (wait for gate pass)
-Verify (Android CLI + Graphify)
-QA review (AI DevKit + Karpathy)
+Design split (Spec Kit + Android)   Stage gates (wait for gate pass)
+Verify (Android CLI + architecture-map tool)
+QA review (Spec Kit + Karpathy)
 Docs finalization (Stage 7)
 ```
 
@@ -920,8 +957,13 @@ READ by incoming dev (by priority):
 4.  docs/ai/tasks/{task_id}/
     ├── requirements/<task>.md                  ← what to build
     ├── design/<task>.md                        ← how to build it
-    ├── decisions/ADR-*.md                      ← why decisions were made
     └── clarification/context-pack.json         ← full context
+
+5.  docs/ai/decisions/README.md                 ← GLOBAL: every decision made so far, any task
+    → docs/ai/decisions/ADR-*.md                ← why (immutable once Accepted; superseded, not edited)
+
+6.  docs/ai/architecture/README.md              ← GLOBAL: current shape of the system, by domain
+    → docs/ai/architecture/<domain>.md          ← living doc, updated in place (not a task snapshot)
 ```
 
 ### status.json — project dashboard
@@ -990,7 +1032,7 @@ Preliminary mode estimate (from description + links)
         Write preliminary_mode → session.json
         │
         ▼
-STAGE 1: Source reading + Graphify
+STAGE 1: Source reading + architecture map
         │
 Finalize scores after reading all sources:
         │

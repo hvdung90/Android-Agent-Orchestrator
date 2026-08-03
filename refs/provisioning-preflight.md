@@ -1,6 +1,6 @@
 # Provisioning Preflight
 
-_Skill version: 4.10.1 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 4.18.0 — update this when SKILL.md bumps a minor or major version._
 
 ## Purpose
 
@@ -42,7 +42,7 @@ In `audit`, the agent may check command availability and file existence, but mus
 | `audit` | No | No, except optional report | Readiness check |
 | `bootstrap` | Missing approved tools only | Yes | First setup |
 | `update` | Yes, approved installed tools | Yes | Bring tools/config current |
-| `refresh-graph` | No, except Graphify if explicitly allowed | Yes | Build/update graph |
+| `refresh-graph` | No, except architecture-map tool if explicitly allowed | Yes | Build/update graph |
 | `force-reinstall` | Yes | Yes | Explicit clean reinstall/reset |
 
 ---
@@ -65,13 +65,14 @@ If intent is ambiguous, choose `audit`.
 
 ---
 
-## AI DevKit
+## Spec Kit
 
 Check:
 
 ```bash
-command -v ai-devkit || true
-test -f .ai-devkit.json && echo "present" || echo "missing"
+command -v specify || true
+test -d .specify && echo "present" || echo "missing"
+specify self check || true
 ```
 
 Decision:
@@ -79,10 +80,10 @@ Decision:
 | State | Mode | Action |
 |---|---|---|
 | CLI missing | `audit` | Report missing |
-| CLI missing | `bootstrap/update` | Install or use `npx ai-devkit@latest ...` |
-| `.ai-devkit.json` missing | `bootstrap` | Run `ai-devkit init` |
-| `.ai-devkit.json` exists | `bootstrap/update` | Run `ai-devkit install` |
-| Existing config appears modified | Any | Do not overwrite silently; report |
+| CLI missing | `bootstrap/update` | Install with `uv tool install specify-cli --from git+https://github.com/github/spec-kit.git@vX.Y.Z`, or use `uvx --from git+https://github.com/github/spec-kit.git specify ...` ephemerally |
+| `.specify/` missing | `bootstrap` | Run `specify init --here --integration <agent>` |
+| `.specify/` exists, update requested | `update` | Run `specify self check`; only `specify self upgrade` if newer release confirmed |
+| Existing `.specify/memory/constitution.md` appears modified | Any | Do not overwrite silently; report |
 
 ---
 
@@ -135,7 +136,32 @@ Decision:
 
 ---
 
-## Graphify
+## Understand-Anything
+
+**Checked first for the architecture-map lane.** If found ready, this is the active tool and Graphify is not also checked.
+
+Check:
+
+```bash
+test -d .claude/plugins && find .claude/plugins -maxdepth 3 -iname "*understand-anything*" || true
+test -f .understand-anything/knowledge-graph.json && echo "knowledge-graph exists" || echo "knowledge-graph missing"
+```
+
+Decision:
+
+| State | Mode | Action |
+|---|---|---|
+| Plugin/skill missing | `audit` | Report missing; fall through to check Graphify |
+| Plugin/skill missing | `bootstrap/refresh-graph` | Install if approved: `/plugin marketplace add Egonex-AI/Understand-Anything` (Claude Code) or `curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/install.sh \| bash` |
+| Knowledge graph missing | `audit` | Report missing; fall through to check Graphify |
+| Knowledge graph missing | `bootstrap/refresh-graph` | Run `/understand` |
+| Knowledge graph exists | Stage 1 Discovery | Read `.understand-anything/knowledge-graph.json`; this becomes the active architecture-map tool |
+| Code changed and knowledge graph exists | Stage 5 Verify | Run `/understand`; use `/understand-diff` for impact analysis |
+| User asks graph refresh | `refresh-graph` | Build if missing; update if present |
+
+---
+
+## Graphify (fallback — only checked when Understand-Anything is unavailable)
 
 Check:
 
@@ -179,6 +205,8 @@ Decision:
 | `CLAUDE.md` exists | Any | Do not overwrite silently |
 | Code-touching task | Any | Apply Karpathy principles manually even if install missing |
 
+**Kotlin/Android convention check — not Stage -1 detectable:** whether the `kotlin-reviewer` agent or the companion skills (`kotlin-patterns`, `android-clean-architecture`, `compose-multiplatform-patterns`, `kotlin-coroutines-flows`, `kotlin-testing`) are available is checked by the agent's own tool/skill list at Stage 3/Stage 4 activation time — same reasoning as the Figma MCP and Karpathy-plugin checks. No new field is added to `preflight.json`/`preflight.md` for this; a bash script cannot introspect what the agent itself has loaded.
+
 ---
 
 ## Serena
@@ -201,7 +229,7 @@ Decision:
 
 **Backend note:** Default backend is LSP (no IDE required). JetBrains backend (Android Studio IDE engine) is opt-in by dev — agent does not start the IDE. Record backend as `unknown` unless dev specifies.
 
-**Kotlin LS stability note:** Kotlin Language Server is pre-alpha. Record `kotlin_ls_stable: unknown` unless dev confirms. Agent skips `get_diagnostics_*` calls when stability is unknown.
+**Kotlin LSP support note:** Kotlin Language Server is JetBrains official Alpha and Android Gradle Plugin support is experimental. Record `kotlin_lsp_support: unknown` unless project support is confirmed or the developer opts in. Agent skips `get_diagnostics_*` calls when support is unknown.
 
 **Blocking rule:** Serena missing is **never a blocker**. Always record as non-blocking gap.
 
@@ -228,9 +256,10 @@ audit | bootstrap | update | refresh-graph | force-reinstall
 - Blocking gaps:
 - Non-blocking gaps:
 
-## AI DevKit
+## Spec Kit
 ## Android CLI
 ## Android skills
+## Understand-Anything
 ## Graphify
 ## Karpathy
 ## Decisions
@@ -247,7 +276,7 @@ Block Stage 0 when:
 - user asked to verify device/runtime but no evidence can be produced.
 
 Do not block Stage 0 when:
-- optional Graphify is missing but docs/capture-knowledge can be used,
+- optional architecture-map tool (Understand-Anything or Graphify) is missing but docs/capture-knowledge can be used,
 - Karpathy plugin is missing but principles can be applied manually,
 - Android skills are missing but Android domain memo can still be written with caveat.
 
@@ -303,8 +332,8 @@ After Stage -1 finishes (cache miss path only), write:
 
 - Never run global install/update in `audit`.
 - Never overwrite `CLAUDE.md` without explicit permission.
-- Never delete `graphify-out/` unless user asked for reset.
-- Never hand-edit `graphify-out/**`.
+- Never delete `graphify-out/` or `.understand-anything/` unless user asked for reset.
+- Never hand-edit `graphify-out/**` or `.understand-anything/**`.
 - Never assume a skill name if `android skills find` did not confirm it.
 - Never log or print token values from `.agent-auth.yaml`.
 - Never commit `.agent-auth.yaml` (verify `.gitignore` covers it).
