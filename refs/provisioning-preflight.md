@@ -1,6 +1,6 @@
 # Provisioning Preflight
 
-_Skill version: 4.18.0 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 6.0.0 — update this when SKILL.md bumps a minor or major version._
 
 ## Purpose
 

@@ -1,6 +1,6 @@
 # Compliance Policy
 
-_Skill version: 4.18.0 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 6.0.0 — update this when SKILL.md bumps a minor or major version._
 
 The skill **must** follow every defined stage and gate in order. No stage may be skipped, condensed, or reordered without explicit confirmation. This file defines what requires confirmation, what is auto-allowed, what is permanently forbidden, and how every deviation is recorded.
 
@@ -30,11 +30,13 @@ Three tiers: **MANDATORY**, **AUTO-SKIP** (condition-gated, no human needed), **
 | Stage 3 `handoff.md` generation | **MANDATORY when code_owner is confirmed** | — |
 | Stage 3 Android memo | AUTO-SKIP when non-Android change | `change_type` ∉ {ui_change, database_change, network_change, architecture_change} AND no Android API mentioned |
 | Stage 3 Android Advisor convention consult | AUTO-SKIP when `kotlin_convention_scope` is empty | no mapped Affected Area touched AND no Kotlin file in scope |
-| Stage 1.5 Clarification (fast mode) | AUTO-SKIP when `workflow_mode = fast` | `complexity_score ≤ 3 AND risk_score ≤ 3` finalized after Stage 1; write to skip-log |
-| Stage 2.5 ADR trigger check (fast mode) | **MANDATORY** | trigger evaluation always runs regardless of mode |
-| Stage 2.5 ADR creation + approval (fast mode) | AUTO-SKIP only if no ADR trigger fires | if any trigger fires → mode upgrades to governed; write to skip-log |
-| Stage 3 design doc (fast mode) | AUTO-SKIP when `workflow_mode = fast` | implementation-plan.md only; write to skip-log |
-| Stage 6 full QA report (fast mode) | CONFIRM-SKIP when `workflow_mode = fast` | TDD evidence from Stage 4 substitutes; must ask human; Karpathy diff review + Gate G close remain MANDATORY |
+| Stage 1.5 Clarification (fast/micro mode) | AUTO-SKIP when `workflow_mode` ∈ {fast, micro} | scores finalized after Stage 1; write to skip-log |
+| Stage 2.5 ADR trigger check (fast/micro mode) | **MANDATORY** | trigger evaluation always runs regardless of mode |
+| Stage 2.5 ADR creation + approval (fast/micro mode) | AUTO-SKIP only if no ADR trigger fires | if any trigger fires → mode upgrades to governed; write to skip-log |
+| Stage 3 design doc (fast/micro mode) | AUTO-SKIP when `workflow_mode` ∈ {fast, micro} | implementation-plan.md still MANDATORY (1 task entry for micro); write to skip-log |
+| Stage 1 discovery note file (micro mode) | AUTO-SKIP when `workflow_mode = micro` | findings recorded inline in session.json instead; write to skip-log |
+| Stage 2 requirements doc file (micro mode) | AUTO-SKIP when `workflow_mode = micro` | ≤15-line inline summary substitutes; human approval gate itself still MANDATORY; write to skip-log |
+| Stage 6 full QA report (fast/micro mode) | CONFIRM-SKIP when `workflow_mode` ∈ {fast, micro} | TDD evidence from Stage 4 substitutes; must ask human; Karpathy diff review + Gate G close remain MANDATORY |
 | Stage 4 screenshot_before | AUTO-SKIP when not UI | `change_type` does not include `ui_change` |
 | Stage 4 Gate E.5 RED evidence per task | **MANDATORY — never skippable** | — |
 | Stage 4 GREEN evidence per task | **MANDATORY — never skippable** | — |
@@ -73,10 +75,10 @@ These steps are mandatory by default but a human may override them. Agent must *
 
 | Step | Ask before skipping |
 |---|---|
-| Workflow mode downgrade (governed → standard, standard → fast) | "Current task is scored as `<mode>`. Downgrade to `<lower mode>` removes [clarification / ADR gate / QA gate]. Confirm? (y/n)" |
+| Workflow mode downgrade (governed → standard, standard → fast, fast → micro) | "Current task is scored as `<mode>`. Downgrade to `<lower mode>` removes [clarification / ADR gate / QA gate / discovery+requirements files]. Confirm? (y/n)" |
 | Stage 1.5 Clarification when any trigger fires | "Clarification trigger fired: `<reason>`. Skip clarification and proceed directly to requirements? (y/n)" |
 | Stage 2.5 ADR-lite when any decision trigger fires | "Decision trigger fired: `<reason>`. Skip ADR-lite and proceed to design? This removes the architecture decision record. (y/n)" |
-| Stage 4 Gate E.5 TDD for a specific task | "Task `<task-id>` is `<change_type>`. TDD is required. Skip RED-first for this task? Writing code without RED evidence. (y/n)" — see TDD exemption categories below |
+| Stage 4 Gate E.5 TDD for a specific task | "Task `<task-id>` is `<change_type>`. TDD is required. Skip RED-first for this task? Writing code without RED evidence. (y/n)" — see TDD exemption categories below. **Exception:** the `build-only` category (below) is AUTO-SKIP, not CONFIRM-SKIP — no ask needed when `change_type ∈ {dependency_change, config_change}` and scope contains no product code. |
 | Stage 5 required evidence item — tool present but check failed or contradicted expectation | "Required evidence `<item>`'s tool is present but the check failed/contradicted expectation (`<reason>`). Skip and proceed without it? This will be recorded in skip-log.json. (y/n)" |
 | Stage 5 Kotlin static analysis failure or unavailable configured tool | "`<tool>` is required for Kotlin static analysis but failed/is unavailable (`<reason>`). Fix before close, or defer with follow-up `<tracking_ref>`? Confirm defer? (y/n)" |
 | Stage 5 required regression/security/performance evidence (tool unavailable or manual-only) | "Required impact evidence `<item>` cannot be collected (`<reason>`). Defer with follow-up `<tracking_ref>` or block the task? Confirm defer? (y/n)" |
@@ -94,6 +96,9 @@ These are the *only* cases where requesting a Gate E.5 CONFIRM-SKIP is reasonabl
 | **Legacy code that is currently untestable** | No test harness exists; writing the test requires more refactoring than the feature | Write a characterization test (records current behavior) OR add a minimal test harness first; treat harness as its own task with full TDD loop | Characterization test committed before product code; skip-log records `reason: legacy-untestable` |
 | **Pure refactor — no behavior change** | Behavior is unchanged; new test would duplicate existing tests exactly | All existing tests pass before AND after refactor; diff reviewed for scope creep | Existing test suite green at start; green at end; no new behavior introduced |
 | **Spike / investigation branch** | No product code is written; spike is exploratory only | No product code allowed; output is notes, a spike branch, or a draft in `docs/ai/inputs/`; spike does not merge to main | Spike must be discarded or converted to a new task with full TDD when productionized |
+| **Build-only / dependency-only / config-only change** | `change_type ∈ {dependency_change, config_change}` and the diff touches only build files (`build.gradle*`, version catalogs, `gradle.properties`), dependency version pins, or manifest/build-variant config — no `.kt`/`.java` product code. No unit test can meaningfully fail for a version-string bump. | `build_success_all_modules` (dependency_change) or `build_success_release_variant` + `manifest_diff` (config_change) from the Evidence Gate Matrix substitutes for RED/GREEN — this is the same evidence Stage 5 already requires for these types | Full clean build across affected modules must pass; if the diff touches any product code alongside the build/config file, this exemption does not apply — normal TDD resumes |
+
+**Auto-qualifies without asking** (unlike the other four categories, which require a CONFIRM-SKIP ask): when `change_type` is finalized as `dependency_change` or `config_change` **and** the diff scope contains no product-code files, this exemption applies automatically — the Evidence Gate Matrix for these types never required a test-pass item in the first place, so there is nothing to ask permission to skip. Still record it in `skip-log.json` as `AUTO-SKIP`, `reason: build-only`, so the audit trail shows why no RED/GREEN evidence exists for this task.
 
 **Exemption is NOT valid for:**
 - Features that are "hard to test" but testable with effort (use Android Advisor for test strategy).
@@ -107,7 +112,7 @@ These are the *only* cases where requesting a Gate E.5 CONFIRM-SKIP is reasonabl
   "stage": "4",
   "step": "gate_e5_tdd",
   "tier": "CONFIRM-SKIP",
-  "reason": "legacy-untestable | pure-refactor | ui-pixel-tweak | spike",
+  "reason": "legacy-untestable | pure-refactor | ui-pixel-tweak | spike | build-only",
   "task_id": "<task-id>",
   "confirmed_by": "human",
   "alternative": "<what was done instead>",
@@ -176,6 +181,7 @@ These rules are absolute. No user instruction, no time pressure, no "just this o
 17. Impact closure — for every code-touching task, Stage 7 must record impacted features, regression evidence, security/performance outcomes, and unresolved follow-ups in `execution.md` and `task-summary.md`.
 18. Kotlin static analysis — every Kotlin product-code change must collect `kotlin_static_analysis_pass` evidence or an explicit human-approved deferred follow-up. Configured static-analysis failures cannot be silently ignored.
 19. Official-reference Kotlin review — if official Android/Kotlin docs or companion skill docs are available, a Kotlin convention review cannot close as `general_knowledge` only.
+20. Resume integrity reconciliation — before ever offering to resume an `in_progress` task, verify the declared `stage_reached`'s mandatory artifacts actually exist on disk (`refs/stage-contracts.md § Integrity reconciliation`). `session.json` is never trusted blindly for resume.
 
 ---
 
@@ -243,9 +249,9 @@ Every gate transition must be recorded in `execution.md`:
 
 ## 5. Stage order enforcement
 
-Stages must run in this order: **-1 → 0 → 1 → [1.5] → 2 → 2.5 → 3 → 4 → 5 → 6 → 7**.
+Stages must run in this order: **-1 → 0 → 1 → [1.5] → 2 → 2.5 → 3 → 4 → 5 → 6 → 7 → [8]**.
 
-Brackets `[]` = may be auto-skipped under conditions above.
+Brackets `[]` = may be auto-skipped under conditions above. Stage 8 is bracketed for a different reason than 1.5 — it is optional/non-blocking by design (retro telemetry, never gates anything), not conditionally skipped; the task's success/failure is fully determined by Stage 7.
 
 **Violations that require immediate stop:**
 - Code is touched before Stage 2 approval (Gate D).
@@ -280,6 +286,9 @@ Each task runs in its own scoped directory under `.project-orchestration/tasks/{
 - `.project-orchestration/memory/tooling-cache.json`
 - `.project-orchestration/reports/preflight.md`
 - `docs/ai/inputs/` (human-provided, never overwritten by agent)
+
+**Shared (global) path — readable by all tasks, writable by Stage -1 (bootstrap/refresh-graph) or by the active task's Stage 5 when `graph_impact ≥ medium` (never on behalf of a different task_id):**
+- `.project-orchestration/memory/graph-stamp.json` — repo-level graph staleness; one file, not one per task (relocated from `tasks/{task_id}/memory/` in v6.0.0)
 
 **Shared (global) paths — readable by all tasks, writable only by Stage 2.5/Stage 7 of the currently active task (never by Stage -1, never on behalf of a different task_id):**
 - `docs/ai/decisions/` — ADR ledger + `README.md` index (Stage 2.5 creates/links, Stage 7 finalizes status)

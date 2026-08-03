@@ -3,7 +3,7 @@ name: android-agent-orchestrator
 description: Use when starting, planning, analyzing, or implementing any Android task — new feature, bug fix, refactor, migration, AGP upgrade, architecture review, team task tracking, or repo setup. Use when user says start task, new feature, fix bug, analyze repo, migrate, upgrade, implement, review architecture, team task, or set up agents for an Android project.
 license: MIT
 metadata:
-  version: 5.0.0
+  version: 6.0.0
   category: orchestration
   lanes:
     - ai-devkit
@@ -26,7 +26,7 @@ metadata:
     - refs/team-docs.md
 ---
 
-# Android Agent Orchestrator v5.0.0
+# Android Agent Orchestrator v6.0.0
 
 ## Activation
 
@@ -60,24 +60,30 @@ Trigger phrases: `start task` · `new feature` · `fix bug` · `analyze repo` ·
 
 ## Workflow Modes
 
-Three modes shape the stage sequence and artifact depth. Mode is derived at Stage 0 (preliminary) and finalized at the end of Stage 1. Override at any time: "use fast mode", "use standard mode", "use governed mode".
+Four modes shape the stage sequence and artifact depth. Mode is derived at Stage 0 (preliminary) and finalized at the end of Stage 1. Override at any time: "use micro mode", "use fast mode", "use standard mode", "use governed mode".
 
 | Mode | Use when | Stage sequence | Artifact depth |
 |---|---|---|---|
+| **micro** | Single file, purely additive (nothing existing modified/deleted), no shared state, trivially testable — e.g. new constant, new isolated pure function, new log line | -1 → 0 → 1(inline) → 2(inline) → 2.5-lite → 3-micro → 4 → 5(micro) → 6(lite) → 7(lite) | Requirements ≤ 15 lines inline in `session.json` notes — no separate discovery/requirements/design files; 3-micro: `implementation-plan.md` still generated (1 task entry, never skipped) + code_owner + branch; Evidence Gate Matrix per `change_type` is unchanged (never lightened) |
 | **fast** | Single-file bug fix, isolated logic fix, ≤ 2 files, no architecture impact | -1 → 0 → 1 → 2(mini) → 2.5-lite → 3-lite → 4 → 5(lite) → 6(lite) → 7(lite) | Requirements ≤ 40 lines, 3-lite: plan + code_owner + branch only, lite verify |
 | **standard** | Normal Android feature, multi-file, single module, clear requirements | -1 → 0 → 1 → [1.5] → 2 → [2.5] → 3 → 4 → 5 → 6 → 7 | Requirements ≤ 120 lines, design ≤ 180 lines |
 | **governed** | Large feature, migration, multi-module, Jira + Figma, any ADR trigger | Full -1 → 7 | No restrictions |
 
-**Never changes regardless of mode:** auth init, team docs check, human requirements approval, TDD evidence (Gate E.5), `session.json` + `skip-log.json` writes, `status.json` updates, Stage 2.5 ADR trigger check, Karpathy diff review.
+**Never changes regardless of mode (including micro):** auth init, team docs check, human requirements approval, TDD evidence (Gate E.5), `session.json` + `skip-log.json` writes, `status.json` updates, Stage 2.5 ADR trigger check, Karpathy diff review, Evidence Gate Matrix required items for the task's `change_type`. Micro only reduces which *files* get generated (requirements/design/discovery docs collapse to inline notes) — it never removes an approval gate or evidence requirement.
 
 **Fast mode stage skips** (all recorded in `skip-log.json`): Stage 1.5 AUTO-SKIP; Stage 2.5 ADR creation AUTO-SKIP only if no trigger fires (trigger fires → upgrade to governed); Stage 3 design doc AUTO-SKIP (3-lite still runs); Stage 6 full QA CONFIRM-SKIP (Karpathy + Gate G MANDATORY).
+
+**Micro mode stage skips** (all recorded in `skip-log.json`, in addition to every fast-mode skip above): Stage 1 discovery note AUTO-SKIP (findings recorded inline in `session.json` instead); Stage 2 requirements doc file AUTO-SKIP (≤ 15-line inline summary substitutes, human still approves it before Stage 3-micro). `implementation-plan.md` is never skipped — compliance-policy.md § 3 forbids it — but collapses to exactly 1 task entry.
+
+**Micro is not "fast, but skip more" — it is a stricter, narrower subset.** Do not auto-select it when scope is even slightly ambiguous (multi-file, touches any existing behavior, touches shared/ViewModel/Repository state, or `change_type` is unclear). When unsure, fall through to `fast` and let the normal evidence stage catch any underestimated complexity — a task wrongly run as `fast` self-corrects faster than one wrongly run as `micro`, because `fast` still writes real requirements/plan artifacts to catch scope creep.
 
 **Override rules (priority order):**
 1. Any ADR trigger fires → minimum `governed`
 2. Jira ticket + Figma link both present → minimum `standard`
 3. Human explicitly requests a mode → use that mode; log `mode_override` in `session.json`
 4. Task brief is incomplete or ambiguous → minimum `standard`
-5. Otherwise → use computed mode from scores
+5. Scope is ambiguous between `micro` and `fast` → minimum `fast` (never auto-select `micro` on an ambiguous read)
+6. Otherwise → use computed mode from scores
 
 ### Scoring
 
@@ -108,10 +114,14 @@ Computed at Stage 0 from task description (preliminary). Finalized after Stage 1
 **Mode mapping:**
 
 ```
-complexity_score ≤ 3 AND risk_score ≤ 3   →  fast
-complexity_score ≤ 7 AND risk_score ≤ 6   →  standard
-otherwise                                   →  governed
+complexity_score = 1 AND risk_score ≤ 1
+  AND exactly 1 file AND change is additive-only  →  micro
+complexity_score ≤ 3 AND risk_score ≤ 3            →  fast
+complexity_score ≤ 7 AND risk_score ≤ 6            →  standard
+otherwise                                            →  governed
 ```
+
+The `micro` condition requires **all four** clauses to hold — file count and additive-only are read literally from the task description, not inferred. If either is unclear, do not select `micro`; use the `fast` formula instead (see Override rule 5 above).
 
 Write `preliminary_mode` to `session.json` at Stage 0. **Finalize at the end of Stage 1** — write `workflow_mode`, `complexity_score`, `risk_score`, `mode_reasons` to `context-pack.json` and `session.json`.
 
@@ -141,12 +151,16 @@ Write `preliminary_mode` to `session.json` at Stage 0. **Finalize at the end of 
 
 Load refs on demand — **do not load all refs upfront**. Match tier to task complexity.
 
+**Note — two different "modes" exist; do not confuse them:** `source_mode` (A/B/C — what external sources the developer provided, see Stage 0) is unrelated to `workflow_mode` (fast/standard/micro/governed — task complexity, see Workflow Modes above). The table below keys ref-loading off both, explicitly named to avoid the collision.
+
 | Tier | Condition | Load |
 |---|---|---|
-| **LIGHT** | Mode C · single-file fix · no external sources | SKILL.md only |
-| **MEDIUM** | Mode B · docs-only · no Jira/Figma | + `refs/clarification-workflow.md` |
-| **HEAVY** | Mode A (Jira/Figma links) | + `refs/sub-agents.md` |
-| **FULL** | Migration · AGP · unfamiliar codebase · god nodes in path | + `refs/playbooks.md` + all refs |
+| **LIGHT** | `workflow_mode` ∈ {micro, fast} AND `source_mode = C` (no external sources) AND `graph_impact = low` | SKILL.md only |
+| **MEDIUM** | `workflow_mode = standard` AND `source_mode = B` (docs-only) | + `refs/clarification-workflow.md` |
+| **HEAVY** | `source_mode = A` (Jira/Figma links present) | + `refs/sub-agents.md` |
+| **FULL** | `workflow_mode = governed` · migration · AGP · unfamiliar codebase · god nodes in path | + `refs/playbooks.md` + all refs |
+
+**Tiers are cumulative and highest-match wins.** Each tier loads its own refs plus everything from lower tiers. When a task matches more than one row (e.g. a governed migration with no Jira link matches both LIGHT's `source_mode = C` and FULL's `workflow_mode = governed`), load the **highest** matching tier — never let a low-signal source_mode match suppress a high-signal workflow_mode/complexity match.
 
 Always load at Stage -1: `refs/auth-bootstrap.md`, `refs/provisioning-preflight.md`.
 If `TEAM_DOCS_PATH` is set in CLAUDE.md: also load `refs/team-docs.md` at Stage -1.
@@ -154,6 +168,8 @@ Always load when writing artifacts: `refs/contracts-and-artifacts.md`.
 Always load when resuming an interrupted task: `refs/stage-contracts.md`.
 Always load before any stage skip: `refs/compliance-policy.md`.
 Load when `graph_impact ≥ medium` or multi-module: `refs/sub-agents.md` (Gradle Module Impact Analyzer).
+
+→ See **§ Ref-load schedule** near the end of this file for the consolidated per-stage list (all the scattered `→ Load refs/...` pointers below summarized in one table).
 
 ---
 
@@ -163,7 +179,7 @@ Load when `graph_impact ≥ medium` or multi-module: `refs/sub-agents.md` (Gradl
 2. **One code owner at a time** — including sub-agents: only the designated code owner may write files or execute mutations; sub-agents are read-only observers.
 3. **One canonical synthesizer.** AI DevKit owns requirements, synthesis, routing, and final go/no-go. No other lane produces canonical artifacts.
 4. **No success without evidence.** Never invent commands — only use commands found in project docs, Makefile, README, or confirmed by shell `which`/`--help`. Every claim of success requires runnable proof.
-5. **Stage order is law.** Stages run -1 → 0 → 1 → [1.5] → 2 → 2.5 → 3 → 4 → 5 → 6 → 7. Any re-ordering or parallel shortcut not defined in this skill is a violation — stop and report.
+5. **Stage order is law.** Stages run -1 → 0 → 1 → [1.5] → 2 → 2.5 → 3 → 4 → 5 → 6 → 7 → [8]. Any re-ordering or parallel shortcut not defined in this skill is a violation — stop and report. Stage 8 is bracketed because it is optional and non-blocking (see § Stage 8 — Retro); the task is already "done" at Stage 7.
 6. **Read architecture map before touching code.** When `graphify-out/` exists, read it in Discovery. Understand-Anything → Graphify fallback for new repos.
 7. **Karpathy applies to every code-touching step.** Apply principles even without the plugin installed; record how the gate was applied.
 8. **Every skip is logged.** Write to `skip-log.json` on every auto-skip and confirm-skip. Load `refs/compliance-policy.md` before any skip decision. MANDATORY steps cannot be skipped.
@@ -234,7 +250,7 @@ Run before Intake.
 
 **Otherwise run:** `bash templates/tooling-preflight.sh --json > .project-orchestration/reports/preflight.json && bash templates/tooling-preflight.sh > .project-orchestration/reports/preflight.md` — parallel checks; JSON for gate decisions, markdown for human reading. Use `preflight.json → ready_for_stage_0` as the boolean gate; do not parse markdown for proceed/block decisions.
 
-**Graphify staleness check:** After commit-hash check, read `graph-stamp.json → built_at`. If `built_at + 7 days < now` → flag `stale (time-based)` in `preflight.md`, non-blocking.
+**Graphify staleness check:** After commit-hash check, read `.project-orchestration/memory/graph-stamp.json → built_at` (GLOBAL — shared by every task, not scoped per `{task_id}`). If `built_at + 7 days < now` → flag `stale (time-based)` in `preflight.md`, non-blocking.
 
 **Project status index:** Read `.project-orchestration/status.json`. If missing, create with empty `tasks: []`. Surface any `stage_status: in_progress` tasks at Stage 0.
 
@@ -288,7 +304,7 @@ Run Stage 1.5 if **ANY** of the following are true:
 - [ ] Graph exists and shows affected components not mentioned in sources
 - [ ] API, state handling, or error behavior is unspecified
 
-If `workflow_mode = fast` → AUTO-SKIP (write to `skip-log.json`). Skip or minimize when docs are detailed, acceptance criteria are testable, no conflicts exist, and graph shows a clean isolated change surface.
+If `workflow_mode` ∈ {micro, fast} → AUTO-SKIP (write to `skip-log.json`). Skip or minimize when docs are detailed, acceptance criteria are testable, no conflicts exist, and graph shows a clean isolated change surface.
 
 Source modes:
 - **Mode A** — Jira/Figma/Confluence present: full clarification with source readers and analysis workers.
@@ -319,7 +335,7 @@ If ADR-lite not required: record `adr_required: false` and reason in `session.js
 
 ### Stage 3 — Design split + Executable Plan
 
-AI DevKit writes design/planning docs. Android skills write Android memo. No product-code changes. **Fast mode:** skip design doc entirely; produce `implementation-plan.md` only (≤ 5 tasks). Write AUTO-SKIP for design doc to `skip-log.json`.
+AI DevKit writes design/planning docs. Android skills write Android memo. No product-code changes. **Fast mode:** skip design doc entirely; produce `implementation-plan.md` only (≤ 5 tasks). Write AUTO-SKIP for design doc to `skip-log.json`. **Micro mode (3-micro):** also skip the separate design doc; `implementation-plan.md` still must exist (never optional — Gate E.5 RED evidence reads its exact test command) but collapses to exactly 1 task entry; record `code_owner` and `branch` in `session.json`.
 
 → **Load `refs/playbooks.md`** to select the correct workflow for the task type.
 
@@ -346,7 +362,7 @@ If `TEAM_DOCS_PATH` set: upgrade pending lock entries from `⏳ planning` → `�
 
 Exactly one code owner edits code. All other lanes are advisory only.
 
-**Iron law:** No product-code change without a failing test first, or an approved TDD exemption (CONFIRM-SKIP per compliance matrix). **If code is written before a failing test exists: delete it. No exceptions.**
+**Iron law:** No product-code change without a failing test first, or an approved TDD exemption (CONFIRM-SKIP per compliance matrix, `refs/compliance-policy.md § TDD exemption categories`). **If code is written before a failing test exists and no exemption category applies: delete it.** The five exemption categories (pixel-tweak, legacy-untestable, pure-refactor, spike, build-only) are the *only* valid exceptions — outside them, this is absolute. Note: `config_change` and `dependency_change` (build files, version bumps, manifest-only edits) structurally cannot have a failing unit test written for them — see the `build-only` exemption category; this is not a loophole, it matches the Evidence Gate Matrix already requiring only `build_success` for these types.
 
 **Per-task loop** (repeat for every task in `implementation-plan.md`):
 
@@ -393,6 +409,22 @@ AI DevKit finalizes governance artifacts after QA:
 - Create `archive/YYYY-MM/` directory if it doesn't exist.
 - Move `active-tasks/<repo>/<task-id>-<slug>.md` → `archive/YYYY-MM/<repo>-<task-id>-<slug>.md`.
 - Remove row from `active-tasks/<repo>/README.md`. Decrement count in global README. Remove lock entries owned by this task from Cross-repo Conflicts.
+
+### Stage 8 — Retro (optional, non-blocking)
+
+The task is already **done** after Stage 7 — Stage 8 never gates close and is never itself a reason to block, delay, or reopen a task. It exists because nothing in Stages -1–7 captures whether the *process* worked: was the mode right, did a gate fail on the first try, how long did it actually take. Without that signal the scoring thresholds in § Workflow Modes never improve.
+
+Run best-effort, append one line to the **global**, cross-task rolling log `.project-orchestration/memory/retro-log.jsonl` (one JSON object per line):
+
+```json
+{"task_id": "ANDROID-42", "workflow_mode": "standard", "mode_changed_mid_task": false, "complexity_score": 5, "risk_score": 4, "cycle_time_minutes": 47, "gates_failed_first_try": ["Gate G: Karpathy flagged 1 HIGH issue"], "skip_count": 2, "stale_lock_reclaims": 0, "completed_at": "2026-05-07T12:00:00Z"}
+```
+
+- `mode_changed_mid_task`: true if an artifact-budget auto-upgrade or human override changed `workflow_mode` after Stage 1 finalized it (signal that initial scoring was off).
+- `gates_failed_first_try`: short reasons only, taken from the `execution.md` Gate log — not a full postmortem.
+- Skip if disk write fails or the human declines — this is telemetry, not audit trail; unlike `skip-log.json` it is never required for Gate G and never blocks anything.
+
+Periodically (not per-task) feed `retro-log.jsonl` into the `continuous-learning` / `continuous-learning-v2` skill to refine the complexity/risk scoring thresholds and the `micro`/`fast` boundary in § Workflow Modes.
 
 ---
 
@@ -455,15 +487,15 @@ The parent orchestrator must wait:
 .project-orchestration/                       ← gitignored
 ├── status.json                               ← GLOBAL: project-level task index (all tasks)
 ├── memory/
-│   └── tooling-cache.json                    ← GLOBAL: Stage -1 cache
+│   ├── tooling-cache.json                    ← GLOBAL: Stage -1 cache
+│   ├── graph-stamp.json                      ← GLOBAL: graph staleness (repo-level, one per repo — not per task)
+│   └── retro-log.jsonl                       ← GLOBAL: append-only, one line per completed task (Stage 8, best-effort)
 ├── reports/
 │   └── preflight.md                          ← GLOBAL: Stage -1 result
 └── tasks/
     └── {task_id}/                            ← e.g. ANDROID-42 | add-login-flow
         ├── session.json                      ← task state + stage compliance log
         ├── skip-log.json                     ← append-only audit of every skip/bypass
-        ├── memory/
-        │   └── graph-stamp.json
         ├── reports/
         │   └── execution.md                  ← Stage 5-6 evidence manifest + Gate log
         └── evidence/
@@ -518,14 +550,38 @@ graphify-out/
 
 1. **Auth init** — check `.agent-auth.yaml`; auto-create if missing (`refs/auth-bootstrap.md` Step 1). Cannot be skipped.
 2. **Team docs check** — if `TEAM_DOCS_PATH` is set: `git pull --rebase` docs repo; read global + per-repo boards; HARD STOP on file conflict.
-3. **Cache + resume check** — read `tooling-cache.json`; if valid → AUTO-SKIP Stage -1 (write skip-log). Scan `tasks/` for `stage_status: in_progress` → offer resume via `refs/stage-contracts.md`. Load `refs/compliance-policy.md` before any skip.
+3. **Cache + resume check** — read `tooling-cache.json`; if valid → AUTO-SKIP Stage -1 (write skip-log). Scan `tasks/` for `stage_status: in_progress` → run `refs/stage-contracts.md § Integrity reconciliation` (verify declared stage's mandatory artifacts actually exist before trusting it) → offer resume from the verified stage. Load `refs/compliance-policy.md` before any skip.
 4. **Tooling Preflight** — run `bash templates/tooling-preflight.sh --json` → `preflight.json`; run without flag → `preflight.md`; write `tooling-cache.json`. Read `preflight.json → ready_for_stage_0` for the gate.
 5. **Intake** — collect links; derive source mode (A/B/C); resolve credentials; derive `task_id`; write `session.json`. If team docs active: create task file + write pending lock entries immediately.
 6. **Discovery** — read Graphify; activate source readers in parallel; auto-follow Jira attachments (1 level). Derive `change_type` (initial). Activate Gradle Module Impact Analyzer if `graph_impact ≥ medium`. Finalize `workflow_mode` at end of Stage 1.
-7. **Clarification** (Stage 1.5) — if fast mode: AUTO-SKIP. Otherwise: if any trigger fires, run workers in parallel; parent synthesizes context-pack + brief.
+7. **Clarification** (Stage 1.5) — if micro or fast mode: AUTO-SKIP. Otherwise: if any trigger fires, run workers in parallel; parent synthesizes context-pack + brief.
 8. **Requirements → Decision Gate** — AI DevKit writes canonical requirements; human approves; Stage 2.5 trigger check (MANDATORY); create ADR if required, stop for approval. Cross-link ADR in team task file if team docs active.
 9. **Design + Implementation** — Stage 3: plan + `implementation-plan.md` (no placeholders); code owner + branch confirmed; handoff.md generated; team lock entries upgraded to `🔒`. Stage 4: per-task TDD loop per `implementation-plan.md`.
 10. **Verify → Close** — Evidence Gate Matrix determines required evidence; Android CLI runs it; Graphify updates if `graph_impact ≥ medium`; QA gate; Stage 7 finalization + ADR status update + team task archive.
+
+---
+
+## Ref-load schedule (consolidated)
+
+Every `→ Load refs/...` pointer scattered through the stages above, in one place. This table is the source of truth for *when*; the inline arrows at each stage are convenience pointers back here — if the two ever disagree, this table wins.
+
+| When | Ref | Why |
+|---|---|---|
+| Stage -1, always | `refs/auth-bootstrap.md` | Step 1: initialize `.agent-auth.yaml` |
+| Stage -1, always | `refs/provisioning-preflight.md` | decision tables, cache check, safety rules |
+| Stage -1, if `TEAM_DOCS_PATH` set | `refs/team-docs.md` | full team-docs protocol before conflict check |
+| Stage 0 | `refs/clarification-workflow.md` § Source integrations | source mode (A/B/C) derivation |
+| Stage 1 | `refs/stage-contracts.md` § Stage 1 | typed input/output contract |
+| Stage 1, if `graph_impact ≥ medium` or multi-module | `refs/sub-agents.md` | Gradle Module Impact Analyzer + Serena activation matrix |
+| Stage 1.5, if not AUTO-SKIP | `refs/clarification-workflow.md` | full sequence, exit criteria, clarity scoring |
+| Stage 2 | `refs/contracts-and-artifacts.md` | requirements schema, Gate D criteria |
+| Stage 2.5 | `refs/contracts-and-artifacts.md` | ADR-lite schema, Decision Ownership matrix |
+| Stage 3 | `refs/playbooks.md` | select correct workflow for task type |
+| Stage 5 | `refs/stage-contracts.md` § Stage 5 | typed input/output contract |
+| Any resume of an interrupted task | `refs/stage-contracts.md` | resume rule + integrity reconciliation |
+| Any stage-skip decision (auto or confirm) | `refs/compliance-policy.md` | tier definitions, confirmation protocol |
+| Any artifact write | `refs/contracts-and-artifacts.md` | canonical schema for whatever is being written |
+| Tool provisioning decisions (any stage) | `refs/provisioning-preflight.md` | per-tool decision tables |
 
 ---
 

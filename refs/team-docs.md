@@ -1,6 +1,6 @@
 # Team Docs Integration
 
-_Skill version: 5.0.0_
+_Skill version: 6.0.0_
 
 ## When active
 
@@ -86,8 +86,31 @@ If two devs start simultaneously and both pass Stage -1 (race window ~seconds), 
 2. Read `<TEAM_DOCS_PATH>/active-tasks/README.md` → parse `locked_files[]` and `cross_repo_impacts[]`.
 3. Read `<TEAM_DOCS_PATH>/active-tasks/<repo-name>/README.md` → parse task table and per-repo locked paths.
 4. Match planned scope against `locked_files[]`:
-   - If overlap → HARD STOP, print conflict table with owner @github-handle and `Since` timestamp.
+   - If overlap AND matching lock's `Since` is **not stale** (see § Stale lock reclaim policy) → HARD STOP, print conflict table with owner @github-handle and `Since` timestamp.
+   - If overlap AND matching lock's `Since` **is stale** → do not hard-stop; follow § Stale lock reclaim policy (CONFIRM-SKIP, human must approve reclaim).
    - If clean → log `team_docs.conflict_check: clean` in `session.json`.
+
+---
+
+## Stale lock reclaim policy
+
+Locks are written once at Stage 0 and never touched again until Stage 3 (upgrade) or Stage 7 (removal) — a task that crashes, gets abandoned, or whose owner simply moves on leaves an orphaned row forever unless something reclaims it.
+
+**Staleness threshold:** a lock (`⏳ planning` or `🔒 locked`) is stale when `now - Since > 7 days`. This is a default, not a hard constant — a team may tune it in their own `active-tasks/README.md` header comment (`<!-- stale_after_days: N -->`); absent that, assume 7.
+
+**Reclaim flow (CONFIRM-SKIP — human must approve, never auto-reclaim):**
+1. When Stage -1's conflict check finds an overlapping lock whose `Since` is stale, do not hard-stop. Instead ask:
+   > "Lock on `<file>` by @`<owner>` (Task `<task-id>`) is `<N>` days old — stale threshold is `<threshold>`. It may be abandoned, or the owner may just not have reached Stage 7 yet. Reclaim this lock and proceed? (y/n)"
+2. If the human confirms reclaim:
+   - Remove the stale row from `active-tasks/README.md § Cross-repo Conflicts` (do not edit it in place — delete and let the current task's Stage 0 write its own row).
+   - Append an audit line to the current task file `## Notes/Gotchas`: `Reclaimed stale lock on <file> from <old-task-id> (@<old-owner>, locked since <old-since>).`
+   - `git push`.
+3. If the human declines → treat as a normal HARD STOP; do not proceed with the overlapping file.
+4. **Never reclaim silently.** A false "abandoned" read (owner is mid-task but simply hasn't touched that file in days) is a real conflict risk — staleness is a prompt to ask, not a license to proceed.
+
+**Tiebreak for genuine concurrent races** (both locks fresh — this is the residual window described in the anti-race protocol above, where two devs start within seconds of each other and both pass Stage -1 before either's Stage 0 write lands):
+- **Earliest `Since` wins.** The task with the later `Since` timestamp must yield: replan scope to avoid the contested file(s), or pause and contact the earlier owner directly.
+- **Post-push re-verification (closes the residual window):** immediately after Stage 0's `git push` succeeds, re-`git pull --rebase` and re-read `active-tasks/README.md`. If a row for the same file now shows an earlier `Since` than the current task's own lock → the current task lost the tiebreak; remove its own pending lock, `git push`, and follow the tiebreak rule above. This check is cheap (one more pull) and is the only thing that actually closes the race window — the original protocol only detected the conflict on the *next* stage transition, which could be much later.
 
 ---
 
@@ -103,6 +126,7 @@ If two devs start simultaneously and both pass Stage -1 (race window ~seconds), 
 - Bump count in `active-tasks/README.md` Overview table.
 - **Write pending lock entries** to `active-tasks/README.md § Cross-repo Conflicts` for all files likely to be touched. Status = `⏳ planning`. This is mandatory — do not defer to Stage 3. Only shared paths go in the global board (commonLibrary/*, shared Gradle modules).
 - **`git push` docs repo after all writes complete.** Do NOT wait for other concurrent tasks on the same repo to finish — each task manages only its own rows/files. Other tasks will pick up changes via `git pull --rebase` before their next write.
+- **Post-push re-verify (mandatory, closes the residual race window):** `git pull --rebase`, re-read `active-tasks/README.md § Cross-repo Conflicts`. If any row for a file this task just locked now shows an earlier `Since` than this task's own → apply § Stale lock reclaim policy's tiebreak rule (earliest `Since` wins; this task yields).
 
 ### Stage 2.5 (decision affecting other repos)
 

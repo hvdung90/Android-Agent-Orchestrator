@@ -1,6 +1,6 @@
 # Contracts, Artifacts, and Gates
 
-_Skill version: 4.18.0 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 6.0.0 — update this when SKILL.md bumps a minor or major version._
 
 ---
 
@@ -247,10 +247,10 @@ Exception: always include `feature_id`, `clarity_score`, `outcome`, `blocked`, `
   "blocked": false,
   "clarity_score": 0,
   "outcome": "ready | blocked | research-loop",
-  "preliminary_mode": "fast | standard | governed",
+  "preliminary_mode": "micro | fast | standard | governed",
   "complexity_score": 0,
   "risk_score": 0,
-  "workflow_mode": "fast | standard | governed",
+  "workflow_mode": "micro | fast | standard | governed",
   "mode_reasons": [],
   "mode_override": null
 }
@@ -972,7 +972,7 @@ When `change_type` is `multi`, apply the union of required items for each applic
 
 | change_type | Required evidence | Optional evidence |
 |---|---|---|
-| `ui_change` | screenshot_before + screenshot_after, layout_inspector_capture | accessibility_report, animated_state_recording |
+| `ui_change` | screenshot_before + screenshot_after, layout_inspector_capture (see § Degraded evidence: no device/emulator attached when headless) | accessibility_report, animated_state_recording |
 | `database_change` | migration_test_pass, room_schema_diff | db_inspector_screenshot, populated_query_log |
 | `network_change` | logcat_network_capture, api_contract_test_pass | charles_proxy_har, mock_server_recording |
 | `dependency_change` | build_success_all_modules, license_check_pass | binary_size_diff, dependency_tree_diff |
@@ -1012,6 +1012,19 @@ Applies to every required item in the Evidence Gate Matrix above, generalizing t
 
 - **Tool/command absent or not configured** in this repo → AUTO-record an Unavailable-tool record (see above); no human confirmation needed for absence alone.
 - **Tool/command present but the check fails or contradicts expectation** → this blocks Gate F; ask CONFIRM-SKIP per `refs/compliance-policy.md` before deferring — this is not a silent pass.
+
+### Degraded evidence: no device/emulator attached (`ui_change` in headless environments)
+
+`screenshot_before`, `screenshot_after`, and `layout_inspector_capture` all require a connected device or running emulator. In a headless environment (CI, a sandboxed agent host with no emulator) `adb` itself can be present and correctly configured while genuinely having **zero devices attached** — this is neither "tool absent" (the binary exists) nor an ordinary "check failed" (there is nothing wrong to fix; the environment structurally cannot produce this evidence). Treating it as a plain check-failure would force a CONFIRM-SKIP ask on every single UI task run outside a device-having environment, which is exactly the ceremony this skill should avoid manufacturing.
+
+**Detection (run before attempting any screenshot command):** `adb devices` (or equivalent). If the device list is empty:
+
+1. AUTO-record a degraded-evidence entry (same shape as an Unavailable-tool record, `tool: "adb"`, `detection_command: "adb devices"`, `detection_output: "<literal empty list output>"`, `status: "no-device-attached"`) — no CONFIRM-SKIP needed for the detection itself, same as ordinary tool-absence.
+2. **Substitute, in order of preference:** Compose semantics test output (if the change is Compose-based and a semantics assertion covers the affected UI) → Robolectric screenshot/paparazzi test output (if configured) → if neither exists, the item is genuinely uncollectable this run.
+3. If a substitute was produced in step 2 → it satisfies Gate F for that item; record which substitute tier was used (`ui_evidence_tier: device_capture | compose_semantics | robolectric | uncollectable`) next to the evidence, same pattern as `kotlin_convention_check`.
+4. If no substitute exists (step 2 exhausted) → this **does** require CONFIRM-SKIP per `refs/compliance-policy.md` before deferring — record a follow-up (`tracking_ref`) to collect real device evidence before the next release, same as any other deferred Gate F item.
+
+This does not lower the bar for evidence that a device-having run *could* collect — it only prevents "no device in this sandbox" from silently either blocking every headless UI task or, worse, being waved through with no record at all.
 
 ### Security / performance evidence overlays
 
@@ -1109,10 +1122,11 @@ When Kotlin product code is touched, Stage 3 must create `kotlin_android_rule_ch
 
 **Global** (shared across tasks, stored in `.project-orchestration/memory/`):
 - `tooling-cache.json` — Stage -1 cache
+- `graph-stamp.json` — repo-level graph staleness metadata (one graph per repo, not per task — see § below; relocated here in v6.0.0, was previously mis-scoped per-task)
 - `preflight.md` written to `.project-orchestration/reports/`
 
 **Per-task** (stored in `.project-orchestration/tasks/{task_id}/`):
-- `session.json`, `skip-log.json`, `memory/graph-stamp.json`, `reports/execution.md`, `evidence/**`
+- `session.json`, `skip-log.json`, `reports/execution.md`, `evidence/**`
 
 All paths in `.project-orchestration/` are gitignored.
 
@@ -1170,9 +1184,9 @@ In-progress task state — allows resume after an interruption.
   "adr_required": false,
   "adr_status": "proposed | accepted | deferred | superseded | not_required | null",
   "decision_record": "docs/ai/decisions/ADR-NNNN-slug.md | null",
-  "workflow_mode": "fast | standard | governed | null",
-  "preliminary_mode": "fast | standard | governed | null",
-  "mode_override": "fast | standard | governed | null",
+  "workflow_mode": "micro | fast | standard | governed | null",
+  "preliminary_mode": "micro | fast | standard | governed | null",
+  "mode_override": "micro | fast | standard | governed | null",
   "complexity_score": 0,
   "risk_score": 0,
   "change_type": "ui_change | database_change | network_change | dependency_change | architecture_change | logic_change | test_change | config_change | multi | null",
@@ -1219,7 +1233,7 @@ See `refs/compliance-policy.md` for full tier definitions and confirmation proto
 
 ### `graph-stamp.json`
 
-**Path:** `.project-orchestration/tasks/{task_id}/memory/graph-stamp.json`
+**Path:** `.project-orchestration/memory/graph-stamp.json` — **GLOBAL**, not per-task. The graph itself is a repo-level artifact (one per repo, tied to `git rev-parse HEAD`), so its staleness stamp belongs beside `tooling-cache.json`, not duplicated under every `{task_id}/`. Read at Stage -1 by every task; written only by whichever task/stage rebuilds or updates the graph (Stage -1 bootstrap/refresh-graph, or Stage 5 when `graph_impact ≥ medium`).
 
 Metadata about the most recent Graphify run. **Graphify-only** — Understand-Anything has no separate stamp file; its freshness is checked directly from `.understand-anything/knowledge-graph.json` mtime (see SKILL.md § Architecture-map time-based staleness check).
 
@@ -1244,10 +1258,24 @@ If either check fails → flag graph as stale in `preflight.md`. Commit-mismatch
 
 ## Artifact budget
 
-Controls artifact depth per workflow mode. Agents must not exceed these limits in `fast` and `standard` modes. In `governed` mode all limits are removed.
+Controls artifact depth per workflow mode. Agents must not exceed these limits in `micro`, `fast`, and `standard` modes. In `governed` mode all limits are removed.
 
 ```yaml
 artifact_budget:
+  micro:
+    requirements_max_lines: 15         # inline in session.json — no separate requirements/<task>.md file
+    discovery_note: skip               # AUTO-SKIP; findings recorded inline in session.json instead
+    design_doc: skip                   # AUTO-SKIP; write to skip-log.json
+    implementation_plan_max_tasks: 1   # exactly 1 — if more than 1 task is needed, upgrade to fast
+    execution_report: minimal
+    handoff_md: minimal
+    impact_regression_plan: lite
+    quality_gate_plan: signal-only
+    impact_closure: minimal
+    task_summary_md: minimal
+    implementation_plan_code_snippets: not_required
+    evidence_gate_matrix: unrestricted  # NEVER lightened by mode — same required items as every other mode for the task's change_type
+
   fast:
     requirements_max_lines: 40        # facts, ACs, out-of-scope only — no lengthy background
     design_doc: skip                   # AUTO-SKIP; write to skip-log.json
@@ -1272,6 +1300,7 @@ artifact_budget:
 ```
 
 **Enforcement rules:**
+- If a task in `micro` mode needs more than 1 `implementation-plan.md` task entry, touches more than 1 file, or modifies any existing behavior (not purely additive) → auto-upgrade mode to `fast`; write upgrade reason to `skip-log.json`.
 - If a task in `fast` mode has > 5 acceptance criteria → auto-upgrade mode to `standard`; write upgrade reason to `skip-log.json`.
 - If `requirements` content would exceed `max_lines` → trim background/rationale first; keep ACs and facts.
 - If `design_doc: skip` → write one AUTO-SKIP entry to `skip-log.json` with reason `workflow_mode: fast`.

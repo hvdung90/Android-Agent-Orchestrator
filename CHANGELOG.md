@@ -1,5 +1,31 @@
 # Changelog
 
+## v6.0.0
+
+### Breaking changes
+
+- **New `micro` workflow tier** below `fast`. For single-file, purely-additive, no-shared-state changes (new constant, new isolated pure function, new log line). `session.json`/`context-pack.json` `workflow_mode`/`preliminary_mode`/`mode_override` enums now include `micro` everywhere they appear. `implementation-plan.md` is still MANDATORY in micro mode (collapses to 1 task entry) — never skipped, since Gate E.5 RED evidence depends on it. Auto-upgrades to `fast` if scope turns out to be more than 1 file, modifies existing behavior, or needs >1 plan task.
+- **`graph-stamp.json` relocated** from `.project-orchestration/tasks/{task_id}/memory/` to `.project-orchestration/memory/` (GLOBAL). It was a repo-level artifact (one graph per repo, keyed to `git rev-parse HEAD`) incorrectly scoped per-task — every task was tracking its own redundant copy of the same fact. Read by every task at Stage -1; written by whichever task/stage rebuilds or updates the graph.
+- **Ref-load tier table fixed** (`SKILL.md` § When to load refs): the LIGHT/MEDIUM/HEAVY/FULL condition column previously reused "Mode A/B/C" — the same letters as `source_mode` — as if it meant task complexity. A governed migration with no Jira link could resolve to LIGHT tier. Table now keys explicitly off `workflow_mode`/`source_mode`/`graph_impact`, with an explicit "highest matching tier wins" precedence rule.
+
+### Added
+
+- **Resume integrity reconciliation** (`refs/stage-contracts.md`, new compliance-policy.md § 3 rule #20): before offering to resume an interrupted task, verify the declared `stage_reached`'s MANDATORY output artifacts actually exist on disk — walk backward to the highest stage where everything checks out, and roll `stage_reached` back if the session file was lying (crash between writes, manual deletion, failed git op). Previously `session.json` was trusted blindly.
+- **Stale-lock TTL + reclaim policy + tiebreak** (`refs/team-docs.md` § Stale lock reclaim policy, mirrored in `vulcan-android-docs/CLAUDE.md`): locks older than 7 days (tunable) can be reclaimed via CONFIRM-SKIP instead of blocking forever on an abandoned task. Added earliest-`Since`-wins tiebreak plus a mandatory post-push re-verify step that actually closes the residual race window the v5.0.0 anti-race protocol only detected on the *next* stage transition.
+- **`build-only` TDD exemption category** (`refs/compliance-policy.md` § TDD exemption categories): fixes a real contradiction where Stage 4's "no exceptions" iron law required a failing test before any product code, while the Evidence Gate Matrix only ever required `build_success` for `dependency_change`/`config_change` — impossible to satisfy literally (no test can fail for an AGP version bump). Auto-qualifies (no ask) when the diff touches only build/config files.
+- **Stage 8 — Retro (optional, non-blocking)** (`SKILL.md`): best-effort append to a new global `retro-log.jsonl` — cycle time, mode-changed-mid-task flag, gates that failed on first try, skip count. Never gates close. Intended to feed `continuous-learning`/`continuous-learning-v2` to refine scoring thresholds over time.
+- **Ref-load schedule, consolidated** (`SKILL.md`, new § near the end): one table listing every stage → ref-to-load pairing that was previously scattered across ~14 inline `→ Load refs/...` pointers through the file.
+- **Headless UI-evidence degradation tier** (`refs/contracts-and-artifacts.md` § Degraded evidence: no device/emulator attached): `ui_change` evidence in a device-less environment (CI, sandboxed host) now has a defined substitution path (Compose semantics → Robolectric/paparazzi → uncollectable-with-follow-up) instead of forcing a CONFIRM-SKIP ask on every headless UI task or silently passing with no record.
+
+### Changed
+
+- `SKILL.md`: version 5.0.0 → 6.0.0; all `refs/*.md` version headers bumped to match.
+- Artifact budget (`refs/contracts-and-artifacts.md`): added `micro` row; requirements ≤15 lines inline, discovery note + design doc AUTO-SKIP, exactly 1 implementation-plan task, Evidence Gate Matrix explicitly marked `unrestricted` (never lightened by mode).
+
+---
+
+---
+
 ## v5.0.0
 
 ### Breaking changes

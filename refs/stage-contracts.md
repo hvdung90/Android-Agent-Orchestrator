@@ -1,10 +1,19 @@
 # Stage Output Contracts
 
-_Skill version: 4.18.0 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 6.0.0 — update this when SKILL.md bumps a minor or major version._
 
 Each stage defines a typed contract: what it requires as input, what it must produce as output, and what state it writes to `session.json` on completion or interrupt.
 
-**Resume rule:** At Stage -1, read `session.json`. If `stage_status = in_progress`, the previous run was interrupted at `stage_reached`. Offer to resume from `resume_entry_point`. If user declines, overwrite session and start fresh.
+**Resume rule:** At Stage -1, read `session.json`. If `stage_status = in_progress`, the previous run was interrupted at `stage_reached`. Run the **Integrity reconciliation** check below before offering to resume. Offer to resume from `resume_entry_point`. If user declines, overwrite session and start fresh.
+
+**Integrity reconciliation (mandatory before any resume offer — do not skip even when `stage_status = complete`):** `session.json` records what the agent *believes* happened; it is not proof the artifacts actually exist — a crash between writing `session.json` and writing the stage's output file, a manual deletion, or a failed git operation can all leave them out of sync. Trusting `stage_reached` blindly risks starting Stage 4 with no `handoff.md`, or closing Stage 6 against evidence that was never collected.
+
+1. Take the declared `stage_reached` (treat `2.5` as its own step between 2 and 3).
+2. Walk backward from `stage_reached` to `-1`, and for each stage in that range check its **MANDATORY** entries from this file's `output_produces` (skip AUTO-SKIP/CONFIRM-SKIP items already recorded in `skip-log.json` for that stage — those are legitimately absent).
+3. Find the **highest stage N where every MANDATORY output for stages `-1` through `N` exists on disk.**
+4. If `N == stage_reached` → integrity confirmed, proceed to offer resume normally.
+5. If `N < stage_reached` → do **not** trust the higher `stage_reached`. Write an integrity-mismatch note to `skip-log.json` (`tier: VIOLATION`, `reason: "artifact missing for declared stage <stage_reached>: <path>"`), roll `session.json.stage_reached` back to `N`, and offer resume from Stage `N`'s `resume_entry_point` instead. Tell the human what was found missing and why the resume point moved back.
+6. Never silently proceed as if a stage is complete when its mandatory artifact is absent — this check exists specifically to catch that case before it corrupts a later gate (e.g. Stage 4 starting without `implementation-plan.md`, or Stage 6 closing without `execution.md` evidence).
 
 **Interrupt safety:** On any unrecoverable error or user interruption, write the current stage's interrupt state to `session.json` before stopping. Never leave `session.json` in an inconsistent state.
 
@@ -75,14 +84,14 @@ output_produces:
       explicit_continuation: true | false
       decision: "skip | read_full | ask_human"
   - ref tier determined (LIGHT / MEDIUM / HEAVY / FULL)
-  - preliminary_mode (fast / standard / governed) derived from task description and link presence
+  - preliminary_mode (micro / fast / standard / governed) derived from task description and link presence
 
 state_on_complete:
   stage_reached: 0
   stage_status: complete
   source_mode: "A | B | C"
   task_continuity: "new | continuation | unknown"
-  preliminary_mode: "fast | standard | governed"
+  preliminary_mode: "micro | fast | standard | governed"
   blocker: null
   # status.json updated: entry added or refreshed for this task_id
 
@@ -114,19 +123,19 @@ guard_conditions:
   - if history_scan.decision = ask_human: block before Discovery until user confirms continuation vs independent task
 
 output_produces:
-  - docs/ai/tasks/{task_id}/discovery/<task>.md  (raw discovery notes)
+  - docs/ai/tasks/{task_id}/discovery/<task>.md  (raw discovery notes; AUTO-SKIP when workflow_mode = micro — findings recorded inline in session.json instead)
   - docs/ai/tasks/{task_id}/clarification/context-pack.json (partial — sources, graph_path, graph_impact, change_type, history_context if read)
   - impact_assessment, regression_test_matrix, quality_gate_plan, follow_up_watchlist drafted in context-pack for code-touching tasks
   - module_impact_chain populated if graph_impact >= medium (Gradle Module Impact Analyzer)
   - .project-orchestration/tasks/{task_id}/skip-log.json appended if Gradle Module Impact Analyzer auto-skipped
-  - workflow_mode (fast / standard / governed) finalized; complexity_score and risk_score computed after all sources read
+  - workflow_mode (micro / fast / standard / governed) finalized; complexity_score and risk_score computed after all sources read
   - mode_reasons list written to context-pack.json
   - session.json updated: workflow_mode, complexity_score, risk_score, mode_reasons set
 
 state_on_complete:
   stage_reached: 1
   stage_status: complete
-  workflow_mode: "fast | standard | governed"
+  workflow_mode: "micro | fast | standard | governed"
   complexity_score: <1-10>
   risk_score: <1-10>
   blocker: null
@@ -199,13 +208,13 @@ guard_conditions:
   - if outcome = blocked → escalate to user before proceeding
 
 output_produces:
-  - docs/ai/tasks/{task_id}/requirements/<task>.md (canonical requirements doc)
-  - requirements artifact header, Affected Areas checklist, Decision Triggers section, Impact / Regression section
+  - docs/ai/tasks/{task_id}/requirements/<task>.md (canonical requirements doc; when workflow_mode = micro, a ≤15-line inline summary written to session.json substitutes for this file — AUTO-SKIP the file, never the content)
+  - requirements artifact header, Affected Areas checklist, Decision Triggers section, Impact / Regression section (micro: same substance, inline)
   - .project-orchestration/tasks/{task_id}/session.json: requirements_approved → false (pending)
 
 approval_gate:
-  - STOP after producing requirements doc
-  - Do not proceed to Stage 3 until human sets approval
+  - STOP after producing requirements doc (or inline summary, for micro)
+  - Do not proceed to Stage 3 until human sets approval — this gate is never skipped or lightened, only the underlying artifact's file-vs-inline form changes
   - session.json: requirements_approved: true written only after explicit human approval
 
 state_on_complete:
@@ -294,9 +303,9 @@ guard_conditions:
   - no product-code changes allowed in this stage
 
 output_produces:
-  - docs/ai/tasks/{task_id}/design/<task>.md (Spec Kit design doc)
-  - docs/ai/tasks/{task_id}/planning/<task>.md (Spec Kit planning doc)
-  - docs/ai/tasks/{task_id}/planning/implementation-plan.md (executable TDD plan; MANDATORY — no placeholders; includes regression/security/performance checks)
+  - docs/ai/tasks/{task_id}/design/<task>.md (Spec Kit design doc; AUTO-SKIP when workflow_mode ∈ {micro, fast})
+  - docs/ai/tasks/{task_id}/planning/<task>.md (Spec Kit planning doc; AUTO-SKIP when workflow_mode ∈ {micro, fast})
+  - docs/ai/tasks/{task_id}/planning/implementation-plan.md (executable TDD plan; MANDATORY in every mode including micro — no placeholders; collapses to exactly 1 task entry when workflow_mode = micro; includes regression/security/performance checks)
   - kotlin_android_versions and kotlin_android_rule_checklist written to context-pack / implementation-plan when Kotlin product code is touched
   - docs/ai/tasks/{task_id}/android-memo/<task>.md (Android skills memo, if Android-specific — auto-skip written to skip-log if omitted)
   - docs/ai/tasks/{task_id}/handoff.md (generated when code_owner is confirmed; MANDATORY)
@@ -548,9 +557,9 @@ Any interrupt → stage_status: in_progress, blocker: "<reason>"
   "adr_required": false,
   "adr_status": "proposed | accepted | deferred | superseded | not_required | null",
   "decision_record": "docs/ai/decisions/ADR-NNNN-slug.md | null",
-  "workflow_mode": "fast | standard | governed | null",
-  "preliminary_mode": "fast | standard | governed | null",
-  "mode_override": "fast | standard | governed | null",
+  "workflow_mode": "micro | fast | standard | governed | null",
+  "preliminary_mode": "micro | fast | standard | governed | null",
+  "mode_override": "micro | fast | standard | governed | null",
   "complexity_score": 0,
   "risk_score": 0,
   "change_type": "ui_change | database_change | network_change | dependency_change | architecture_change | logic_change | test_change | config_change | multi | null",
