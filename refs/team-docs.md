@@ -102,6 +102,7 @@ If two devs start simultaneously and both pass Stage -1 (race window ~seconds), 
 - Append row to `active-tasks/<repo>/README.md`.
 - Bump count in `active-tasks/README.md` Overview table.
 - **Write pending lock entries** to `active-tasks/README.md § Cross-repo Conflicts` for all files likely to be touched. Status = `⏳ planning`. This is mandatory — do not defer to Stage 3. Only shared paths go in the global board (commonLibrary/*, shared Gradle modules).
+- **`git push` docs repo after all writes complete.** Do NOT wait for other concurrent tasks on the same repo to finish — each task manages only its own rows/files. Other tasks will pick up changes via `git pull --rebase` before their next write.
 
 ### Stage 2.5 (decision affecting other repos)
 
@@ -123,6 +124,7 @@ When a decision matches the "affects other repos" heuristic (see SKILL.md § Sta
 - Upgrade pending lock entries from `⏳ planning` → `🔒 locked` with the final file list from `implementation-plan.md`.
 - Add any new files not in the pending list; remove entries for files that won't be touched.
 - Update team task file `## Scope > Files sẽ touch (LOCKED)` from `implementation-plan.md`.
+- **`git push` docs repo after all writes complete.**
 
 ### Stage 7 (archive)
 
@@ -133,6 +135,7 @@ When a decision matches the "affects other repos" heuristic (see SKILL.md § Sta
 - Remove row from `active-tasks/<repo>/README.md`.
 - Decrement count in `active-tasks/README.md` Overview table.
 - Remove lock entries owned by this task from Cross-repo Conflicts.
+- **`git push` docs repo after all writes complete.**
 
 ---
 
