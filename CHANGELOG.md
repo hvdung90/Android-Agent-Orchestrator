@@ -1,5 +1,35 @@
 # Changelog
 
+## v5.0.0
+
+### Breaking changes
+
+- **Hard rules: 24 → 13.** Rules 1 (Run Stage -1), 2 (Default to audit), 3 (Do not install), 6 (Sub-agents read-only), 7 (Do not skip Clarification), 11 (No invented commands), 13 (If sources disagree), 15 (Serena read-only), 16 (Compliance first), 18 (Task isolation), 21 (status.json always current) removed or merged. Sub-agents read-only clause merged into Rule 2 (one code owner). No-invented-commands clause merged into Rule 4 (no success without evidence). Task isolation moved to Directory layout section.
+- **`TEAM_DOCS_PATH` variable support.** When defined in project CLAUDE.md, enables cross-team file-lock coordination via a shared docs repo. Skill hard-stops on file conflicts at Stage -1. New hard rules 11–13 govern team task lifecycle.
+- **Stage -1 extended.** Team Docs Check now runs as the first step when `TEAM_DOCS_PATH` is set: reads global + per-repo boards, matches planned scope against locked files.
+- **Stage 0 extended.** Team Task Create: copies task template, writes pending lock entries (`⏳ planning`) immediately — race condition prevention.
+- **Stage 2.5 extended.** ADR cross-link to team task file; "affects other repos" heuristic defined (shared modules, published APIs, root build config).
+- **Stage 3 extended.** Pending locks upgraded to `🔒 locked` with final file list from `implementation-plan.md`.
+- **Stage 7 extended.** Team Task Archive: move task file to `archive/YYYY-MM/`, remove lock entries.
+- **New ref: `refs/team-docs.md`.** Contains team docs protocol, file format spec, fallback template, anti-race rules, and `git pull --rebase` requirements before every write.
+- **Stage 1.5 trigger checklist reduced from 6 → 4 conditions.** "Two or more sources contradict" and "Graph shows god nodes" removed (former covered by Ambiguity Detector, latter is edge case now in refs).
+- **Serena activation matrix moved to `refs/sub-agents.md`.** No longer duplicated in SKILL.md.
+- **`SKILL.md` version history sections removed.** All version history lives in `CHANGELOG.md` only.
+
+### Added
+
+- `refs/team-docs.md`: team docs integration protocol with file format spec, fallback template, anti-race note, and `git pull --rebase` guards on all write operations.
+- "team task" added to trigger phrases in description and Activation section.
+- `TEAM_DOCS_PATH` not-resolvable case added to "Do not use this skill when".
+- Directory layout section now shows `<TEAM_DOCS_PATH>/` tree.
+- Note on team docs vs per-repo artifacts (team docs is shared coordination layer only).
+
+### Changed
+
+- `SKILL.md`: version 4.10.1 → 5.0.0; TL;DR trimmed to 4 bullets; Workflow Modes section compacted; Hard rules rewritten (24 → 13); Serena matrix pointer only (detail in refs/sub-agents.md); Tool action rules trimmed (detail in refs/provisioning-preflight.md); Minimal operating algorithm 15 → 10 steps.
+
+---
+
 ## v4.10.1
 
 ### Added
