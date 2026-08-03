@@ -17,6 +17,25 @@ Resolve at Stage -1. If the resolved path doesn't exist → HARD STOP with instr
 
 ---
 
+## File naming conventions
+
+Rules that apply when creating or archiving any file in the docs repo:
+
+| Directory | Pattern | Example |
+|---|---|---|
+| `active-tasks/<repo>/` | `<task-id>-<slug>.md` | `AT-42-migrate-datastore.md` |
+| `ADRs/` | `<repo>-<nnnn>-<slug>.md` | `library-vulcan-0004-new-cache.md` |
+| `contracts/` | `<repo>-<slug>.md` | `library-vulcan-ump-consent.md` |
+| `archive/YYYY-MM/` | `<repo>-<task-id>-<slug>.md` | `library-vulcan-AT-42-migrate-datastore.md` |
+
+**Why:** ADRs, contracts, and archive are flat directories shared across all repos. The `<repo>` prefix prevents filename collisions and makes ownership obvious at a glance.
+
+**When creating a new ADR or contract:** always prefix with the repo name that owns the decision, even if only one repo is currently active.
+
+**Template 0000-template.md** in ADRs/ keeps its generic name (no repo prefix) — it is a template, not a decision.
+
+---
+
 ## File format spec
 
 ### `active-tasks/README.md` (global board)
