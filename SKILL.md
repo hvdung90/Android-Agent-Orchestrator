@@ -6,7 +6,7 @@ metadata:
   version: 6.0.0
   category: orchestration
   lanes:
-    - ai-devkit
+    - spec-kit
     - android-skills
     - android-cli
     - graphify
@@ -50,7 +50,7 @@ Trigger phrases: `start task` · `new feature` · `fix bug` · `analyze repo` ·
 **Five-lane skeleton. Stage -1: Tooling Preflight + Auth Bootstrap + optional Team Docs Check. Single `.agent-auth.yaml` manages all tokens.**
 
 - Stage -1: auth init → tooling readiness → team docs conflict check (if `TEAM_DOCS_PATH` is set).
-- AI DevKit is the sole conductor: requirements, synthesis, routing, final go/no-go.
+- Spec Kit is the sole conductor: requirements, synthesis, routing, final go/no-go.
 - One code owner at a time — sub-agents and all other lanes are read-only observers.
 - `TEAM_DOCS_PATH` (optional in CLAUDE.md): enables cross-team file-lock coordination via a shared docs repo.
 
@@ -134,16 +134,16 @@ Write `preliminary_mode` to `session.json` at Stage 0. **Finalize at the end of 
 | Moment | Parallel | Serial |
 |---|---|---|
 | Tooling Preflight | Safe read-only checks | Install/update only when mode allows |
-| Intake | AI DevKit opens phase; Graphify existence check | No code touched |
+| Intake | Spec Kit opens phase; Graphify existence check | No code touched |
 | Discovery | Graphify read + source readers + Android domain tagging | No code touched |
 | Clarification | Multiple sub-agents analyze in parallel | Parent synthesis waits for required outputs |
-| Requirements | AI DevKit writes one canonical requirements doc | Single owner |
-| Decision Gate | AI DevKit decides ADR requirement; human approves Proposed ADR when required | Stop before Design if required |
-| Design split | AI DevKit writes plan; Android skills writes memo | Neither edits product code |
+| Requirements | Spec Kit writes one canonical requirements doc | Single owner |
+| Decision Gate | Spec Kit decides ADR requirement; human approves Proposed ADR when required | Stop before Design if required |
+| Design split | Spec Kit writes plan; Android skills writes memo | Neither edits product code |
 | Implementation | One code owner only | All other lanes advisory only |
 | Verify | Android CLI runs build/device/capture; Graphify updates | Code frozen |
-| QA gate | AI DevKit + Karpathy review diff | No new code changes |
-| Docs finalization | AI DevKit updates ADR status and task changelog | No product changes |
+| QA gate | Spec Kit + Karpathy review diff | No new code changes |
+| Docs finalization | Spec Kit updates ADR status and task changelog | No product changes |
 
 ---
 
@@ -177,7 +177,7 @@ Load when `graph_impact ≥ medium` or multi-module: `refs/sub-agents.md` (Gradl
 
 1. **Auth first.** `.agent-auth.yaml` is the single source of truth for all tokens. Never log token values. Never commit the file. Default provisioning mode is `audit`.
 2. **One code owner at a time** — including sub-agents: only the designated code owner may write files or execute mutations; sub-agents are read-only observers.
-3. **One canonical synthesizer.** AI DevKit owns requirements, synthesis, routing, and final go/no-go. No other lane produces canonical artifacts.
+3. **One canonical synthesizer.** Spec Kit owns requirements, synthesis, routing, and final go/no-go. No other lane produces canonical artifacts.
 4. **No success without evidence.** Never invent commands — only use commands found in project docs, Makefile, README, or confirmed by shell `which`/`--help`. Every claim of success requires runnable proof.
 5. **Stage order is law.** Stages run -1 → 0 → 1 → [1.5] → 2 → 2.5 → 3 → 4 → 5 → 6 → 7 → [8]. Any re-ordering or parallel shortcut not defined in this skill is a violation — stop and report. Stage 8 is bracketed because it is optional and non-blocking (see § Stage 8 — Retro); the task is already "done" at Stage 7.
 6. **Read architecture map before touching code.** When `graphify-out/` exists, read it in Discovery. Understand-Anything → Graphify fallback for new repos.
@@ -193,7 +193,7 @@ Load when `graph_impact ≥ medium` or multi-module: `refs/sub-agents.md` (Gradl
 
 ## Lanes
 
-### Lane A — AI DevKit
+### Lane A — Spec Kit
 Owns phase control, `docs/ai/**`, routing, synthesis, final requirements, planning, and review gates.
 
 ### Lane B — Android skills
@@ -313,7 +313,7 @@ Source modes:
 
 ### Stage 2 — Requirements
 
-AI DevKit writes canonical requirements from synthesized context. Stop for human review.
+Spec Kit writes canonical requirements from synthesized context. Stop for human review.
 
 → **Load `refs/contracts-and-artifacts.md`** for `requirements/<task>.md` schema and Gate D criteria.
 
@@ -321,7 +321,7 @@ Requirements must include: artifact version header, Affected Areas checklist, fa
 
 ### Stage 2.5 — Decision Gate / ADR-lite
 
-AI DevKit decides whether an ADR-lite is required before design. **ADR trigger check is MANDATORY in all modes.**
+Spec Kit decides whether an ADR-lite is required before design. **ADR trigger check is MANDATORY in all modes.**
 
 Create an ADR-lite when the task touches any of: module boundary, navigation graph, public API or internal contract, persistence schema, DI graph, Gradle/AGP/Kotlin version, Compose/View migration, state ownership, background work, permissions, billing, auth, notifications, or test strategy with broad impact.
 
@@ -335,7 +335,7 @@ If ADR-lite not required: record `adr_required: false` and reason in `session.js
 
 ### Stage 3 — Design split + Executable Plan
 
-AI DevKit writes design/planning docs. Android skills write Android memo. No product-code changes. **Fast mode:** skip design doc entirely; produce `implementation-plan.md` only (≤ 5 tasks). Write AUTO-SKIP for design doc to `skip-log.json`. **Micro mode (3-micro):** also skip the separate design doc; `implementation-plan.md` still must exist (never optional — Gate E.5 RED evidence reads its exact test command) but collapses to exactly 1 task entry; record `code_owner` and `branch` in `session.json`.
+Spec Kit writes design/planning docs. Android skills write Android memo. No product-code changes. **Fast mode:** skip design doc entirely; produce `implementation-plan.md` only (≤ 5 tasks). Write AUTO-SKIP for design doc to `skip-log.json`. **Micro mode (3-micro):** also skip the separate design doc; `implementation-plan.md` still must exist (never optional — Gate E.5 RED evidence reads its exact test command) but collapses to exactly 1 task entry; record `code_owner` and `branch` in `session.json`.
 
 → **Load `refs/playbooks.md`** to select the correct workflow for the task type.
 
@@ -392,11 +392,11 @@ Scope build commands to `module_impact_chain.build_order` if present.
 
 ### Stage 6 — QA gate
 
-AI DevKit + Karpathy review diff, evidence, graph update, acceptance coverage, and scope discipline.
+Spec Kit + Karpathy review diff, evidence, graph update, acceptance coverage, and scope discipline.
 
 ### Stage 7 — Docs / Decision Finalization
 
-AI DevKit finalizes governance artifacts after QA:
+Spec Kit finalizes governance artifacts after QA:
 - Update ADR-lite from `Proposed` to `Accepted`, `Deferred`, or `Superseded`.
 - Update `execution.md` with Task Changelog.
 - Run drift checks for skill refs/templates/version consistency.
@@ -446,8 +446,8 @@ If unsure, choose `audit`.
 
 → **Load `refs/provisioning-preflight.md`** for full per-tool decision tables and safety rules.
 
-### AI DevKit
-- If CLI missing in `audit`, report missing. If `.ai-devkit.json` missing and setup requested, run `ai-devkit init`. If exists and update requested, prefer `ai-devkit install`.
+### Spec Kit
+- If `specify` CLI missing in `audit`, report missing. If `.specify/` directory missing and setup requested, run `specify init --here --integration android`. If exists and update requested, run `specify self upgrade`.
 
 ### Android CLI
 - If CLI missing in `audit`, report missing. If update requested, run `android update`. If missing when verification requires it, block runtime verification.
@@ -522,7 +522,7 @@ docs/ai/
 
 graphify-out/
 .skills/
-.ai-devkit.json
+.specify/
 .agent-auth.yaml                              ← gitignored; auto-created; contains all tokens
 ```
 
@@ -555,7 +555,7 @@ graphify-out/
 5. **Intake** — collect links; derive source mode (A/B/C); resolve credentials; derive `task_id`; write `session.json`. If team docs active: create task file + write pending lock entries immediately.
 6. **Discovery** — read Graphify; activate source readers in parallel; auto-follow Jira attachments (1 level). Derive `change_type` (initial). Activate Gradle Module Impact Analyzer if `graph_impact ≥ medium`. Finalize `workflow_mode` at end of Stage 1.
 7. **Clarification** (Stage 1.5) — if micro or fast mode: AUTO-SKIP. Otherwise: if any trigger fires, run workers in parallel; parent synthesizes context-pack + brief.
-8. **Requirements → Decision Gate** — AI DevKit writes canonical requirements; human approves; Stage 2.5 trigger check (MANDATORY); create ADR if required, stop for approval. Cross-link ADR in team task file if team docs active.
+8. **Requirements → Decision Gate** — Spec Kit writes canonical requirements; human approves; Stage 2.5 trigger check (MANDATORY); create ADR if required, stop for approval. Cross-link ADR in team task file if team docs active.
 9. **Design + Implementation** — Stage 3: plan + `implementation-plan.md` (no placeholders); code owner + branch confirmed; handoff.md generated; team lock entries upgraded to `🔒`. Stage 4: per-task TDD loop per `implementation-plan.md`.
 10. **Verify → Close** — Evidence Gate Matrix determines required evidence; Android CLI runs it; Graphify updates if `graph_impact ≥ medium`; QA gate; Stage 7 finalization + ADR status update + team task archive.
 
