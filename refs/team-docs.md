@@ -9,9 +9,13 @@ Active only when project's `CLAUDE.md` defines `TEAM_DOCS_PATH`. Otherwise the s
 ## Path resolution
 
 `TEAM_DOCS_PATH` may be:
-- Absolute: `/Users/dung/dev/vulcan-android-docs`
+- Relative to git root (recommended): `../vulcan-android-docs`
 - `~`-prefixed: `~/dev/vulcan-android-docs` (expand `~` to `$HOME`)
-- Relative to git root: `../vulcan-android-docs`
+- Absolute: `/Users/dung/dev/vulcan-android-docs`
+
+**Recommended convention:** docs repo and all Android repos are siblings in the same workspace folder. Using `../vulcan-android-docs` requires zero machine-specific config — works on any machine as long as the workspace layout is consistent.
+
+`REPOS_ROOT` (used when the skill needs to resolve sibling repo paths) = `$(git rev-parse --show-toplevel)/..` — derived at runtime, never hardcoded.
 
 Resolve at Stage -1. If the resolved path doesn't exist → HARD STOP with instruction to either clone the docs repo or unset the variable.
 
