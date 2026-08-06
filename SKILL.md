@@ -188,6 +188,7 @@ Load when `graph_impact ≥ medium` or multi-module: `refs/sub-agents.md` (Gradl
 11. **Team docs first.** If `TEAM_DOCS_PATH` is set in project CLAUDE.md, read `active-tasks/README.md` + `active-tasks/<repo>/README.md` at Stage -1. If any planned file overlaps `locked_files` → HARD STOP. Load `refs/team-docs.md` for the full protocol.
 12. **Task file follows the task.** When `TEAM_DOCS_PATH` is set, create/update the team task file at Stage 0. Write pending lock entries immediately — do not defer to Stage 3. Update on stage transitions. Archive at Stage 7.
 13. **Decisions leave a trace.** Any decision affecting other repos → write in team task file `## Decisions` + update `active-tasks/README.md § Cross-repo Impacts`.
+14. **Warn on session end if docs have unpushed changes.** When `TEAM_DOCS_PATH` is set and the session ends or is interrupted before Stage 7: run `git -C <TEAM_DOCS_PATH> status --porcelain`. If output is non-empty → warn the user: `"⚠️ vulcan-android-docs has uncommitted or unpushed changes — task may be incomplete. Run git push manually or resume the task."` Do not auto-push; the human decides. This check is informational only and never blocks exit.
 
 ---
 
