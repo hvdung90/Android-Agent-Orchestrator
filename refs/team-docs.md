@@ -123,6 +123,7 @@ Locks are written once at Stage 0 and never touched again until Stage 3 (upgrade
 ### Stage 0 (task creation)
 
 - `git pull --rebase` on docs repo before writing.
+- **Bootstrap per-repo board if missing:** if `active-tasks/<repo>/README.md` does not exist → copy `active-tasks/REPO_BOARD_TEMPLATE.md`, replace `<REPO_SLUG>` placeholder with actual slug, create the file. This happens once per repo, not per task.
 - If `active-tasks/TASK_TEMPLATE.md` exists → copy to `active-tasks/<repo>/<task-id>-<slug>.md`.
 - If template NOT found → use embedded fallback below. Log warning: `TASK_TEMPLATE.md not found — used embedded fallback. Consider adding template to docs repo.`
 - Fill: Task ID, Repo, Branch, Owner (ask user if not derivable from `git config user.name`), Started (ISO datetime), Mode.
