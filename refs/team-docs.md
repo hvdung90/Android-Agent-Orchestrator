@@ -40,6 +40,28 @@ Rules that apply when creating or archiving any file in the docs repo:
 
 ---
 
+## Repo-type conventions
+
+Rules that apply **in addition to** the standard stage protocol, based on repo type.
+
+### Library repo (e.g. library-vulcan)
+
+| Trigger | Required |
+|---|---|
+| Feature branch task with app repos testing it | Add `Consumers: <repo-list>` to `## Cross-task Dependencies` in task file |
+| Public API change (signature, interface, required param, removed method) | ADR mandatory + row in `§ Cross-repo Impacts` with Repos Affected = "all" |
+| New API on open feature branch (not yet merged) | Create `contracts/<repo>-<slug>.md` with `Status: Draft (branch: feature/X)` |
+
+### App repo
+
+| Trigger | Required |
+|---|---|
+| Testing against a lib feature branch | Add to task file `## Cross-task Dependencies`: `library-vulcan AT-XX (feature/X) — <what you're testing>` |
+| Need to check state of a lib feature branch | Read `active-tasks/library-vulcan/README.md` → find task by branch → read task file |
+| Find all tasks on a lib branch | `grep -rl "feature/X" active-tasks/library-vulcan/` |
+
+---
+
 ## File format spec
 
 ### `active-tasks/README.md` (global board)
