@@ -158,6 +158,15 @@ Exception: always include `feature_id`, `clarity_score`, `outcome`, `blocked`, `
       }
     ]
   },
+  "relevant_adrs": [
+    {
+      "id": "<e.g. library-vulcan-0001>",
+      "title": "<ADR title from index>",
+      "status": "Accepted | Deferred | Proposed | Superseded",
+      "file": "<TEAM_DOCS_PATH>/ADRs/<filename>.md",
+      "relevance": "<one-line reason this ADR was loaded for this task>"
+    }
+  ],
   "business_goal": "",
   "user_problem": "",
   "acceptance_criteria": [],

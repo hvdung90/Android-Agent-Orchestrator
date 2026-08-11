@@ -2,6 +2,24 @@
 
 _Skill version: 6.1.1_
 
+## Hybrid model — what goes where
+
+**Decision rule:** if a doc answers *"what does this task / this code in this repo do?"* → keep it in the code repo. If it answers *"what standards does the Android team follow in general?"* → put it in `TEAM_DOCS_PATH`.
+
+| Stays in code repo | Goes to `TEAM_DOCS_PATH` |
+|---|---|
+| `docs/ai/tasks/{task_id}/` (requirements, design, planning, clarification, handoff) | `standards/` — coding conventions, security, git workflow |
+| `docs/ai/decisions/` — repo-level and task-level ADRs | `platform-adr/` — cross-repo or org-level decisions |
+| `.project-orchestration/` — session state, memory, reports | `active-tasks/` — lock index + team coordination signals |
+| `docs/architecture/` (when repo-scoped) | `shared-architecture/` — multi-repo architecture docs |
+| Any doc that moves with a branch or PR | `templates/` — reusable task/ADR/contract templates |
+
+**Why:** task docs co-locate with code so reviewers see requirements and design in the same PR. Agent reads/writes to the repo it's operating in, keeping context correct. Cross-repo knowledge (standards, platform decisions, onboarding) lives centrally because it applies regardless of which repo is active.
+
+**What is NOT centralized:** `docs/ai/tasks/{task_id}/` is never replicated to `TEAM_DOCS_PATH`. The `active-tasks/<repo>/<task-id>-<slug>.md` coordination file is a lightweight visibility artifact (who, what files are locked, key decisions) — not the full task documentation.
+
+---
+
 ## When active
 
 Active only when project's `CLAUDE.md` defines `TEAM_DOCS_PATH`. Otherwise the skill runs solo-repo mode (existing behavior, no team docs I/O).
@@ -138,8 +156,9 @@ If two devs start simultaneously and both pass Stage -1 (race window ~seconds), 
    - If overlap AND matching lock's `locked_at` is **not stale** (see § Stale lock reclaim policy) → HARD STOP, print conflict table with owner @github-handle and `locked_at` timestamp.
    - If overlap AND matching lock's `locked_at` **is stale** → do not hard-stop; follow § Stale lock reclaim policy (CONFIRM-SKIP, human must approve reclaim).
    - If clean → log `team_docs.conflict_check: clean` in `session.json`.
-4. Load `<TEAM_DOCS_PATH>/standards/` only when `team_coordination` project policy is enabled, the task has cross-repo impact, or a matching lock/task file must be inspected. Apply loaded standards as active constraints for the task.
-5. Read markdown boards (`active-tasks/README.md`, `active-tasks/<repo-name>/README.md`) only for writes, conflict details after a lock match, or explicit human-facing team status work.
+4. Read `<TEAM_DOCS_PATH>/ADRs/README.md` when `workflow_mode ≥ standard`. Scan the index for ADRs whose repo prefix matches the current repo OR whose title keywords overlap with the task brief. Load the full ADR file only for matches. Record loaded ADRs in `context-pack.json → relevant_adrs[]`. Skip for `micro`/`fast` modes. This is the primary mechanism for surfacing historical decisions and rationale before planning — do not wait for an ADR conflict to discover that a past decision exists.
+5. Load `<TEAM_DOCS_PATH>/standards/` only when `team_coordination` project policy is enabled, the task has cross-repo impact, or a matching lock/task file must be inspected. Apply loaded standards as active constraints for the task.
+6. Read markdown boards (`active-tasks/README.md`, `active-tasks/<repo-name>/README.md`) only for writes, conflict details after a lock match, or explicit human-facing team status work.
 
 ---
 
