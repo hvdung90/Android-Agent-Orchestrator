@@ -109,9 +109,10 @@ Parse rules: each row is one active task. "Files Touched" column is used to matc
 If two devs start simultaneously and both pass Stage -1 (race window ~seconds), Stage 0 writes will create a conflict visible to the second dev when they re-read before Stage 3.
 
 1. `git pull --rebase` on docs repo before reading any file.
-2. Read `<TEAM_DOCS_PATH>/active-tasks/README.md` → parse `locked_files[]` and `cross_repo_impacts[]`.
-3. Read `<TEAM_DOCS_PATH>/active-tasks/<repo-name>/README.md` → parse task table and per-repo locked paths.
-4. Match planned scope against `locked_files[]`:
+2. Read `<TEAM_DOCS_PATH>/standards/` — load all files once per session (coding-conventions, security, git-workflow, architecture). Apply as active constraints for the duration of this task.
+3. Read `<TEAM_DOCS_PATH>/active-tasks/README.md` → parse `locked_files[]` and `cross_repo_impacts[]`.
+4. Read `<TEAM_DOCS_PATH>/active-tasks/<repo-name>/README.md` → parse task table and per-repo locked paths.
+5. Match planned scope against `locked_files[]`:
    - If overlap AND matching lock's `Since` is **not stale** (see § Stale lock reclaim policy) → HARD STOP, print conflict table with owner @github-handle and `Since` timestamp.
    - If overlap AND matching lock's `Since` **is stale** → do not hard-stop; follow § Stale lock reclaim policy (CONFIRM-SKIP, human must approve reclaim).
    - If clean → log `team_docs.conflict_check: clean` in `session.json`.
