@@ -1,6 +1,6 @@
 # Provisioning Preflight
 
-_Skill version: 6.0.0 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 6.1.1 — update this when SKILL.md bumps a minor or major version._
 
 ## Purpose
 
@@ -65,28 +65,6 @@ If intent is ambiguous, choose `audit`.
 
 ---
 
-## Spec Kit
-
-Check:
-
-```bash
-command -v specify || true
-test -d .specify && echo "present" || echo "missing"
-specify self check || true
-```
-
-Decision:
-
-| State | Mode | Action |
-|---|---|---|
-| CLI missing | `audit` | Report missing |
-| CLI missing | `bootstrap/update` | Install with `uv tool install specify-cli --from git+https://github.com/github/spec-kit.git@vX.Y.Z`, or use `uvx --from git+https://github.com/github/spec-kit.git specify ...` ephemerally |
-| `.specify/` missing | `bootstrap` | Run `specify init --here --integration <agent>` |
-| `.specify/` exists, update requested | `update` | Run `specify self check`; only `specify self upgrade` if newer release confirmed |
-| Existing `.specify/memory/constitution.md` appears modified | Any | Do not overwrite silently; report |
-
----
-
 ## Android CLI
 
 Check:
@@ -94,16 +72,24 @@ Check:
 ```bash
 command -v android || true
 android info || true
+android studio check || true
+android --help || true
+android studio --help || true
+adb version || true
 ```
 
 Decision:
 
 | State | Mode | Action |
 |---|---|---|
-| CLI missing | `audit` | Report missing |
+| CLI missing | `audit` | Report missing; all CLI-dependent evidence items skipped; non-blocking unless runtime evidence required |
+| CLI missing | `bootstrap/update` | Install: `curl -fsSL https://dl.google.com/android/android-agent-cli/install.sh \| bash` (follow official docs at developer.android.com/tools/agents/android-cli) |
 | CLI present | `update` | Run `android update` |
 | Agent setup requested | `bootstrap/update` | Run `android init` |
+| Android Studio available (`android studio check` succeeds) | Any | Use `android studio` commands for symbol navigation and diagnostics |
 | Runtime evidence needed but CLI missing | Any | Block verification |
+
+Stage -1 also discovers optional Android/Android Studio subcommands and caches support in `tooling-cache.json`; see `refs/android-cli-compatibility.md`. Later stages must read the cached command support before calling `android studio version-lookup`, `render-compose-preview`, `analyze-file`, `find-usages`, `find-declaration`, `android screen capture --annotate`, `android layout`, or `android run`.
 
 ---
 
@@ -209,32 +195,6 @@ Decision:
 
 ---
 
-## Serena
-
-Check:
-
-```bash
-command -v uv >/dev/null 2>&1 && echo "uv: present" || echo "uv: missing"
-uvx serena --version 2>/dev/null | head -1 || echo "serena: not available"
-```
-
-Decision:
-
-| State | Mode | Action |
-|---|---|---|
-| uv missing | Any | Report missing; Serena unavailable; non-blocking |
-| uv present, Serena not runnable | `audit` | Report not-installed; non-blocking |
-| uv present, Serena not runnable | `bootstrap/update` | Install: `uv tool install oraios-serena` if approved |
-| Serena runnable | Any | Record ready; no further action in audit |
-
-**Backend note:** Default backend is LSP (no IDE required). JetBrains backend (Android Studio IDE engine) is opt-in by dev — agent does not start the IDE. Record backend as `unknown` unless dev specifies.
-
-**Kotlin LSP support note:** Kotlin Language Server is JetBrains official Alpha and Android Gradle Plugin support is experimental. Record `kotlin_lsp_support: unknown` unless project support is confirmed or the developer opts in. Agent skips `get_diagnostics_*` calls when support is unknown.
-
-**Blocking rule:** Serena missing is **never a blocker**. Always record as non-blocking gap.
-
----
-
 ## Preflight report
 
 Write to:
@@ -256,7 +216,6 @@ audit | bootstrap | update | refresh-graph | force-reinstall
 - Blocking gaps:
 - Non-blocking gaps:
 
-## Spec Kit
 ## Android CLI
 ## Android skills
 ## Understand-Anything
@@ -319,6 +278,7 @@ After Stage -1 finishes (cache miss path only), write:
 - `valid_until`: now + 24h
 - `graph_commit`: output of `git rev-parse HEAD`
 - tool versions/states from preflight results
+- Android command discovery (`android_commands`, `android_studio_commands`, `adb`) from `refs/android-cli-compatibility.md`
 
 **`.project-orchestration/memory/session.json`** — only if no existing session or user chose not to resume:
 - `task_id`: from Intake (Stage 0) — write after source mode is determined

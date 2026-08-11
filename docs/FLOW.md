@@ -1,6 +1,6 @@
 # Android Agent Orchestrator — Complete Flow
 
-_Reflects skill v4.18.0. Update when SKILL.md changes._
+_Reflects skill v6.1.1. Update when SKILL.md changes._
 
 ---
 
@@ -66,7 +66,8 @@ All task types start with Stage -1.
     │    │          │                                       │
     │    ▼          ▼                                       │
     │  CACHE HIT   Run full preflight.sh (parallel)        │
-    │  → skip tool  → write tooling-cache.json             │
+    │  → use cached → write tooling-cache.json incl.       │
+    │    tool/command Android command discovery            │
     │    checks     → write/update session.json            │
     └───────────────────────────────────────────────────────┘
                             │
@@ -122,8 +123,8 @@ All task types start with Stage -1.
     ┌───────────────────────────────────────────────────────┐
     │  Parallel checks (read-only, all modes):              │
     │                                                       │
-    │  ① Spec Kit    — CLI present? .specify/?              │
-    │  ② Android CLI  — present? android info?              │
+    │  ① Orchestrator — project state + status?             │
+    │  ② Android CLI  — present? android info? commands?    │
     │  ③ Android skills — list available?                   │
     │  ④ Understand-Anything — plugin/skill present?        │
     │                   knowledge-graph.json present?       │
@@ -412,7 +413,7 @@ All task types start with Stage -1.
 └─────────────────────────────────────────────────────────────────┘
         │
         ▼
-  Spec Kit writes docs/ai/tasks/{task_id}/requirements/<task>.md
+  Orchestrator writes docs/ai/tasks/{task_id}/requirements/<task>.md
   with artifact header + Affected Areas + Decision Triggers
         │
         ▼
@@ -466,7 +467,7 @@ All task types start with Stage -1.
         ▼
   Parallel (no code changes):
   ┌────────────────────────┬──────────────────────────────┐
-  │  Spec Kit              │  Android skills              │
+  │  Orchestrator          │  Android skills              │
   │  docs/ai/tasks/...     │  docs/ai/tasks/...           │
   │  design/ + planning/   │  android-memo/<task>.md      │
   └────────────────────────┴──────────────────────────────┘
@@ -566,7 +567,7 @@ All task types start with Stage -1.
         ▼
   Parallel review:
   ┌──────────────────────────┬───────────────────────────────┐
-  │  Spec Kit                │  Karpathy guidelines          │
+  │  Orchestrator            │  Karpathy guidelines          │
   │  - diff review           │  - surgical changes           │
   │  - acceptance coverage   │  - no over-engineering        │
   │  - scope discipline      │  - explicit assumptions       │
@@ -582,7 +583,8 @@ All task types start with Stage -1.
         │
         ▼
   Finalize ADR status (docs/ai/decisions/, update README.md index row),
-  Task Changelog, Gate log, Drift Check. No product-code changes.
+  Task Changelog, Gate log, Artifact Integrity Check,
+  Skill Drift Check only when skill files changed. No product-code changes.
         │
         ▼
   adr_required OR estimated_build_scope∈{local-chain,full-project}
@@ -740,7 +742,7 @@ Stage -1 (refresh-graph)
 
 ### [G] Bug fix
 ```
--1 (audit Android CLI + architecture map (Understand-Anything → Graphify fallback) + auth check + status.json init)
+-1 (audit Android CLI + command discovery + architecture map (Understand-Anything → Graphify fallback) + auth check + status.json init)
 → 0 (collect: repro steps, device, version, expected behavior)
 → 1 (graph path + runtime evidence if available)
 → 1.5 (clarify only when repro is unclear)
@@ -756,7 +758,7 @@ Stage -1 (refresh-graph)
 
 ### [H] XML → Compose migration
 ```
--1 (check Android CLI + Android skills + architecture map (Understand-Anything → Graphify fallback) + auth + status.json init)
+-1 (check Android CLI + command discovery + Android skills + architecture map (Understand-Anything → Graphify fallback) + auth + status.json init)
 → 0 (collect migration target, sources, constraints)
 → 1 (architecture-map query "xml layout view fragment"
       android skills find "compose")
@@ -773,7 +775,7 @@ Stage -1 (refresh-graph)
 
 ### [I] AGP / Build modernization
 ```
--1 (check Spec Kit + Android CLI + Android skills
+-1 (check Orchestrator + Android CLI command discovery + Android skills
      + Gradle wrapper + architecture map (Understand-Anything → Graphify fallback) + auth + status.json init)
 → 0 (collect upgrade target, constraints, source docs)
 → 1 (architecture-map query "gradle build agp"
@@ -849,7 +851,8 @@ Stage 4    → DO NOT query graph while coding
 Stage 5    → /understand or /graphify . --update (if graph_impact >= medium)
               skip if graph_impact = low (write to skip-log)
 Stage 6    → optional before/after compare; check god nodes
-Stage 7    → finalize ADR status + task changelog + drift check
+Stage 7    → finalize ADR status + task changelog + artifact integrity;
+              skill drift only when skill files changed
 ```
 
 ---
@@ -867,9 +870,9 @@ Analysis workers (Stage 1.5)         Parent synthesis
 Advisory workers (Stage 1.5)         Requirements → human approval
 Decision review (Stage 2.5)          ADR approval when trigger fires
 Lane reads in Discovery              Code ownership (1 owner only)
-Design split (Spec Kit + Android)   Stage gates (wait for gate pass)
+Design split (Orchestrator + Android) Stage gates (wait for gate pass)
 Verify (Android CLI + architecture-map tool)
-QA review (Spec Kit + Karpathy)
+QA review (Orchestrator + Karpathy)
 Docs finalization (Stage 7)
 ```
 
@@ -893,7 +896,8 @@ Docs finalization (Stage 7)
 ⑨  Stage 4 interrupt   :  handoff.md not updated before stopping (MANDATORY)
 ⑩  Stage 5 → Stage 6   :  Missing runtime evidence + graph update
 ⑪  Stage 6 → Stage 7   :  Karpathy review has not passed
-⑫  Stage 7 → Close     :  Missing ADR final status, Task Changelog, or Drift Check
+⑫  Stage 7 → Close     :  Missing ADR final status, Task Changelog,
+                           Artifact Integrity Check, or applicable Skill Drift Check
                            handoff.md not finalized to status: complete
 ```
 
@@ -956,7 +960,7 @@ READ by incoming dev (by priority):
 
 4.  docs/ai/tasks/{task_id}/
     ├── requirements/<task>.md                  ← what to build
-    ├── design/<task>.md                        ← how to build it
+    ├── design/design-doc.md                    ← how to build it, when trigger requires it
     └── clarification/context-pack.json         ← full context
 
 5.  docs/ai/decisions/README.md                 ← GLOBAL: every decision made so far, any task
@@ -1086,7 +1090,8 @@ Mode mapping:
 │  LITE (always runs, minimal output):                        │
 │    Stage 2  — requirements ≤ 40 lines, ACs + facts only     │
 │    Stage 5  — evidence gate; graph update skipped if low    │
-│    Stage 7  — Task Changelog + Drift Check (MANDATORY);     │
+│    Stage 7  — Task Changelog + Artifact Integrity            │
+│      (MANDATORY); Skill Drift only when skill files changed; │
 │      no ADR status update when no ADR exists                │
 │                                                             │
 │  NEVER SKIPPED regardless of mode:                          │

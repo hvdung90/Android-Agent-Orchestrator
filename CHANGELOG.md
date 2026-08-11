@@ -1,5 +1,31 @@
 # Changelog
 
+## v6.1.1
+
+### Fixed
+
+- **Canonical design doc schema without Spec Kit dependency** (`refs/contracts-and-artifacts.md`, `refs/stage-contracts.md`, `refs/compliance-policy.md`, `SKILL.md`): defined `docs/ai/tasks/{task_id}/design/design-doc.md` with stable required sections and trigger-based applicability.
+- **Reduced Stage 3 design ceremony**: design doc is mandatory only when `workflow_mode=governed`, `graph_impact≥medium`, or ADR-lite was triggered; micro/fast and low-impact standard tasks auto-skip it while still requiring `implementation-plan.md`.
+
+## v6.1.0
+
+### Changed
+
+- **`SKILL.md` trimmed to pointer-only stage guidance**: moved detailed stage procedures out of the entrypoint and kept conductor rules, mode routing, hard rules, stage pointers, directory shape, and ref-load schedule. This reduces per-task context load while preserving mandatory gates through refs.
+- **Team docs conflict check now uses `active-tasks/locks.json`** (`SKILL.md`, `refs/team-docs.md`, `refs/stage-contracts.md`, `refs/contracts-and-artifacts.md`): Stage -1 reads the lightweight lock index first and opens markdown boards/task files only on conflict, write, or explicit team-status work.
+
+### Added
+
+- **Android CLI compatibility contract** (`refs/android-cli-compatibility.md`, `refs/provisioning-preflight.md`, `refs/contracts-and-artifacts.md`, `templates/tooling-preflight.sh`): Stage -1 discovers optional Android/Android Studio commands, caches support in `tooling-cache.json`, and requires later stages to use cached/documented command support or the fallback matrix before calling Android CLI commands.
+
+## v6.0.1
+
+### Fixed
+
+- **Stage 7 wording synchronized** (`SKILL.md`, `docs/FLOW.md`, `refs/stage-contracts.md`, `refs/contracts-and-artifacts.md`, `refs/compliance-policy.md`, `refs/playbooks.md`): Artifact Integrity Check is always mandatory; Skill Drift Check runs only when the task modified orchestrator skill files (`SKILL.md`, `refs/**`, `templates/**`, `docs/FLOW.md`, or `CHANGELOG.md`), otherwise it is AUTO-SKIP.
+- **Commit policy wording synchronized** (`SKILL.md`): Stage 3 implementation-plan tasks now require a `commit_policy`-aware commit/checkpoint instruction instead of always requiring a commit message; Stage 4 follows `per_task`, `single_commit`, or `no_commit`.
+- **Version drift fixed** (`SKILL.md`, `README.md`, `refs/*.md`, `docs/FLOW.md`): bumped skill docs to `6.0.1`, added an explicit README current-version line, and removed the stale `v4.18.0` flow header.
+
 ## v6.0.0
 
 ### Breaking changes

@@ -19,19 +19,13 @@
 - Project overrides defined: <count>
 - Notes:
 
-## Spec Kit
-
-- CLI present:
-- CLI evidence:
-- Project config `.specify/`:
-- Action allowed:
-- Action taken:
-- Notes:
-
 ## Android CLI
 
 - CLI present:
+- ADB present:
 - `android info` result:
+- Android commands discovered:
+- Android Studio commands discovered:
 - Action allowed:
 - Action taken:
 - Notes:
@@ -73,16 +67,6 @@
 - Action allowed:
 - Action taken:
 - Notes:
-
-## Serena
-
-- uv present:
-- Serena runnable:
-- Backend: lsp | jetbrains | unknown
-- Kotlin LS stable: true | false | unknown
-- Action allowed:
-- Action taken:
-- Notes: (always non-blocking)
 
 ## Decisions
 

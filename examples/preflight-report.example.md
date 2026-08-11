@@ -22,22 +22,26 @@
 - Project overrides defined: 1 (name: "client-alpha", key: "CA")
 - Notes: `atlassian.api_token` will be requested just-in-time when a Jira link is provided. `figma.personal_access_token` is requested only as a fallback if Figma MCP tools are unavailable when a Figma link is provided (MCP-first, see `refs/clarification-workflow.md` § Figma). github token available for private repo access.
 
-## Spec Kit
-
-- CLI present: yes
-- CLI evidence: `specify-cli 0.12.2`
-- Project config `.specify/`: present
-- Action allowed: no update in audit mode
-- Action taken: none
-- Notes: config exists and looks current
-
 ## Android CLI
 
 - CLI present: yes
+- ADB present: yes
 - `android info` result: Android SDK path printed; version 34
+- Android commands discovered:
+  - docs_search: supported
+  - docs_fetch: supported
+  - screen_capture_annotate: missing
+  - layout: supported
+  - run: supported
+- Android Studio commands discovered:
+  - version_lookup: missing
+  - render_compose_preview: missing
+  - analyze_file: supported
+  - find_declaration: supported
+  - find_usages: supported
 - Action allowed: no update in audit mode
 - Action taken: none
-- Notes: skills list available
+- Notes: unsupported commands use `refs/android-cli-compatibility.md` fallback matrix
 
 ## Android skills
 
@@ -76,16 +80,6 @@
 - Action allowed: no install in audit mode
 - Action taken: none
 - Notes: principles will be applied manually at Stage 6 QA gate
-
-## Serena
-
-- uv present: yes
-- Serena runnable: yes (`oraios-serena 0.3.1`)
-- Backend: lsp (default); JetBrains opt-in not configured
-- Kotlin LS stable: unknown (dev has not confirmed; pre-alpha)
-- Action allowed: no install in audit mode
-- Action taken: none
-- Notes: ready for symbol-level queries; `get_diagnostics_*` disabled until Kotlin LS stability confirmed; non-blocking
 
 ## Decisions
 

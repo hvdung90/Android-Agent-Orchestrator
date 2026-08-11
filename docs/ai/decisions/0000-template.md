@@ -1,7 +1,7 @@
 ---
 artifact: android-adr-lite
 version: 1.0
-owner: spec-kit
+owner: orchestrator
 status: proposed
 task: <task_id>
 supersedes: <ADR-NNNN | null>

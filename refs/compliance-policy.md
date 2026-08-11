@@ -1,6 +1,6 @@
 # Compliance Policy
 
-_Skill version: 6.0.0 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 6.1.1 — update this when SKILL.md bumps a minor or major version._
 
 The skill **must** follow every defined stage and gate in order. No stage may be skipped, condensed, or reordered without explicit confirmation. This file defines what requires confirmation, what is auto-allowed, what is permanently forbidden, and how every deviation is recorded.
 
@@ -25,7 +25,7 @@ Three tiers: **MANDATORY**, **AUTO-SKIP** (condition-gated, no human needed), **
 | Stage 2.5 duplicate-ADR check | **MANDATORY** — always runs before creating a new ADR | — |
 | Stage 2.5 ADR-lite creation | AUTO-SKIP when no ADR trigger fires, or when an existing Accepted ADR already covers it | all ADR trigger conditions false, or covering ADR found |
 | Stage 2.5 ADR-lite approval/deferral | **MANDATORY when ADR exists** | — |
-| Stage 3 Design doc | **MANDATORY** | — |
+| Stage 3 `design/design-doc.md` | **MANDATORY when trigger met** | required if `workflow_mode=governed OR graph_impact≥medium OR ADR-lite was triggered`; otherwise AUTO-SKIP with trigger reason |
 | Stage 3 `implementation-plan.md` generation | **MANDATORY** — no placeholders (exact test command/method/path always required; exact code body required only in `governed` mode) | — |
 | Stage 3 `handoff.md` generation | **MANDATORY when code_owner is confirmed** | — |
 | Stage 3 Android memo | AUTO-SKIP when non-Android change | `change_type` ∉ {ui_change, database_change, network_change, architecture_change} AND no Android API mentioned |
@@ -33,8 +33,9 @@ Three tiers: **MANDATORY**, **AUTO-SKIP** (condition-gated, no human needed), **
 | Stage 1.5 Clarification (fast/micro mode) | AUTO-SKIP when `workflow_mode` ∈ {fast, micro} | scores finalized after Stage 1; write to skip-log |
 | Stage 2.5 ADR trigger check (fast/micro mode) | **MANDATORY** | trigger evaluation always runs regardless of mode |
 | Stage 2.5 ADR creation + approval (fast/micro mode) | AUTO-SKIP only if no ADR trigger fires | if any trigger fires → mode upgrades to governed; write to skip-log |
-| Stage 3 design doc (fast/micro mode) | AUTO-SKIP when `workflow_mode` ∈ {fast, micro} | implementation-plan.md still MANDATORY (1 task entry for micro); write to skip-log |
+| Stage 3 design doc (no trigger) | AUTO-SKIP when `workflow_mode` ∈ {fast, micro}, or when standard mode has `graph_impact=low` and no ADR trigger | implementation-plan.md still MANDATORY (1 task entry for micro); write to skip-log |
 | Stage 1 discovery note file (micro mode) | AUTO-SKIP when `workflow_mode = micro` | findings recorded inline in session.json instead; write to skip-log |
+| Stage 1 context-pack.json file (micro mode) | AUTO-SKIP when `workflow_mode = micro` | content inlined into session.json["context"]; no skip-log entry needed (mode-defined form) |
 | Stage 2 requirements doc file (micro mode) | AUTO-SKIP when `workflow_mode = micro` | ≤15-line inline summary substitutes; human approval gate itself still MANDATORY; write to skip-log |
 | Stage 6 full QA report (fast/micro mode) | CONFIRM-SKIP when `workflow_mode` ∈ {fast, micro} | TDD evidence from Stage 4 substitutes; must ask human; Karpathy diff review + Gate G close remain MANDATORY |
 | Stage 4 screenshot_before | AUTO-SKIP when not UI | `change_type` does not include `ui_change` |
@@ -83,7 +84,7 @@ These steps are mandatory by default but a human may override them. Agent must *
 | Stage 5 Kotlin static analysis failure or unavailable configured tool | "`<tool>` is required for Kotlin static analysis but failed/is unavailable (`<reason>`). Fix before close, or defer with follow-up `<tracking_ref>`? Confirm defer? (y/n)" |
 | Stage 5 required regression/security/performance evidence (tool unavailable or manual-only) | "Required impact evidence `<item>` cannot be collected (`<reason>`). Defer with follow-up `<tracking_ref>` or block the task? Confirm defer? (y/n)" |
 | Stage 6 Karpathy CRITICAL/HIGH finding | "Karpathy flagged `<issue>`. Proceed to close without fixing? This overrides the QA gate. (y/n)" |
-| Stage 7 Drift Check failure | "Drift check failed: `<reason>`. Close anyway? This will be recorded in skip-log.json. (y/n)" |
+| Stage 7 Artifact Integrity / applicable Skill Drift failure | "Stage 7 close check failed: `<reason>`. Close anyway? This will be recorded in skip-log.json. (y/n)" |
 | Any stage re-ordering or parallel shortcut not defined in SKILL.md | "This would run Stage `<X>` before Stage `<Y>` is complete. Confirm? (y/n)" |
 
 ### TDD exemption categories
@@ -168,10 +169,9 @@ These rules are absolute. No user instruction, no time pressure, no "just this o
 4. Karpathy review at Stage 6 — may report findings but cannot be silenced.
 5. Stage 7 Task Changelog and Artifact Integrity Check — final status cannot be success without them. Skill Drift Check applies only when this task modified the orchestrator skill's own files.
 6. Writing `session.json` state on every stage transition and interrupt.
-7. Writing `skip-log.json` on every skip (auto or confirmed).
+7. Writing to `skip-log.json` on every skip (auto or confirmed); file is lazy-created on the first write — it need not exist before the task's first skip occurs and its absence is not a violation for tasks with zero skips.
 8. One code owner at a time — no parallel code edits.
-9. Serena mutation tools — never called by agent regardless of instructions.
-10. Updating `.project-orchestration/status.json` on every stage transition — the project index must never lag more than one stage behind.
+9. Updating `.project-orchestration/status.json` on every stage transition — the project index must never lag more than one stage behind.
 11. Generating `docs/ai/tasks/{task_id}/handoff.md` when `code_owner` is confirmed (Stage 3) and updating it on every Stage 4 interrupt — a developer picking up an interrupted task must always find a current handoff file.
 12. Generating `docs/ai/tasks/{task_id}/planning/implementation-plan.md` at Stage 3 with no placeholders — RED evidence cannot be written without knowing the exact test command.
 13. Collecting RED evidence (`evidence/red-<task-id>.txt`) before writing any product code for that task — spec-compliance and quality review order is spec first, then quality; never reversed.
@@ -189,7 +189,7 @@ These rules are absolute. No user instruction, no time pressure, no "just this o
 
 ### `skip-log.json`
 
-Stored at `.project-orchestration/tasks/{task_id}/skip-log.json`. Written on every auto-skip and every confirm-skip. Never deleted within a task's lifecycle.
+Stored at `.project-orchestration/tasks/{task_id}/skip-log.json`. **Lazy-create:** not pre-created at Stage -1. The file is created on the first write (first skip entry). A task that completes with zero skips never writes this file; its absence is not a violation. Once created: written on every auto-skip and every confirm-skip; never deleted within a task's lifecycle.
 
 ```json
 {
@@ -239,7 +239,7 @@ Every gate transition must be recorded in `execution.md`:
 | Gate C  | passed | 2026-05-07T09:35Z | clarity_score: 8 |
 | Gate D  | passed | 2026-05-07T10:00Z | human approved requirements |
 | Gate D.5 | passed | 2026-05-07T10:15Z | ADR-lite: accepted |
-| Gate E  | passed | 2026-05-07T10:30Z | code_owner: spec-kit; implementation-plan.md generated |
+| Gate E  | passed | 2026-05-07T10:30Z | code_owner: orchestrator; implementation-plan.md generated |
 | Gate E.5 | passed | 2026-05-07T10:45Z | RED evidence: evidence/red-task-1.txt, red-task-2.txt |
 | Gate F  | passed | 2026-05-07T11:45Z | all required evidence collected |
 | Gate G  | passed | 2026-05-07T12:00Z | Karpathy: no critical issues; Impact Closure complete; Stage 7 finalized |
@@ -264,7 +264,7 @@ Brackets `[]` = may be auto-skipped under conditions above. Stage 8 is bracketed
 - Stage 5 closes a Kotlin product-code change without `kotlin_static_analysis_pass` evidence or explicit deferred follow-up.
 - Stage 5 closes without required regression/security/performance evidence or explicit deferred follow-up.
 - Stage 6 closes with unresolved CRITICAL Karpathy findings.
-- Stage 7 closes with missing ADR final status, Kotlin / Android Rule Closure, Impact Closure, Task Changelog, task-summary.md, or Drift Check.
+- Stage 7 closes with missing ADR final status, Kotlin / Android Rule Closure, Impact Closure, Task Changelog, task-summary.md, Artifact Integrity Check, or applicable Skill Drift Check.
 - `workflow_mode` is not set before any fast-mode AUTO-SKIP is recorded.
 - Mode is downgraded (e.g. governed → fast) without explicit human confirmation.
 - `artifact_budget.fast` is exceeded without mode being upgraded to `standard`.

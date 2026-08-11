@@ -52,7 +52,6 @@ Prepare the repo for future Android tasks.
 
 Expected setup:
 - Create `.agent-auth.yaml` if missing, but do not print token values.
-- Initialize or reconcile Spec Kit project setup if needed.
 - Check Android CLI and Android skills availability.
 - Build Understand-Anything output only if useful for this codebase and approved; build Graphify instead only if Understand-Anything is unavailable.
 
@@ -73,11 +72,9 @@ Goal:
 Bring existing orchestration tools and skill setup up to date without changing product code.
 
 Update scope:
-- Spec Kit: <update/reconcile/none>
 - Android CLI and skills: <update/list/reconcile/none>
 - Understand-Anything: <update/none>
 - Graphify package (fallback, if Understand-Anything unavailable): <update/none>
-- Serena: <check/update/none>
 
 Constraints:
 - Do not reinstall tools that are already healthy.

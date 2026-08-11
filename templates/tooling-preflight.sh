@@ -39,6 +39,19 @@ def cmd_ok(cmd):
     except Exception:
         return False
 
+def command_help_text(cmd):
+    try:
+        r = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=10)
+        return (r.stdout or "") + "\n" + (r.stderr or "")
+    except Exception:
+        return ""
+
+def support_from_help(help_text, *needles):
+    if not help_text.strip():
+        return "unknown"
+    text = help_text.lower()
+    return "supported" if all(n.lower() in text for n in needles) else "missing"
+
 result = {
     "timestamp": datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
     "mode": MODE,
@@ -70,18 +83,28 @@ else:
     t["figma_token"] = "unknown"
     gaps_warn.append("auth_file_missing")
 
-# ── Spec Kit ─────────────────────────────────────────────────────────────────
-spec_kit_ok = cmd_ok("command -v specify")
-t["spec_kit"] = "present" if spec_kit_ok else "missing"
-t["spec_kit_config"] = "present" if os.path.isdir(".specify") else "missing"
-if not spec_kit_ok:
-    gaps_blocking.append("spec_kit_missing")
-
 # ── Android CLI ───────────────────────────────────────────────────────────────
 android_ok = cmd_ok("command -v android")
 t["android_cli"] = "present" if android_ok else "missing"
 if not android_ok:
     gaps_warn.append("android_cli_missing")
+android_help = command_help_text("android --help") if android_ok else ""
+studio_help = command_help_text("android studio --help") if android_ok else ""
+t["adb"] = "present" if cmd_ok("command -v adb") else "missing"
+t["android_commands"] = {
+    "docs_search": support_from_help(android_help, "docs", "search") if android_ok else "missing",
+    "docs_fetch": support_from_help(android_help, "docs", "fetch") if android_ok else "missing",
+    "screen_capture_annotate": support_from_help(android_help, "screen", "capture") if android_ok else "missing",
+    "layout": support_from_help(android_help, "layout") if android_ok else "missing",
+    "run": support_from_help(android_help, "run") if android_ok else "missing",
+}
+t["android_studio_commands"] = {
+    "version_lookup": support_from_help(studio_help, "version-lookup") if android_ok else "missing",
+    "render_compose_preview": support_from_help(studio_help, "render-compose-preview") if android_ok else "missing",
+    "analyze_file": support_from_help(studio_help, "analyze-file") if android_ok else "missing",
+    "find_declaration": support_from_help(studio_help, "find-declaration") if android_ok else "missing",
+    "find_usages": support_from_help(studio_help, "find-usages") if android_ok else "missing",
+}
 
 # ── Understand-Anything (checked first for architecture-map lane) ─────────────
 ua_plugin = False
@@ -144,18 +167,6 @@ if not karpathy == "installed":
 t["karpathy"] = karpathy
 if karpathy == "missing":
     gaps_warn.append("karpathy_missing")
-
-# ── Serena ────────────────────────────────────────────────────────────────────
-uv_ok = cmd_ok("command -v uv")
-t["uv"] = "present" if uv_ok else "missing"
-if uv_ok:
-    serena_ok = cmd_ok("uvx serena --version 2>/dev/null")
-    t["serena"] = "present" if serena_ok else "missing"
-    if not serena_ok:
-        gaps_warn.append("serena_missing")
-else:
-    t["serena"] = "missing"
-    gaps_warn.append("serena_missing")
 
 # ── Memory cache ──────────────────────────────────────────────────────────────
 cache_path = ".project-orchestration/memory/tooling-cache.json"
@@ -223,30 +234,53 @@ write_section() {
   fi
 ) &
 
-# ② Spec Kit
-(
-  out="$TMPDIR_PREFIX/speckit"
-  if command -v specify >/dev/null 2>&1; then
-    echo "- specify: present ($(command -v specify))" > "$out"
-  else
-    echo "- specify: missing" > "$out"
-    [ "$MODE" = "audit" ] && echo "- action: report only (audit mode)" >> "$out"
-  fi
-  [ -d ".specify" ] \
-    && echo "- .specify/: present" >> "$out" \
-    || echo "- .specify/: missing" >> "$out"
-) &
-
-# ③ Android CLI
+# ② Android CLI
 (
   out="$TMPDIR_PREFIX/androidcli"
   if command -v android >/dev/null 2>&1; then
     echo "- android CLI: present ($(command -v android))" > "$out"
     android info 2>&1 | head -5 | sed 's/^/  /' >> "$out" || true
+    echo "- command discovery:" >> "$out"
+    python3 - <<'PYEOF' >> "$out" 2>/dev/null || echo "  - discovery: unavailable" >> "$out"
+import subprocess
+
+def help_text(cmd):
+  try:
+    r = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=10)
+    return (r.stdout or "") + "\n" + (r.stderr or "")
+  except Exception:
+    return ""
+
+def support(text, *needles):
+  if not text.strip():
+    return "unknown"
+  low = text.lower()
+  return "supported" if all(n.lower() in low for n in needles) else "missing"
+
+android = help_text("android --help")
+studio = help_text("android studio --help")
+commands = {
+  "android docs search": support(android, "docs", "search"),
+  "android docs fetch": support(android, "docs", "fetch"),
+  "android screen capture --annotate": support(android, "screen", "capture"),
+  "android layout": support(android, "layout"),
+  "android run": support(android, "run"),
+  "android studio version-lookup": support(studio, "version-lookup"),
+  "android studio render-compose-preview": support(studio, "render-compose-preview"),
+  "android studio analyze-file": support(studio, "analyze-file"),
+  "android studio find-declaration": support(studio, "find-declaration"),
+  "android studio find-usages": support(studio, "find-usages"),
+}
+for name, state in commands.items():
+  print(f"  - {name}: {state}")
+PYEOF
   else
     echo "- android CLI: missing" > "$out"
     [ "$MODE" = "audit" ] && echo "- action: report only (audit mode)" >> "$out"
   fi
+  command -v adb >/dev/null 2>&1 \
+    && echo "- adb: present ($(command -v adb))" >> "$out" \
+    || echo "- adb: missing" >> "$out"
 ) &
 
 # ④ Android skills
@@ -356,38 +390,16 @@ except: print('- session: unreadable')
   fi
 ) &
 
-# ⑨ Serena
-(
-  out="$TMPDIR_PREFIX/serena"
-  if command -v uv >/dev/null 2>&1; then
-    echo "- uv: present ($(command -v uv))" > "$out"
-    ver=$(uvx serena --version 2>/dev/null | head -1)
-    if [ -n "$ver" ]; then
-      echo "- serena: $ver" >> "$out"
-    else
-      echo "- serena: not installed (uvx serena unavailable)" >> "$out"
-      [ "$MODE" = "audit" ] && echo "- action: report only (audit mode); non-blocking" >> "$out"
-    fi
-  else
-    echo "- uv: missing" > "$out"
-    echo "- serena: unavailable (uv not installed); non-blocking" >> "$out"
-  fi
-  echo "- backend: lsp (default) — JetBrains is dev opt-in, not auto-detected" >> "$out"
-  echo "- kotlin-ls: pre-alpha — diagnostics disabled unless dev confirms stable" >> "$out"
-) &
-
 wait  # ← all parallel checks complete here
 
 # ── Print results in order ────────────────────────────────────────────────────
 
 write_section "Auth"              auth
-write_section "Spec Kit"          speckit
 write_section "Android CLI"       androidcli
 write_section "Android skills"    skills
 write_section "Understand-Anything" understand
 write_section "Graphify"          graphify
 write_section "Karpathy"          karpathy
-write_section "Serena"            serena
 write_section "Memory cache"      memory
 
 echo

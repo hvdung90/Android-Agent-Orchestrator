@@ -1,5 +1,7 @@
 # Android Agent Orchestrator
 
+_Current skill version: 6.1.1_
+
 > **A meta-skill for Android projects.**  
 > Audit the tooling. Read the architecture map. Clarify the task. Approve requirements. Then code with one owner.
 
@@ -46,13 +48,13 @@ The short version:
 The skill runs through numbered stages. Each stage has a defined input, output, and gate:
 
 ```
-Stage -1  Tooling Preflight     Audit tools, check auth, read architecture graph (Understand-Anything, or Graphify fallback)
+Stage -1  Tooling Preflight     Audit tools, discover Android commands, check auth/team locks, read architecture graph
 Stage  0  Intake                Classify task, derive source mode (Jira / Figma / plain text)
 Stage  1  Discovery             Run source readers, graph impact analysis
 Stage  1.5 Clarification        Resolve ambiguities, conflicts, missing info (auto-skipped if clear)
 Stage  2  Requirements          Write canonical requirements doc → STOP for human approval
 Stage  2.5 Decision Gate        Check if ADR-lite is needed → STOP for human approval if yes
-Stage  3  Design                Write design + executable implementation plan (tasks with test commands)
+Stage  3  Design                Write design + executable implementation plan (tasks with discovered/fallback commands)
 Stage  4  Implementation        TDD per task: RED → GREEN → spec review → quality review → commit
 Stage  5  Verify                Collect all required evidence (build, tests, screenshots, Kotlin static analysis)
 Stage  6  QA Gate               Karpathy diff review + acceptance, regression, security/performance coverage
@@ -62,6 +64,8 @@ Stage  7  Finalization          ADR status, impact closure, task summary, artifa
 The agent **stops at Stage 2 and Stage 2.5** and will not write code without your explicit approval.
 
 Stage 7 always runs the task artifact integrity check. The heavier skill drift check runs only when orchestration files such as `SKILL.md`, `refs/**`, `templates/**`, `docs/FLOW.md`, or `CHANGELOG.md` changed.
+
+Android CLI commands are discovered at Stage -1 and cached in `tooling-cache.json`; unsupported commands must use the documented fallback matrix. When `TEAM_DOCS_PATH` is active, Stage -1 reads `active-tasks/locks.json` first and opens markdown boards only when needed.
 
 ---
 
@@ -161,7 +165,7 @@ docs/
 ```text
 docs/ai/tasks/{task_id}/
 ├── requirements/<task>.md        ← canonical requirements (human-approved)
-├── design/<task>.md              ← design doc
+├── design/design-doc.md          ← design doc when trigger requires it
 ├── planning/implementation-plan.md  ← executable TDD plan (exact files + test commands)
 ├── handoff.md                    ← current task snapshot for incoming dev
 └── task-summary.md               ← compact continuity summary for future tasks

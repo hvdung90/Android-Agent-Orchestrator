@@ -1,6 +1,6 @@
 # Stage Output Contracts
 
-_Skill version: 6.0.0 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 6.1.1 — update this when SKILL.md bumps a minor or major version._
 
 Each stage defines a typed contract: what it requires as input, what it must produce as output, and what state it writes to `session.json` on completion or interrupt.
 
@@ -9,7 +9,7 @@ Each stage defines a typed contract: what it requires as input, what it must pro
 **Integrity reconciliation (mandatory before any resume offer — do not skip even when `stage_status = complete`):** `session.json` records what the agent *believes* happened; it is not proof the artifacts actually exist — a crash between writing `session.json` and writing the stage's output file, a manual deletion, or a failed git operation can all leave them out of sync. Trusting `stage_reached` blindly risks starting Stage 4 with no `handoff.md`, or closing Stage 6 against evidence that was never collected.
 
 1. Take the declared `stage_reached` (treat `2.5` as its own step between 2 and 3).
-2. Walk backward from `stage_reached` to `-1`, and for each stage in that range check its **MANDATORY** entries from this file's `output_produces` (skip AUTO-SKIP/CONFIRM-SKIP items already recorded in `skip-log.json` for that stage — those are legitimately absent).
+2. Walk backward from `stage_reached` to `-1`, and for each stage in that range check its **MANDATORY** entries from this file's `output_produces` (skip AUTO-SKIP/CONFIRM-SKIP items already recorded in `skip-log.json` for that stage — those are legitimately absent; if `skip-log.json` does not exist, treat it as empty — lazy-create means a task with zero skips never writes the file).
 3. Find the **highest stage N where every MANDATORY output for stages `-1` through `N` exists on disk.**
 4. If `N == stage_reached` → integrity confirmed, proceed to offer resume normally.
 5. If `N < stage_reached` → do **not** trust the higher `stage_reached`. Write an integrity-mismatch note to `skip-log.json` (`tier: VIOLATION`, `reason: "artifact missing for declared stage <stage_reached>: <path>"`), roll `session.json.stage_reached` back to `N`, and offer resume from Stage `N`'s `resume_entry_point` instead. Tell the human what was found missing and why the resume point moved back.
@@ -35,10 +35,11 @@ guard_conditions:
 output_produces:
   - .project-orchestration/reports/preflight.md                    ← GLOBAL
   - .project-orchestration/memory/tooling-cache.json               ← GLOBAL
+  - if TEAM_DOCS_PATH active: conflict check read from <TEAM_DOCS_PATH>/active-tasks/locks.json (or treated missing as empty)
   - .project-orchestration/status.json (initialized if missing)    ← GLOBAL
   - .project-orchestration/tasks/{task_id}/session.json (stage_reached: -1)
-  - .project-orchestration/tasks/{task_id}/skip-log.json (initialized empty)
   - context fields: tooling_readiness, auth_status, provisioning_mode, blockers, architecture_map_staleness
+  # skip-log.json is NOT pre-created here — lazy: created only on first skip entry
 
 state_on_complete:
   stage_reached: -1
@@ -74,6 +75,8 @@ guard_conditions:
 
 output_produces:
   - .project-orchestration/tasks/{task_id}/session.json (task_id, source_mode, started_at)
+  - if TEAM_DOCS_PATH active and starting a new task: <TEAM_DOCS_PATH>/active-tasks/locks.json appended with planning locks
+  - if TEAM_DOCS_PATH active and starting a new task: team task markdown + board rows updated for human visibility
   - link list recorded (Jira, Figma, Confluence URLs if provided)
   - task_continuity: "new | continuation | unknown"
   - history_scan:
@@ -124,7 +127,7 @@ guard_conditions:
 
 output_produces:
   - docs/ai/tasks/{task_id}/discovery/<task>.md  (raw discovery notes; AUTO-SKIP when workflow_mode = micro — findings recorded inline in session.json instead)
-  - docs/ai/tasks/{task_id}/clarification/context-pack.json (partial — sources, graph_path, graph_impact, change_type, history_context if read)
+  - docs/ai/tasks/{task_id}/clarification/context-pack.json (partial — sources, graph_path, graph_impact, change_type, history_context if read; AUTO-SKIP when workflow_mode = micro — content inlined into session.json["context"] instead)
   - impact_assessment, regression_test_matrix, quality_gate_plan, follow_up_watchlist drafted in context-pack for code-touching tasks
   - module_impact_chain populated if graph_impact >= medium (Gradle Module Impact Analyzer)
   - .project-orchestration/tasks/{task_id}/skip-log.json appended if Gradle Module Impact Analyzer auto-skipped
@@ -170,7 +173,6 @@ output_produces:
   - docs/ai/tasks/{task_id}/clarification/clarification-brief.md
   - clarity_score written to context-pack.json
   - impact_assessment / regression_test_matrix / quality_gate_plan / follow_up_watchlist finalized or explicitly omitted as not_applicable
-  - Serena outputs attached if triggered
   - module_impact_chain finalized (Gradle Module Impact Analyzer may refine graph_impact here)
   - change_type finalized
   - .project-orchestration/tasks/{task_id}/skip-log.json appended if Stage 1.5 was auto-skipped or confirm-skipped
@@ -303,14 +305,15 @@ guard_conditions:
   - no product-code changes allowed in this stage
 
 output_produces:
-  - docs/ai/tasks/{task_id}/design/<task>.md (Spec Kit design doc; AUTO-SKIP when workflow_mode ∈ {micro, fast})
-  - docs/ai/tasks/{task_id}/planning/<task>.md (Spec Kit planning doc; AUTO-SKIP when workflow_mode ∈ {micro, fast})
+  - docs/ai/tasks/{task_id}/design/design-doc.md (design doc; MANDATORY when workflow_mode = governed OR graph_impact >= medium OR ADR-lite was triggered; otherwise AUTO-SKIP)
+  - docs/ai/tasks/{task_id}/planning/<task>.md (planning doc; AUTO-SKIP when workflow_mode ∈ {micro, fast})
   - docs/ai/tasks/{task_id}/planning/implementation-plan.md (executable TDD plan; MANDATORY in every mode including micro — no placeholders; collapses to exactly 1 task entry when workflow_mode = micro; includes regression/security/performance checks)
   - kotlin_android_versions and kotlin_android_rule_checklist written to context-pack / implementation-plan when Kotlin product code is touched
   - docs/ai/tasks/{task_id}/android-memo/<task>.md (Android skills memo, if Android-specific — auto-skip written to skip-log if omitted)
   - docs/ai/tasks/{task_id}/handoff.md (generated when code_owner is confirmed; MANDATORY)
   - .project-orchestration/tasks/{task_id}/session.json: code_owner, assignee, branch, commit_policy set (commit_policy defaults to per_task; human-request-only)
   - .project-orchestration/status.json: entry updated (stage_reached: 3, assignee, branch)
+  - if TEAM_DOCS_PATH active: <TEAM_DOCS_PATH>/active-tasks/locks.json reconciled to final file list, status: locked
 
 state_on_complete:
   stage_reached: 3
@@ -323,11 +326,11 @@ state_on_complete:
 state_on_interrupt:
   stage_reached: 3
   stage_status: in_progress
-  blocker: "<design doc incomplete or code_owner not yet selected>"
+  blocker: "<required design-doc incomplete or code_owner not yet selected>"
   partial_outputs:
-    - "docs/ai/tasks/{task_id}/design/<task>.md (partial)"
+    - "docs/ai/tasks/{task_id}/design/design-doc.md (partial, only when trigger met)"
 
-resume_entry_point: "resume writing incomplete design doc; if code_owner missing, derive from design scope; regenerate handoff.md after code_owner is confirmed"
+resume_entry_point: "resume writing required design-doc if trigger met; if code_owner missing, derive from design scope or implementation-plan scope; regenerate handoff.md after code_owner is confirmed"
 ```
 
 ---
@@ -338,8 +341,8 @@ resume_entry_point: "resume writing incomplete design doc; if code_owner missing
 stage: "4_implementation"
 
 input_requires:
-  - docs/ai/tasks/{task_id}/design/<task>.md (stage 3 complete)
-  - docs/ai/tasks/{task_id}/planning/<task>.md
+  - docs/ai/tasks/{task_id}/design/design-doc.md (stage 3 complete, only when design-doc trigger was met)
+  - docs/ai/tasks/{task_id}/planning/<task>.md (if not auto-skipped by mode)
   - docs/ai/tasks/{task_id}/planning/implementation-plan.md (exists, no placeholders)
   - session.json: code_owner set, requirements_approved: true
   - session.json: adr_status is accepted | deferred | not_required
@@ -348,7 +351,6 @@ input_requires:
 guard_conditions:
   - exactly one code owner — all other lanes advisory only
   - Karpathy guidelines applied to every code change
-  - Serena advisory only (no mutation tools)
   - screenshot_before captured BEFORE first code change (if change_type includes ui_change)
   - Gate E.5 enforced per task: RED evidence must exist before any product code for that task
 
@@ -486,7 +488,8 @@ guard_conditions:
     OR change_type: architecture_change): section-level patch only, never whole-file rewrite;
     Change Log section always appended; otherwise AUTO-SKIP
   - Task Changelog must summarize behavior changes, not just file diffs
-  - Drift Check must pass or list blockers
+  - Artifact Integrity Check must pass or list blockers
+  - Skill Drift Check must pass or list blockers only when this task modified the orchestrator skill's own files; otherwise AUTO-SKIP must be recorded
 
 output_produces:
   - docs/ai/decisions/ADR-NNNN-<slug>.md updated with final status (GLOBAL, if present)
@@ -501,6 +504,7 @@ output_produces:
   - .project-orchestration/tasks/{task_id}/session.json: stage_status: complete
   - docs/ai/tasks/{task_id}/handoff.md: status set to complete; final summary written
   - .project-orchestration/status.json: entry updated (stage_reached: 7, stage_status: complete, pr_url if known)
+  - if TEAM_DOCS_PATH active: current task's locks removed from <TEAM_DOCS_PATH>/active-tasks/locks.json and team task archived
 
 state_on_complete:
   stage_reached: 7
@@ -510,9 +514,9 @@ state_on_complete:
 state_on_interrupt:
   stage_reached: 7
   stage_status: in_progress
-  blocker: "<ADR final status missing | task changelog incomplete | impact closure incomplete | drift check failed>"
+  blocker: "<ADR final status missing | task changelog incomplete | impact closure incomplete | artifact integrity failed | applicable skill drift failed>"
 
-resume_entry_point: "finish execution.md Task Changelog / Impact Closure / Drift Check, write task-summary.md, and finalize ADR status"
+resume_entry_point: "finish execution.md Task Changelog / Impact Closure / Artifact Integrity Check / applicable Skill Drift Check, write task-summary.md, and finalize ADR status"
 ```
 
 ---
@@ -568,7 +572,8 @@ Any interrupt → stage_status: in_progress, blocker: "<reason>"
   "impact_closure_status": "not_started | partial | complete | blocked | null",
   "follow_up_watchlist": [],
   "blocker": "null | <human-readable reason>",
-  "partial_outputs": []
+  "partial_outputs": [],
+  "context": null   // micro mode only: sparse context-pack content inlined here; null for non-micro
 }
 ```
 

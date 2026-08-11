@@ -1,8 +1,10 @@
 # Playbooks
 
-_Skill version: 6.0.0 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 6.1.1 — update this when SKILL.md bumps a minor or major version._
 
 Each playbook maps a task type to the correct provisioning mode, stage sequence, source mode, clarification workers, and architecture-map queries (Understand-Anything checked first, Graphify fallback).
+
+All `android` / `android studio` commands below are examples that must pass `refs/android-cli-compatibility.md` discovery/cache first. If unsupported, use that ref's fallback matrix or record an Unavailable-tool record.
 
 ---
 
@@ -14,8 +16,6 @@ Use before every non-trivial task.
 
 ```text
 Stage -1 — Tooling Preflight
-  - Check Spec Kit command
-  - Check .specify/
   - Check Android CLI command
   - Check android info if available
   - Check android skills list if available
@@ -31,8 +31,6 @@ Stage -1 — Tooling Preflight
 ```text
 Stage -1 — Tooling Preflight
   - Install missing approved tools only
-  - Run `specify init --here --integration <agent>` if `.specify/` missing
-  - Run `specify self upgrade` if `.specify/` exists and a newer release is confirmed
   - Run android init if Android CLI exists and agent setup requested
   - Run android skills find/list before adding skills
   - Install/build Understand-Anything only if approved and useful for existing codebase; build Graphify instead only if Understand-Anything is unavailable
@@ -66,22 +64,20 @@ Stage -1 — Tooling Preflight
 ## 1) New feature
 
 ```text
-Stage -1 — audit tools and graph state; check Serena (non-blocking)
+Stage -1 — audit tools and graph state
 Stage 0 — collect source list and consume preflight report
 Stage 1 — read graph if present; read docs/ai/inputs
-          [Serena: agent] get_symbols_overview on affected area if graph_impact ≥ medium
 Stage 1.5 — minimal clarification unless triggers fire
-            [Serena: agent] find_implementations / find_referencing_symbols if triggers fire
+            android docs search on any unresolved Android API questions
 Stage 2 — write requirements from clarification brief; STOP
 Stage 2.5 — evaluate ADR-lite triggers; STOP again if ADR approval/deferral required
 Stage 3 — design + Android memo
+          android studio version-lookup agp kotlin compose — record versions in plan header
+          Check Android Skills activation map: load applicable skills (see § Android Skills activation map)
 Stage 4 — one code owner implements
-          [Serena: code-owner request] find_declaration / find_implementations advisory
 Stage 5 — Android CLI evidence + architecture-map update
-          [Serena: agent] get_diagnostics_for_file if graph_impact ≥ medium AND `kotlin_lsp_support: confirmed`
-Stage 6 — Karpathy QA gate
-          [Serena: optional] find_referencing_symbols scope check
-Stage 7 — finalize ADR status + Task Changelog + Drift Check
+Stage 6 — Karpathy QA gate; android studio analyze-file on all changed files
+Stage 7 — finalize ADR status + Task Changelog + Artifact Integrity; Skill Drift only if skill files changed
 ```
 
 ---
@@ -89,14 +85,12 @@ Stage 7 — finalize ADR status + Task Changelog + Drift Check
 ## 2) Weak Jira + partial Figma
 
 ```text
-Stage -1 — audit or setup based on user intent; check Serena (non-blocking)
+Stage -1 — audit or setup based on user intent
 Stage 0 — collect Jira + Figma + linked docs
 Stage 1 — source readers in parallel
           Figma Reader: self-check MCP tools first (get_metadata → scoped get_design_context);
                         PAT+REST fallback only if MCP absent
-          [Serena: agent] find_symbol for key components named in Jira ticket
 Stage 1.5 — Ambiguity + Conflict + Missing-info + State Extractor
-            [Serena: agent] find_implementations for any interface flagged by Missing-info
 Stage 2 — requirements from clarification brief; STOP
 Stage 2.5 — evaluate ADR-lite triggers; STOP again if ADR approval/deferral required
 Stages 3–7 — normal flow
@@ -107,18 +101,14 @@ Stages 3–7 — normal flow
 ## 3) Edit existing feature
 
 ```text
-Stage -1 — audit architecture map (Understand-Anything → Graphify fallback) + Serena state
+Stage -1 — audit architecture map (Understand-Anything → Graphify fallback)
 Stage 1 — query architecture map / path if graph exists
-          [Serena: agent] find_referencing_symbols on the symbol being edited
 Stage 1.5 — Ambiguity + Missing-info + Dependency Impact
-            [Serena: agent] find_implementations if abstract/interface involved
-Stage 2 — include graph path, caller count from Serena, out-of-scope list; STOP
+Stage 2 — include graph path, caller count from graph, out-of-scope list; STOP
 Stage 2.5 — evaluate ADR-lite triggers; STOP again if ADR approval/deferral required
 Stage 4 — surgical changes only
-          [Serena: code-owner request] find_declaration for usage pattern
 Stage 5 — update graph and verify
-          [Serena: agent] get_diagnostics_for_file if `kotlin_lsp_support: confirmed`
-Stage 7 — finalize ADR status + Task Changelog + Drift Check
+Stage 7 — finalize ADR status + Task Changelog + Artifact Integrity; Skill Drift only if skill files changed
 ```
 
 ---
@@ -126,19 +116,15 @@ Stage 7 — finalize ADR status + Task Changelog + Drift Check
 ## 4) Bug investigation
 
 ```text
-Stage -1 — audit Android CLI and architecture map (Understand-Anything → Graphify fallback); check Serena (non-blocking)
+Stage -1 — audit Android CLI and architecture map (Understand-Anything → Graphify fallback)
 Stage 0 — collect repro, device, version, expected behavior
 Stage 1 — graph path + runtime evidence if available
-          [Serena: agent] find_symbol on crash site / reported component
-          [Serena: agent] find_referencing_symbols to trace callers
 Stage 1.5 — clarify only if repro unclear
-Stage 2 — minimal bug requirements; include Serena call chain evidence
+Stage 2 — minimal bug requirements; include call chain from graph evidence
 Stage 2.5 — evaluate ADR-lite triggers; usually not_required unless contract/state/schema changes
 Stage 4 — smallest safe patch
-          [Serena: code-owner request] find_declaration for context
 Stage 5 — runtime evidence + graph update if graph exists
-          [Serena: agent] get_diagnostics_for_file on patched file if `kotlin_lsp_support: confirmed`
-Stage 7 — finalize Task Changelog + Drift Check
+Stage 7 — finalize Task Changelog + Artifact Integrity; Skill Drift only if skill files changed
 ```
 
 ---
@@ -146,17 +132,18 @@ Stage 7 — finalize Task Changelog + Drift Check
 ## 5) XML → Compose migration
 
 ```text
-Stage -1 — check Android CLI, Android skills, architecture map (Understand-Anything → Graphify fallback), Serena
-Stage 1 — query "xml layout view fragment" if graph exists; android skills find "compose"
-          [Serena: agent] get_symbols_overview on XML-bound view layer
-          [Serena: agent] find_referencing_symbols on Fragment/Activity being migrated
+Stage -1 — check Android CLI, Android skills, architecture map (Understand-Anything → Graphify fallback)
+Stage 1 — query "xml layout view fragment" if graph exists
+          android skills add --skill=jetpack-compose/migration/migrate-xml-views-to-jetpack-compose
+          android studio find-usages on Fragment/Activity being migrated
 Stage 1.5 — Android Advisor + Dependency Impact + Rollout/Risk
-            [Serena: agent] find_implementations of ViewBinding / Fragment interfaces
-Stage 2 — migration plan; include Serena symbol surface; STOP
+Stage 2 — migration plan; include symbol surface from graph + android studio; STOP
 Stage 2.5 — ADR-lite required for Compose/View migration strategy unless explicitly deferred
+            If targetSdk ≥ 35: also load system/edge-to-edge
 Stage 4 — per-batch single-owner implementation
-Stage 5 — visual evidence + graph update
-Stage 7 — accept/defer ADR + Task Changelog + Drift Check
+          android studio render-compose-preview on each migrated Composable
+Stage 5 — android screen capture --annotate + android layout + graph update
+Stage 7 — accept/defer ADR + Task Changelog + Artifact Integrity; Skill Drift only if skill files changed
 ```
 
 ---
@@ -164,16 +151,17 @@ Stage 7 — accept/defer ADR + Task Changelog + Drift Check
 ## 6) AGP / build modernization
 
 ```text
-Stage -1 — check Spec Kit, Android CLI, Android skills, Gradle wrapper, architecture map (Understand-Anything → Graphify fallback), Serena
-Stage 1 — query architecture map "gradle build agp"; android skills find "agp"
-          [Serena: agent] find_symbol for build-related symbols if Kotlin DSL in use
+Stage -1 — check Android CLI, Android skills, Gradle wrapper, architecture map (Understand-Anything → Graphify fallback)
+Stage 1 — query architecture map "gradle build agp"
+          android studio version-lookup agp kotlin compose
+          android skills add --skill=build-system/agp/agp-9-upgrade
 Stage 1.5 — Dependency Impact + Rollout/Risk + Android Advisor
 Stage 2 — upgrade plan; STOP
 Stage 2.5 — ADR-lite required for AGP/Gradle/Kotlin version decision
 Stage 4 — controlled implementation
-Stage 5 — clean build + graph update
-          [Serena: agent] get_diagnostics_for_file on changed build files if `kotlin_lsp_support: confirmed`
-Stage 7 — accept/defer ADR + Task Changelog + Drift Check
+Stage 5 — clean build + graph update; android run to verify deploy
+          android studio analyze-file on changed build files
+Stage 7 — accept/defer ADR + Task Changelog + Artifact Integrity; Skill Drift only if skill files changed
 ```
 
 ---
@@ -181,15 +169,49 @@ Stage 7 — accept/defer ADR + Task Changelog + Drift Check
 ## 7) Unfamiliar codebase + raw task brief
 
 ```text
-Stage -1 — audit first; refresh graph only if approved; check Serena (non-blocking)
+Stage -1 — audit first; refresh graph only if approved
 Stage 0 — collect task brief
 Stage 1 — read GRAPH_REPORT.md if present; Doc Reader reads inputs
-          [Serena: agent] get_symbols_overview on codebase entry points (if Serena ready)
+          android studio find-usages on codebase entry points
 Stage 1.5 — Ambiguity + Missing-info + Graph Impact + Dependency Impact
-            [Serena: agent] find_symbol / find_implementations for key domain symbols
-Stage 2 — requirements after ready; include Serena codebase surface summary; STOP
+            android studio find-declaration / find-usages for key domain symbols
+Stage 2 — requirements after ready; include codebase surface summary from graph; STOP
 Stage 2.5 — evaluate ADR-lite triggers; STOP again if ADR approval/deferral required
 ```
+
+---
+
+## Android Skills activation map
+
+Load skills via `android skills add --skill=<slug>` only when the corresponding signal is confirmed.
+Use `android skills find "<keyword>"` to verify the exact name before adding.
+
+### Broadly applicable (check for any Android project)
+
+| Signal | Skill | Stage |
+|---|---|---|
+| No test framework detected + new feature | `testing/testing-setup` | Stage 3 |
+| Any UI task + `targetSdk ≥ 35` (Android 15+) | `system/edge-to-edge` | Stage 2.5 + Stage 4 |
+| Task touches Activity, Service, BroadcastReceiver, or PendingIntent | `security/android-intent-security` | Stage 2.5 + Stage 6 |
+| `change_type = dependency_change` + AGP version in build files | `build-system/agp/agp-9-upgrade` | Stage 3–4 |
+| "Compose migration" / "Views to Compose" in brief or ADR trigger | `jetpack-compose/migration/migrate-xml-views-to-jetpack-compose` | Stage 3–4 |
+| Navigation graph appears in ADR trigger list | `navigation/navigation-3` | Stage 3 |
+| Tablet / foldable / multi-form-factor in Figma or task brief | `jetpack-compose/adaptive` | Stage 3 |
+| Task destined for Play Store release | `play/play-policy-insights` | Stage 5–6 |
+| Task touches billing code | `play/play-billing-library-version-upgrade` | Stage 3–4 |
+| ProGuard / R8 rules in scope or APK size concern | `performance/r8-analyzer` | Stage 5 |
+| Performance regression flagged in Stage 5 verification | `profilers/perfetto-trace-analysis` | Stage 5 |
+
+### Platform-specific (load only when platform confirmed)
+
+| Signal | Skill |
+|---|---|
+| Camera feature in brief | `camera/camerax` |
+| Cast / streaming | `media/media3-cast-integration` |
+| D-pad navigation / TV layout | `tv/leanback-to-compose-tv-migration` |
+| "Wear OS" in brief | `wear/wear-compose-m3` |
+| "AppFunctions" / on-device AI agent exposure (targetSdk 36+) | `device-ai/appfunctions` |
+| OTP-less email verification | `identity/verified-email` |
 
 ---
 

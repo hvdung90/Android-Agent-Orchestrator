@@ -1,7 +1,7 @@
 ---
 artifact: android-architecture-domain
 version: 1.0
-owner: spec-kit
+owner: orchestrator
 last_updated_by_task: <task_id>
 ---
 
@@ -11,7 +11,7 @@ last_updated_by_task: <task_id>
 
 ## Owner
 
-<Team / lane / individual responsible for this domain, if known. Otherwise: "Spec Kit (no dedicated owner)".>
+<Team / lane / individual responsible for this domain, if known. Otherwise: "Orchestrator (no dedicated owner)".>
 
 ## Tech stack
 
