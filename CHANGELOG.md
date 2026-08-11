@@ -1,5 +1,15 @@
 # Changelog
 
+## v6.1.2
+
+### Added
+
+- **`TEAM_DOCS_MODE: coordination | knowledge`** (`refs/team-docs.md`, `refs/stage-contracts.md`, `SKILL.md`): new per-repo flag controlling which team-docs operations run.
+  - `coordination` (default): full protocol — locks + boards + task files + ADRs + standards + archive. Designed for multi-dev repos (e.g. chatsmith).
+  - `knowledge`: lite protocol — ADRs + standards only; no task files, no locks, no boards, no archive. Cross-repo decisions (ADR creation + `Cross-repo Impacts` row) still run in both modes. Designed for single-dev repos and library-vulcan.
+- **`[C]` / `[both]` mode markers** added to all `## Reads` and `## Writes` steps in `refs/team-docs.md` and to all `if TEAM_DOCS_PATH active` lines in `refs/stage-contracts.md` (Stage -1, 0, 3, 7).
+- **Hard rules 11, 12, 13** updated in `SKILL.md` to reference `TEAM_DOCS_MODE` and note which operations are mode-conditional.
+
 ## v6.1.1
 
 ### Fixed

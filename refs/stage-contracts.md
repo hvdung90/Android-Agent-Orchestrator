@@ -1,6 +1,6 @@
 # Stage Output Contracts
 
-_Skill version: 6.1.1 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 6.1.2 — update this when SKILL.md bumps a minor or major version._
 
 Each stage defines a typed contract: what it requires as input, what it must produce as output, and what state it writes to `session.json` on completion or interrupt.
 
@@ -35,7 +35,7 @@ guard_conditions:
 output_produces:
   - .project-orchestration/reports/preflight.md                    ← GLOBAL
   - .project-orchestration/memory/tooling-cache.json               ← GLOBAL
-  - if TEAM_DOCS_PATH active: conflict check read from <TEAM_DOCS_PATH>/active-tasks/locks.json (or treated missing as empty)
+  - if TEAM_DOCS_PATH active [both modes]: conflict check read from <TEAM_DOCS_PATH>/active-tasks/locks.json (or treated missing as empty); ADRs/README.md scanned for relevant_adrs when workflow_mode ≥ standard
   - .project-orchestration/status.json (initialized if missing)    ← GLOBAL
   - .project-orchestration/tasks/{task_id}/session.json (stage_reached: -1)
   - context fields: tooling_readiness, auth_status, provisioning_mode, blockers, architecture_map_staleness
@@ -75,8 +75,8 @@ guard_conditions:
 
 output_produces:
   - .project-orchestration/tasks/{task_id}/session.json (task_id, source_mode, started_at)
-  - if TEAM_DOCS_PATH active and starting a new task: <TEAM_DOCS_PATH>/active-tasks/locks.json appended with planning locks
-  - if TEAM_DOCS_PATH active and starting a new task: team task markdown + board rows updated for human visibility
+  - if TEAM_DOCS_PATH active and coordination mode and starting a new task: <TEAM_DOCS_PATH>/active-tasks/locks.json appended with planning locks  [C]
+  - if TEAM_DOCS_PATH active and coordination mode and starting a new task: team task markdown + board rows updated for human visibility  [C]
   - link list recorded (Jira, Figma, Confluence URLs if provided)
   - task_continuity: "new | continuation | unknown"
   - history_scan:
@@ -313,7 +313,7 @@ output_produces:
   - docs/ai/tasks/{task_id}/handoff.md (generated when code_owner is confirmed; MANDATORY)
   - .project-orchestration/tasks/{task_id}/session.json: code_owner, assignee, branch, commit_policy set (commit_policy defaults to per_task; human-request-only)
   - .project-orchestration/status.json: entry updated (stage_reached: 3, assignee, branch)
-  - if TEAM_DOCS_PATH active: <TEAM_DOCS_PATH>/active-tasks/locks.json reconciled to final file list, status: locked
+  - if TEAM_DOCS_PATH active and coordination mode: <TEAM_DOCS_PATH>/active-tasks/locks.json reconciled to final file list, status: locked  [C]
 
 state_on_complete:
   stage_reached: 3
@@ -504,7 +504,7 @@ output_produces:
   - .project-orchestration/tasks/{task_id}/session.json: stage_status: complete
   - docs/ai/tasks/{task_id}/handoff.md: status set to complete; final summary written
   - .project-orchestration/status.json: entry updated (stage_reached: 7, stage_status: complete, pr_url if known)
-  - if TEAM_DOCS_PATH active: current task's locks removed from <TEAM_DOCS_PATH>/active-tasks/locks.json and team task archived
+  - if TEAM_DOCS_PATH active and coordination mode: current task's locks removed from <TEAM_DOCS_PATH>/active-tasks/locks.json and team task archived  [C]
 
 state_on_complete:
   stage_reached: 7

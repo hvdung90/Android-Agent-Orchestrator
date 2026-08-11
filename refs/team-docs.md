@@ -1,6 +1,6 @@
 # Team Docs Integration
 
-_Skill version: 6.1.1_
+_Skill version: 6.1.2_
 
 ## Hybrid model — what goes where
 
@@ -23,6 +23,40 @@ _Skill version: 6.1.1_
 ## When active
 
 Active only when project's `CLAUDE.md` defines `TEAM_DOCS_PATH`. Otherwise the skill runs solo-repo mode (existing behavior, no team docs I/O).
+
+---
+
+## TEAM_DOCS_MODE
+
+Set in the consuming repo's `CLAUDE.md` alongside `TEAM_DOCS_PATH`. Controls how much of the team docs protocol runs.
+
+```
+TEAM_DOCS_MODE: coordination   # default when omitted
+```
+
+| Mode | Use when | Protocol |
+|---|---|---|
+| `coordination` | Multiple devs may work in parallel on the same repo (e.g. chatsmith) | Full: locks + boards + task files + ADRs + standards + archive |
+| `knowledge` | One dev at a time; need historical context but no concurrent conflict risk (e.g. single-dev repos, library-vulcan) | Lite: ADRs + standards only; no locks, no boards, no task files |
+
+**Omitting the field** is treated as `coordination` — the safe default.
+
+What `knowledge` mode skips vs `coordination`:
+
+| Operation | `coordination` | `knowledge` |
+|---|---|---|
+| `locks.json` conflict check | ✅ | ❌ skip |
+| Planning locks write (Stage 0) | ✅ | ❌ skip |
+| Task file + board maintenance (Stage 0, 3, 7) | ✅ | ❌ skip |
+| Archive at Stage 7 | ✅ | ❌ skip (nothing to archive) |
+| `ADRs/README.md` scan (Stage -1) | ✅ | ✅ |
+| ADR creation when cross-repo decision | ✅ | ✅ |
+| `ADRs/README.md` index update | ✅ | ✅ |
+| Cross-repo Impacts table row | ✅ | ✅ (decision still visible) |
+| `contracts/` writes | ✅ | ✅ |
+| `standards/` reads | ✅ | ✅ |
+
+**Switching modes mid-project:** change the flag in `CLAUDE.md` and commit. No migration needed — `knowledge` mode never created locks or task files, so there is nothing to clean up.
 
 ## Path resolution
 
@@ -147,18 +181,19 @@ Parse rules: each row is one active task. Read this file only when task metadata
 
 ## Reads (Stage -1, mandatory when active)
 
-**IMPORTANT — anti-race protocol:** Stage -1 only reads. Stage 0 immediately writes pending locks.
-If two devs start simultaneously and both pass Stage -1 (race window ~seconds), Stage 0 writes will create a conflict visible to the second dev when they re-read before Stage 3.
+**IMPORTANT — anti-race protocol (coordination mode only):** Stage -1 only reads. Stage 0 immediately writes pending locks. If two devs start simultaneously and both pass Stage -1 (race window ~seconds), Stage 0 writes will create a conflict visible to the second dev when they re-read before Stage 3.
 
-1. `git pull --rebase` on docs repo before reading any file.
-2. Read `<TEAM_DOCS_PATH>/active-tasks/locks.json` if present; if missing, treat as `{ "version": 1, "locks": [] }`.
-3. Match planned scope against `locks[]`:
+Steps marked `[C]` run in `coordination` mode only. Steps marked `[both]` run in both modes.
+
+1. `[both]` `git pull --rebase` on docs repo before reading any file.
+2. `[C]` Read `<TEAM_DOCS_PATH>/active-tasks/locks.json` if present; if missing, treat as `{ "version": 1, "locks": [] }`.
+3. `[C]` Match planned scope against `locks[]`:
    - If overlap AND matching lock's `locked_at` is **not stale** (see § Stale lock reclaim policy) → HARD STOP, print conflict table with owner @github-handle and `locked_at` timestamp.
    - If overlap AND matching lock's `locked_at` **is stale** → do not hard-stop; follow § Stale lock reclaim policy (CONFIRM-SKIP, human must approve reclaim).
    - If clean → log `team_docs.conflict_check: clean` in `session.json`.
-4. Read `<TEAM_DOCS_PATH>/ADRs/README.md` when `workflow_mode ≥ standard`. Scan the index for ADRs whose repo prefix matches the current repo OR whose title keywords overlap with the task brief. Load the full ADR file only for matches. Record loaded ADRs in `context-pack.json → relevant_adrs[]`. Skip for `micro`/`fast` modes. This is the primary mechanism for surfacing historical decisions and rationale before planning — do not wait for an ADR conflict to discover that a past decision exists.
-5. Load `<TEAM_DOCS_PATH>/standards/` only when `team_coordination` project policy is enabled, the task has cross-repo impact, or a matching lock/task file must be inspected. Apply loaded standards as active constraints for the task.
-6. Read markdown boards (`active-tasks/README.md`, `active-tasks/<repo-name>/README.md`) only for writes, conflict details after a lock match, or explicit human-facing team status work.
+4. `[both]` Read `<TEAM_DOCS_PATH>/ADRs/README.md` when `workflow_mode ≥ standard`. Scan the index for ADRs whose repo prefix matches the current repo OR whose title keywords overlap with the task brief. Load the full ADR file only for matches. Record loaded ADRs in `context-pack.json → relevant_adrs[]`. Skip for `micro`/`fast` modes. This is the primary mechanism for surfacing historical decisions and rationale before planning — do not wait for an ADR conflict to discover that a past decision exists.
+5. `[both]` Load `<TEAM_DOCS_PATH>/standards/` when the task has cross-repo impact, `team_coordination` is enabled in project policy, or a matching lock/task file must be inspected. Apply loaded standards as active constraints for the task.
+6. `[C]` Read markdown boards (`active-tasks/README.md`, `active-tasks/<repo-name>/README.md`) only for writes, conflict details after a lock match, or explicit human-facing team status work.
 
 ---
 
@@ -186,7 +221,11 @@ Locks are written once at Stage 0 and never touched again until Stage 3 (upgrade
 
 ## Writes
 
+Steps marked `[C]` run in `coordination` mode only. Steps marked `[both]` run in both modes.
+
 ### Stage 0 (task creation)
+
+`[C]` All steps in this section are coordination-mode only. In `knowledge` mode, Stage 0 makes no writes to the docs repo.
 
 - `git pull --rebase` on docs repo before writing.
 - **Bootstrap per-repo board if missing:** if `active-tasks/<repo>/README.md` does not exist → copy `active-tasks/REPO_BOARD_TEMPLATE.md`, replace `<REPO_SLUG>` placeholder with actual slug, create the file. This happens once per repo, not per task.
@@ -202,18 +241,25 @@ Locks are written once at Stage 0 and never touched again until Stage 3 (upgrade
 ### Stage 2.5 (decision affecting other repos)
 
 When a decision matches the "affects other repos" heuristic (see SKILL.md § Stage 2.5):
-- `git pull --rebase` on docs repo before writing.
-- Append to team task file `## Decisions`:
 
+`[both]` — knowledge mode still deposits decisions as cross-repo knowledge:
+- `git pull --rebase` on docs repo before writing.
+- Create ADR in `<TEAM_DOCS_PATH>/ADRs/<repo>-<nnnn>-<slug>.md` (see `docs/ai/decisions/` schema for format).
+- Update `<TEAM_DOCS_PATH>/ADRs/README.md` index with the new row.
+- Append row to `active-tasks/README.md § Cross-repo Impacts`.
+- **`git push` docs repo.**
+
+`[C]` — coordination mode additionally writes to the task file:
+- Append to team task file `## Decisions`:
 ```
 - [YYYY-MM-DD] [@owner] <decision one-liner>
   → Impact: <repo/task affected>
   → ADR: <link if created>
 ```
 
-- If decision impacts other repo → append row to `active-tasks/README.md § Cross-repo Impacts`.
-
 ### Stage 3 (files locked)
+
+`[C]` All steps in this section are coordination-mode only. In `knowledge` mode, Stage 3 makes no writes to the docs repo.
 
 - `git pull --rebase` on docs repo before writing.
 - Upgrade pending lock objects from `planning` → `locked` with the final file list from `implementation-plan.md`.
@@ -222,6 +268,8 @@ When a decision matches the "affects other repos" heuristic (see SKILL.md § Sta
 - **`git push` docs repo after all writes complete.**
 
 ### Stage 7 (archive)
+
+`[C]` All steps in this section are coordination-mode only. In `knowledge` mode, Stage 7 makes no writes to the docs repo (nothing was created to clean up).
 
 - `git pull --rebase` on docs repo before writing.
 - Update team task file status → `✅ done`.

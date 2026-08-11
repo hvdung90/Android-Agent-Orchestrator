@@ -3,7 +3,7 @@ name: android-agent-orchestrator
 description: Use when starting, planning, analyzing, or implementing any Android task — new feature, bug fix, refactor, migration, AGP upgrade, architecture review, team task tracking, or repo setup. Use when user says start task, new feature, fix bug, analyze repo, migrate, upgrade, implement, review architecture, team task, or set up agents for an Android project.
 license: MIT
 metadata:
-  version: 6.1.1
+  version: 6.1.2
   category: orchestration
   lanes:
     - orchestrator
@@ -111,9 +111,9 @@ Always load the referenced file before acting on any stage pointer below. Load `
 8. **Every skip is logged.** Write to `skip-log.json` on every auto-skip and confirm-skip. Load `refs/compliance-policy.md` before any skip decision. MANDATORY steps cannot be skipped.
 9. **ADR ledger is global and immutable.** Never edit Accepted ADR text. When a decision changes, create a new superseding ADR.
 10. **`handoff.md` when code owner changes or Stage 4 interrupts.** `branch` and `assignee` must be set before Stage 4 begins.
-11. **Team docs first, lazy.** If `TEAM_DOCS_PATH` is set, read `active-tasks/locks.json` at Stage -1. Open markdown boards/tasks only on conflict, write, or explicit team status work. Load `refs/team-docs.md`.
-12. **Task file follows the task.** When `TEAM_DOCS_PATH` is set, create/update the team task file at Stage 0. Write pending `locks.json` entries immediately with `status: planning` — do not defer the initial write to Stage 3 (Stage 3 upgrades `planning → locked`, it does not create them). Update on stage transitions. Archive at Stage 7.
-13. **Decisions leave a trace.** Any decision affecting other repos → write in team task file `## Decisions` + update `active-tasks/README.md § Cross-repo Impacts`.
+11. **Team docs first, lazy.** If `TEAM_DOCS_PATH` is set, read `active-tasks/locks.json` at Stage -1 `[both modes]`. Open markdown boards/tasks only on conflict, write, or explicit team status work. Load `refs/team-docs.md`. Check `TEAM_DOCS_MODE` (default: `coordination`) — it controls which write operations run.
+12. **Task file follows the task `[coordination mode only]`.** When `TEAM_DOCS_PATH` is set and `TEAM_DOCS_MODE: coordination`, create/update the team task file at Stage 0. Write pending `locks.json` entries immediately with `status: planning` — do not defer the initial write to Stage 3 (Stage 3 upgrades `planning → locked`, it does not create them). Update on stage transitions. Archive at Stage 7. In `knowledge` mode, skip all of the above (no task files, no locks, no boards).
+13. **Decisions leave a trace `[both modes]`.** Any decision affecting other repos → create ADR in `<TEAM_DOCS_PATH>/ADRs/` + append row to `active-tasks/README.md § Cross-repo Impacts`. In `coordination` mode, also write in team task file `## Decisions`.
 14. **Warn on session end if docs have unpushed changes.** When `TEAM_DOCS_PATH` is set and the session ends or interrupts before Stage 7, run `git -C <TEAM_DOCS_PATH> status --porcelain`; warn if non-empty. Do not auto-push unless the stage contract requires it.
 
 ---
@@ -150,7 +150,7 @@ Derive task id, source mode, task continuity, preliminary mode, and project/team
 
 Source mode: A = Jira/Figma/Confluence links present; B = local docs only; C = no sources → **BLOCK here, ask human for task brief** before proceeding to Stage 1.
 
-If team docs is active and this is a new task, write the team task file and planning locks via `refs/team-docs.md`.
+If team docs is active and `TEAM_DOCS_MODE: coordination` and this is a new task, write the team task file and planning locks via `refs/team-docs.md`. In `knowledge` mode, skip task file and lock writes.
 
 ### Stage 1 — Discovery
 
@@ -172,7 +172,7 @@ ADR trigger check is mandatory in every mode. Load `refs/contracts-and-artifacts
 
 No product-code changes. Produce `design/design-doc.md` only when its trigger is met, plus required planning artifacts, command/version snapshot, Kotlin/Android rule checklist when applicable, `implementation-plan.md`, `handoff.md`, code owner, branch, and `commit_policy`. Load `refs/stage-contracts.md § Stage 3`, `refs/contracts-and-artifacts.md § design-doc / implementation-plan`, `refs/android-cli-compatibility.md`, and `refs/playbooks.md`.
 
-If team docs is active, reconcile `locks.json` to the final file list.
+If team docs is active and `TEAM_DOCS_MODE: coordination`, reconcile `locks.json` to the final file list. In `knowledge` mode, skip this step.
 
 ### Stage 4 — Implementation Lock with Android TDD
 
