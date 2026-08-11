@@ -3,7 +3,7 @@ name: android-agent-orchestrator
 description: Use when starting, planning, analyzing, or implementing any Android task — new feature, bug fix, refactor, migration, AGP upgrade, architecture review, team task tracking, or repo setup. Use when user says start task, new feature, fix bug, analyze repo, migrate, upgrade, implement, review architecture, team task, or set up agents for an Android project.
 license: MIT
 metadata:
-  version: 6.1.2
+  version: 6.1.3
   category: orchestration
   lanes:
     - orchestrator
@@ -279,15 +279,16 @@ graphify-out/
 # When TEAM_DOCS_PATH is defined in project CLAUDE.md:
 <TEAM_DOCS_PATH>/                              ← e.g. ~/dev/vulcan-android-docs
 ├── active-tasks/
-│   ├── locks.json                             ← conflict index (read at Stage -1)
-│   ├── README.md                              ← global board (read/write only when needed)
+│   ├── shared/
+│   │   └── README.md                          ← Cross-repo Impacts (all repos read; lib writes)
 │   ├── TASK_TEMPLATE.md                       ← template for new task files
-│   └── <repo>/
-│       ├── README.md                          ← per-repo board
-│       └── <task-id>-<slug>.md                ← task file (owned by Stage 0)
-├── ADRs/                                      ← optional: team-level ADRs (cross-repo)
-├── contracts/                                 ← optional: shared interfaces
-└── archive/YYYY-MM/                           ← done tasks moved here at Stage 7
+│   └── <repo>/                                ← coordination zone (one per coordination-mode repo)
+│       ├── README.md                          ← per-repo board (Overview + File Locks)
+│       ├── locks.json                         ← conflict index (read at Stage -1, [C] only)
+│       └── <task-id>-<slug>.md                ← task file (owned by Stage 0, [C] only)
+├── ADRs/                                      ← cross-repo ADRs (all repos write/read)
+├── contracts/                                 ← shared interfaces
+└── archive/YYYY-MM/                           ← done tasks moved here at Stage 7 ([C] only)
 ```
 
 **Team docs does NOT replace `docs/ai/decisions/` and `.project-orchestration/` in the code repo** — those remain for per-repo artifacts. Team docs is the shared coordination layer: file locks, cross-repo decisions, and task visibility across the team.

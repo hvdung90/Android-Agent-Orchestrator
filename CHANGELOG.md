@@ -1,5 +1,23 @@
 # Changelog
 
+## v6.1.3
+
+### Changed
+
+- **Zone structure for `active-tasks/`** (`refs/team-docs.md`, `refs/stage-contracts.md`, `SKILL.md`, `vulcan-android-docs/CLAUDE.md`): replaced flat global board with two-zone layout:
+  - `active-tasks/shared/README.md` — Cross-repo Impacts visible to ALL repos (lib writes here)
+  - `active-tasks/<repo>/` — coordination zone per-repo (board + locks); only coordination-mode repos have a directory here
+  - Knowledge-mode repos (single-dev apps, library-vulcan) have NO directory in `active-tasks/`
+- **`locks.json` moved per-repo** (`active-tasks/<repo>/locks.json`): eliminates cross-repo lock noise; chatsmith only reads its own locks; iptv/psp are invisible to chatsmith and vice versa
+- **`active-tasks/README.md` (global board) removed**: replaced by `shared/README.md` (Cross-repo Impacts only) + per-repo `README.md` (per coordination zone). Token cost reduced — Stage -1 no longer loads a board with 50+ repos.
+
+### Migrated in vulcan-android-docs
+
+- Created `active-tasks/shared/README.md`
+- Created `active-tasks/chatsmith/README.md`
+- Removed `active-tasks/README.md`, `active-tasks/android-actioncam/`, `active-tasks/library-vulcan/`
+- Updated `active-tasks/REPO_BOARD_TEMPLATE.md` for coordination zone format
+
 ## v6.1.2
 
 ### Added

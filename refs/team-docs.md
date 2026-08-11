@@ -1,6 +1,6 @@
 # Team Docs Integration
 
-_Skill version: 6.1.2_
+_Skill version: 6.1.3_
 
 ## Hybrid model — what goes where
 
@@ -73,16 +73,32 @@ Resolve at Stage -1. If the resolved path doesn't exist → HARD STOP with instr
 
 ---
 
+## Zone structure
+
+```
+active-tasks/
+├── shared/
+│   └── README.md              ← Cross-repo Impacts — ALL repos read; lib writes here
+└── <repo>/                    ← coordination zone (one per coordination-mode repo, e.g. chatsmith/)
+    ├── README.md              ← per-repo board (Overview + File Locks)
+    ├── locks.json             ← machine-readable lock index for this repo
+    └── <task-files>
+```
+
+**Knowledge-mode repos** (single-dev apps, library-vulcan) have NO directory in `active-tasks/`. They read `shared/` and write to `ADRs/` and `shared/README.md § Cross-repo Impacts` only.
+
+---
+
 ## File naming conventions
 
 Rules that apply when creating or archiving any file in the docs repo:
 
 | Directory | Pattern | Example |
 |---|---|---|
-| `active-tasks/<repo>/` | `<task-id>-<slug>.md` | `AT-42-migrate-datastore.md` |
+| `active-tasks/<repo>/` | `<task-id>-<slug>.md` | `chatsmith/AT-42-new-feature.md` |
 | `ADRs/` | `<repo>-<nnnn>-<slug>.md` | `library-vulcan-0004-new-cache.md` |
 | `contracts/` | `<repo>-<slug>.md` | `library-vulcan-ump-consent.md` |
-| `archive/YYYY-MM/` | `<repo>-<task-id>-<slug>.md` | `library-vulcan-AT-42-migrate-datastore.md` |
+| `archive/YYYY-MM/` | `<repo>-<task-id>-<slug>.md` | `chatsmith-AT-42-new-feature.md` |
 
 **Why:** ADRs, contracts, and archive are flat directories shared across all repos. The `<repo>` prefix prevents filename collisions and makes ownership obvious at a glance.
 
@@ -109,16 +125,16 @@ Rules that apply **in addition to** the standard stage protocol, based on repo t
 | Trigger | Required |
 |---|---|
 | Testing against a lib feature branch | Add to task file `## Cross-task Dependencies`: `library-vulcan AT-XX (feature/X) — <what you're testing>` |
-| Need to check state of a lib feature branch | Read `active-tasks/library-vulcan/README.md` → find task by branch → read task file |
-| Find all tasks on a lib branch | `grep -rl "feature/X" active-tasks/library-vulcan/` |
+| Need to check state of lib cross-repo decisions | Read `active-tasks/shared/README.md § Cross-repo Impacts` + `ADRs/README.md` (lib is knowledge mode — no task board exists) |
+| Find lib ADRs related to current task | Keyword scan `ADRs/README.md` at Stage -1 (already part of standard read protocol) |
 
 ---
 
 ## File format spec
 
-### `active-tasks/locks.json` (conflict index)
+### `active-tasks/<repo>/locks.json` (conflict index — coordination zone only)
 
-Small machine-readable file used for Stage -1 conflict checks. This is the first and usually only team-docs file read during preflight.
+Per-repo machine-readable file. Path: `<TEAM_DOCS_PATH>/active-tasks/<repo>/locks.json` where `<repo>` is the coordination-mode repo slug (e.g. `chatsmith`). This is the first and usually only team-docs file read during preflight for coordination repos.
 
 ```json
 {
@@ -127,7 +143,7 @@ Small machine-readable file used for Stage -1 conflict checks. This is the first
     {
       "file": "feature/auth/AuthViewModel.kt",
       "task_id": "ANDROID-42",
-      "repo": "android-app",
+      "repo": "chatsmith",
       "owner": "@dunghoang",
       "status": "planning",
       "locked_at": "2026-08-11T09:00:00Z",
@@ -144,38 +160,40 @@ Rules:
 - If `locks.json` is missing, Stage -1 treats it as empty and Stage 0 creates it on first write.
 - Markdown boards remain human-readable mirrors; they are not the preflight conflict source of truth.
 
-### `active-tasks/README.md` (global board)
+### `active-tasks/shared/README.md` (cross-repo signals — all repos read)
 
 ```markdown
-## Overview
-| Repo | Active Tasks | Last Updated |
-|---|---|---|
-| chatgpt-android | 2 | 2026-07-31 |
+# Shared — Cross-repo Signals
 
 ## Cross-repo Impacts
 | Date | Decision | Repos Affected | Owner | ADR |
 |---|---|---|---|---|
-| 2026-07-31 | Migrate SharedPrefs → DataStore | chatgpt-android, widget-sdk | @dunghoang | ADR-042 |
-
-## Cross-repo Conflicts
-See `active-tasks/locks.json` for the machine-readable lock index.
+| 2026-07-31 | Migrate SharedPrefs → DataStore | chatsmith, widget-sdk | @dunghoang | ADR-042 |
 ```
 
 Parse rules:
-- `cross_repo_impacts[]`: all rows in "Cross-repo Impacts"
-- Do NOT edit rows from other tasks. Append-only for Cross-repo Impacts. Overwrite-in-place only for the Overview count table.
+- All repos read this file at Stage -1 for cross-repo context.
+- Append-only for rows — do NOT edit rows from other tasks/repos.
+- Only lib and any repo making a cross-repo decision writes here.
 
-### `active-tasks/<repo>/README.md` (per-repo board)
+### `active-tasks/<repo>/README.md` (per-repo board — coordination zone only)
 
 ```markdown
-## Active Tasks
+# <repo> — Active Tasks
+
+## Overview
 | Task ID | Branch | Owner | Status | Files Touched |
 |---|---|---|---|---|
-| AT-123 | feature/datastore-migration | @dunghoang | 🟡 in-progress | app/src/.../DataStoreManager.kt |
-| AT-124 | fix/widget-crash | @alice | ⏳ planning | app/src/.../WidgetProvider.kt |
+| AT-123 | feature/new-feature | @dunghoang | 🟡 in-progress | app/src/.../ViewModel.kt |
+| AT-124 | fix/crash | @alice | ⏳ planning | app/src/.../Provider.kt |
+
+## File Locks (Cross-dev Conflicts)
+| File Path | Status | Task ID | Owner | Since |
+|---|---|---|---|---|
+| app/src/.../ViewModel.kt | 🔒 locked | AT-123 | @dunghoang | 2026-08-11T09:00Z |
 ```
 
-Parse rules: each row is one active task. Read this file only when task metadata or human-facing board state is needed; do not use it as the normal Stage -1 conflict source.
+Parse rules: human-readable mirror of locks.json. Read only when human-facing board state is needed; locks.json is the preflight conflict source of truth.
 
 ---
 
@@ -186,14 +204,15 @@ Parse rules: each row is one active task. Read this file only when task metadata
 Steps marked `[C]` run in `coordination` mode only. Steps marked `[both]` run in both modes.
 
 1. `[both]` `git pull --rebase` on docs repo before reading any file.
-2. `[C]` Read `<TEAM_DOCS_PATH>/active-tasks/locks.json` if present; if missing, treat as `{ "version": 1, "locks": [] }`.
-3. `[C]` Match planned scope against `locks[]`:
+2. `[both]` Read `<TEAM_DOCS_PATH>/active-tasks/shared/README.md` — scan Cross-repo Impacts for decisions affecting the current repo.
+3. `[C]` Read `<TEAM_DOCS_PATH>/active-tasks/<repo>/locks.json` if present; if missing, treat as `{ "version": 1, "locks": [] }`.
+4. `[C]` Match planned scope against `locks[]`:
    - If overlap AND matching lock's `locked_at` is **not stale** (see § Stale lock reclaim policy) → HARD STOP, print conflict table with owner @github-handle and `locked_at` timestamp.
    - If overlap AND matching lock's `locked_at` **is stale** → do not hard-stop; follow § Stale lock reclaim policy (CONFIRM-SKIP, human must approve reclaim).
    - If clean → log `team_docs.conflict_check: clean` in `session.json`.
-4. `[both]` Read `<TEAM_DOCS_PATH>/ADRs/README.md` when `workflow_mode ≥ standard`. Scan the index for ADRs whose repo prefix matches the current repo OR whose title keywords overlap with the task brief. Load the full ADR file only for matches. Record loaded ADRs in `context-pack.json → relevant_adrs[]`. Skip for `micro`/`fast` modes. This is the primary mechanism for surfacing historical decisions and rationale before planning — do not wait for an ADR conflict to discover that a past decision exists.
-5. `[both]` Load `<TEAM_DOCS_PATH>/standards/` when the task has cross-repo impact, `team_coordination` is enabled in project policy, or a matching lock/task file must be inspected. Apply loaded standards as active constraints for the task.
-6. `[C]` Read markdown boards (`active-tasks/README.md`, `active-tasks/<repo-name>/README.md`) only for writes, conflict details after a lock match, or explicit human-facing team status work.
+5. `[both]` Read `<TEAM_DOCS_PATH>/ADRs/README.md` when `workflow_mode ≥ standard`. Scan the index for ADRs whose repo prefix matches the current repo OR whose title keywords overlap with the task brief. Load the full ADR file only for matches. Record loaded ADRs in `context-pack.json → relevant_adrs[]`. Skip for `micro`/`fast` modes. This is the primary mechanism for surfacing historical decisions and rationale before planning — do not wait for an ADR conflict to discover that a past decision exists.
+6. `[both]` Load `<TEAM_DOCS_PATH>/standards/` when the task has cross-repo impact, `team_coordination` is enabled in project policy, or a matching lock/task file must be inspected. Apply loaded standards as active constraints for the task.
+7. `[C]` Read per-repo board (`active-tasks/<repo>/README.md`) only for writes, conflict details after a lock match, or explicit human-facing team status work.
 
 ---
 
@@ -232,11 +251,10 @@ Steps marked `[C]` run in `coordination` mode only. Steps marked `[both]` run in
 - If `active-tasks/TASK_TEMPLATE.md` exists → copy to `active-tasks/<repo>/<task-id>-<slug>.md`.
 - If template NOT found → use embedded fallback below. Log warning: `TASK_TEMPLATE.md not found — used embedded fallback. Consider adding template to docs repo.`
 - Fill: Task ID, Repo, Branch, Owner (ask user if not derivable from `git config user.name`), Started (ISO datetime), Mode.
-- Append row to `active-tasks/<repo>/README.md`.
-- Bump count in `active-tasks/README.md` Overview table.
-- **Write pending lock objects** to `active-tasks/locks.json` for all files likely to be touched. Status = `planning`. This is mandatory — do not defer to Stage 3.
+- Append row to `active-tasks/<repo>/README.md § Overview`.
+- **Write pending lock objects** to `active-tasks/<repo>/locks.json` for all files likely to be touched. Status = `planning`. This is mandatory — do not defer to Stage 3.
 - **`git push` docs repo after all writes complete.** Do NOT wait for other concurrent tasks on the same repo to finish — each task manages only its own rows/files. Other tasks will pick up changes via `git pull --rebase` before their next write.
-- **Post-push re-verify (mandatory, closes the residual race window):** `git pull --rebase`, re-read `active-tasks/locks.json`. If any object for a file this task just locked has an earlier `locked_at` than this task's own → apply § Stale lock reclaim policy's tiebreak rule (earliest `locked_at` wins; this task yields).
+- **Post-push re-verify (mandatory, closes the residual race window):** `git pull --rebase`, re-read `active-tasks/<repo>/locks.json`. If any object for a file this task just locked has an earlier `locked_at` than this task's own → apply § Stale lock reclaim policy's tiebreak rule (earliest `locked_at` wins; this task yields).
 
 ### Stage 2.5 (decision affecting other repos)
 
@@ -246,7 +264,7 @@ When a decision matches the "affects other repos" heuristic (see SKILL.md § Sta
 - `git pull --rebase` on docs repo before writing.
 - Create ADR in `<TEAM_DOCS_PATH>/ADRs/<repo>-<nnnn>-<slug>.md` (see `docs/ai/decisions/` schema for format).
 - Update `<TEAM_DOCS_PATH>/ADRs/README.md` index with the new row.
-- Append row to `active-tasks/README.md § Cross-repo Impacts`.
+- Append row to `active-tasks/shared/README.md § Cross-repo Impacts`.
 - **`git push` docs repo.**
 
 `[C]` — coordination mode additionally writes to the task file:
@@ -262,7 +280,7 @@ When a decision matches the "affects other repos" heuristic (see SKILL.md § Sta
 `[C]` All steps in this section are coordination-mode only. In `knowledge` mode, Stage 3 makes no writes to the docs repo.
 
 - `git pull --rebase` on docs repo before writing.
-- Upgrade pending lock objects from `planning` → `locked` with the final file list from `implementation-plan.md`.
+- Upgrade pending lock objects from `planning` → `locked` in `active-tasks/<repo>/locks.json` with the final file list from `implementation-plan.md`.
 - Add any new files not in the pending list; remove entries for files that won't be touched.
 - Update team task file `## Scope > Files sẽ touch (LOCKED)` from `implementation-plan.md`.
 - **`git push` docs repo after all writes complete.**
@@ -275,9 +293,8 @@ When a decision matches the "affects other repos" heuristic (see SKILL.md § Sta
 - Update team task file status → `✅ done`.
 - Create `archive/YYYY-MM/` directory if it doesn't exist.
 - Move file: `active-tasks/<repo>/<task-id>-<slug>.md` → `archive/YYYY-MM/<repo>-<task-id>-<slug>.md`.
-- Remove row from `active-tasks/<repo>/README.md`.
-- Decrement count in `active-tasks/README.md` Overview table.
-- Remove lock objects owned by this task from `active-tasks/locks.json`.
+- Remove row from `active-tasks/<repo>/README.md § Overview`.
+- Remove lock objects owned by this task from `active-tasks/<repo>/locks.json`.
 - **`git push` docs repo after all writes complete.**
 
 ---
