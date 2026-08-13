@@ -198,6 +198,31 @@ Optional, non-blocking, never reopens a complete Stage 7 task. Append best-effor
 
 ---
 
+## Model routing
+
+Model tier per stage. Override the session default only when cognitive load warrants it.
+
+| Stage | Task | Default tier | Upgrade condition |
+|---|---|---|---|
+| -1 Preflight | bash checks, cache reads | **Haiku 4.5** | — |
+| 0 Intake | classify, derive source mode | **Haiku 4.5** | — |
+| 1 Discovery | read sources, derive impact + `workflow_mode` | **Sonnet 4.6** | — |
+| 1.5 Clarification | identify ambiguity, synthesize context-pack | **Sonnet 4.6** | — |
+| 2 Requirements | write canonical requirements + acceptance criteria | **Sonnet 4.6** | **Opus 5** when `governed` |
+| 2.5 ADR Decision | architectural trade-off, cross-repo impact | **Sonnet 4.6** | **Opus 5** when `governed` |
+| 3 Design + Plan | design-doc, implementation-plan.md | **Sonnet 4.6** | **Opus 5** when `governed` |
+| 4 Implementation | code, Android TDD | **Sonnet 4.6** | Never — Sonnet is optimal for code |
+| 5 Verify | run tests, check evidence gates | **Sonnet 4.6** | — |
+| 6 QA gate | Karpathy diff, acceptance coverage | **Sonnet 4.6** | — |
+| 7 Finalize | ADR status, task summary, archive | **Haiku 4.5** | — |
+| 8 Retro | reflection, telemetry append | **Haiku 4.5** | — |
+
+**micro mode:** tất cả stages → Haiku 4.5 (task bounded, không cần reasoning nặng).
+
+Model IDs: `claude-haiku-4-5-20251001` · `claude-sonnet-4-6` · `claude-opus-5`
+
+---
+
 ## Provisioning modes
 
 | Mode | Meaning | May install/update? |
