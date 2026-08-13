@@ -1,6 +1,6 @@
 # Sub-agent Catalog and Dependency Rules
 
-_Skill version: 6.1.1 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 6.1.3 — update this when SKILL.md bumps a minor or major version._
 
 ## Design principle
 

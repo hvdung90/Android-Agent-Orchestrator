@@ -1,6 +1,6 @@
 # Playbooks
 
-_Skill version: 6.1.1 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 6.1.3 — update this when SKILL.md bumps a minor or major version._
 
 Each playbook maps a task type to the correct provisioning mode, stage sequence, source mode, clarification workers, and architecture-map queries (Understand-Anything checked first, Graphify fallback).
 
@@ -16,9 +16,8 @@ Use before every non-trivial task.
 
 ```text
 Stage -1 — Tooling Preflight
-  - Check Android CLI command
-  - Check android info if available
-  - Check android skills list if available
+  - Check adb availability (primary Android device tool)
+  - Probe android CLI (expected missing — non-blocking)
   - Check Understand-Anything plugin/skill and .understand-anything/knowledge-graph.json (checked first)
   - If Understand-Anything unavailable: check Graphify command/package and graphify-out/GRAPH_REPORT.md + graph.json (fallback)
   - Check Karpathy guidance/plugin signals
@@ -30,9 +29,8 @@ Stage -1 — Tooling Preflight
 
 ```text
 Stage -1 — Tooling Preflight
-  - Install missing approved tools only
-  - Run android init if Android CLI exists and agent setup requested
-  - Run android skills find/list before adding skills
+  - Install missing approved tools only (adb via Platform-Tools if missing)
+  - Note android CLI as aspirational; do not install
   - Install/build Understand-Anything only if approved and useful for existing codebase; build Graphify instead only if Understand-Anything is unavailable
   - Write preflight report
 ```
@@ -183,8 +181,8 @@ Stage 2.5 — evaluate ADR-lite triggers; STOP again if ADR approval/deferral re
 
 ## Android Skills activation map
 
-Load skills via `android skills add --skill=<slug>` only when the corresponding signal is confirmed.
-Use `android skills find "<keyword>"` to verify the exact name before adding.
+Android skills are Claude Code companion skills — loaded from the agent's own skill list, not via `android skills add`.
+Activate the relevant skill only when its signal is confirmed.
 
 ### Broadly applicable (check for any Android project)
 

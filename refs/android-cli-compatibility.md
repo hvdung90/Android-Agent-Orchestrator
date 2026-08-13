@@ -1,6 +1,6 @@
 # Android CLI Compatibility
 
-_Skill version: 6.1.1 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 6.1.3 — update this when SKILL.md bumps a minor or major version._
 
 This ref makes Android CLI usage evidence-backed. Agents must discover command support before using optional `android` / `android studio` subcommands.
 

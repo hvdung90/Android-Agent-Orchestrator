@@ -1,6 +1,6 @@
 # Provisioning Preflight
 
-_Skill version: 6.1.1 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 6.1.3 — update this when SKILL.md bumps a minor or major version._
 
 ## Purpose
 
@@ -70,24 +70,24 @@ If intent is ambiguous, choose `audit`.
 Check:
 
 ```bash
-command -v android || true
-android info || true
-android studio check || true
-android --help || true
-android studio --help || true
+command -v adb || true
 adb version || true
+command -v android || true   # aspirational CLI — expected to be missing in most environments
+android --help || true
 ```
+
+> **Note:** The `android` CLI (including `android studio *`, `android skills *`, `android run`, `android screen capture`) is aspirational tooling that does not ship with the standard Android SDK. In practice it will always be missing — this is expected and non-blocking. The fallback matrix in `refs/android-cli-compatibility.md` covers all evidence gates with real tools (`adb`, `./gradlew`, `rg`, Gradle tasks). Do **not** attempt to install the `android` CLI.
 
 Decision:
 
 | State | Mode | Action |
 |---|---|---|
-| CLI missing | `audit` | Report missing; all CLI-dependent evidence items skipped; non-blocking unless runtime evidence required |
-| CLI missing | `bootstrap/update` | Install: `curl -fsSL https://dl.google.com/android/android-agent-cli/install.sh \| bash` (follow official docs at developer.android.com/tools/agents/android-cli) |
-| CLI present | `update` | Run `android update` |
-| Agent setup requested | `bootstrap/update` | Run `android init` |
-| Android Studio available (`android studio check` succeeds) | Any | Use `android studio` commands for symbol navigation and diagnostics |
-| Runtime evidence needed but CLI missing | Any | Block verification |
+| `adb` missing | `audit` | Warn; runtime evidence (Gate F) cannot be collected |
+| `adb` missing | `bootstrap/update` | Install via Android SDK Platform-Tools (https://developer.android.com/tools/releases/platform-tools) |
+| `adb` present | Any | Record `adb: present` in tooling-cache.json |
+| `android` CLI present | Any | Record capability; use optional subcommands only when discovery confirms they exist |
+| `android` CLI missing | Any | **Non-blocking** — expected; all evidence gates use fallbacks per `refs/android-cli-compatibility.md` |
+| Runtime evidence needed but `adb` missing | Any | Block Gate F; apply degraded-evidence rule per `refs/contracts-and-artifacts.md` |
 
 Stage -1 also discovers optional Android/Android Studio subcommands and caches support in `tooling-cache.json`; see `refs/android-cli-compatibility.md`. Later stages must read the cached command support before calling `android studio version-lookup`, `render-compose-preview`, `analyze-file`, `find-usages`, `find-declaration`, `android screen capture --annotate`, `android layout`, or `android run`.
 
@@ -95,30 +95,25 @@ Stage -1 also discovers optional Android/Android Studio subcommands and caches s
 
 ## Android skills
 
-Check:
+Android skills are delivered via the Claude Code skill system (not the `android` CLI, which is aspirational).
 
-```bash
-android skills list --long
-```
+Check which companion skills are available in the agent's own skill list:
 
-Find task-specific skills:
-
-```bash
-android skills find "compose"
-android skills find "edge-to-edge"
-android skills find "performance"
-android skills find "agp"
-```
+| Skill | Purpose |
+|---|---|
+| `kotlin-patterns` | Kotlin idioms, coroutines, flows |
+| `android-clean-architecture` | Architecture layer rules |
+| `compose-multiplatform-patterns` | Compose UI patterns |
+| `kotlin-coroutines-flows` | Coroutine/flow patterns |
+| `kotlin-testing` | Test patterns |
 
 Decision:
 
 | State | Mode | Action |
 |---|---|---|
-| Android CLI missing | Any | Cannot manage Android skills |
-| Skill list unavailable | Any | Report capability gap |
-| Needed skill found | `bootstrap/update` | Add with confirmed `--skill` name |
-| Skill name unknown | Any | Do not guess; run `find` or record unknown |
-| User asks all skills | `bootstrap/update` | `android skills add --all` |
+| Companion skills available | Any | List which are available; Android Advisor selects relevant ones at Stage 3 |
+| Companion skills missing | Any | Note capability gap; Android Advisor writes memo from domain knowledge |
+| `android` CLI skill management present | Any | Use it when confirmed available; do not assume |
 
 ---
 
@@ -153,7 +148,7 @@ Check:
 
 ```bash
 command -v graphify || true
-python -m pip show graphifyy || true
+python -m pip show graphify || true
 test -f graphify-out/GRAPH_REPORT.md && echo "GRAPH_REPORT exists" || echo "GRAPH_REPORT missing"
 test -f graphify-out/graph.json && echo "graph.json exists" || echo "graph.json missing"
 ```
@@ -294,6 +289,6 @@ After Stage -1 finishes (cache miss path only), write:
 - Never overwrite `CLAUDE.md` without explicit permission.
 - Never delete `graphify-out/` or `.understand-anything/` unless user asked for reset.
 - Never hand-edit `graphify-out/**` or `.understand-anything/**`.
-- Never assume a skill name if `android skills find` did not confirm it.
+- Never assume a Claude Code skill is available unless it appears in the agent's own skill list.
 - Never log or print token values from `.agent-auth.yaml`.
 - Never commit `.agent-auth.yaml` (verify `.gitignore` covers it).
