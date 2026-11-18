@@ -887,7 +887,7 @@ Docs finalization (Stage 7)
 ①  Stage -1 → Stage 0  :  Blocker in preflight is unresolved
 ②  Stage -1 → Stage 0  :  .agent-auth.yaml missing + external links present → WARN
                            (does not block, but source readers will skip)
-③  Stage 0  (Mode C)   :  Task unclear → require developer to provide a brief
+③  Stage 0  (any mode) :  Brief unusable (no goal or no testable AC) → ask for the missing parts
 ④  Stage 1.5 outcome   :  blocked → ask human, do not fabricate requirements
 ⑤  Stage 2 → 2.5       :  MANDATORY human approval requirements
 ⑥  Stage 2.5 → Stage 3 :  Decision trigger fired but ADR-lite not approved/deferred

@@ -86,14 +86,16 @@ Scoring, skip rules, and artifact budgets live in `refs/contracts-and-artifacts.
 
 ## When to load refs
 
-Load refs on demand; do not load all refs upfront. Highest matching tier wins.
+Load refs on demand; do not load all refs upfront. Rows are checked top to bottom; the **first** match wins, and the last row catches every remaining combination.
 
-| Tier | Condition | Load |
+| Tier | Condition (first match wins) | Load |
 |---|---|---|
-| **LIGHT** | `workflow_mode` ∈ {micro, fast} AND `source_mode = C` (no external sources) AND `graph_impact = low` | mandatory stage refs only; no optional/deep refs |
-| **MEDIUM** | `workflow_mode = standard` AND `source_mode = B` (docs-only) | + `refs/clarification-workflow.md` |
-| **HEAVY** | `source_mode = A` (Jira/Figma links present) | + `refs/sub-agents.md` |
 | **FULL** | `workflow_mode = governed` · migration · AGP · unfamiliar codebase · god nodes in path | + `refs/playbooks.md` + all refs |
+| **HEAVY** | `source_mode = A` (Jira/Figma/Confluence links present) | + `refs/sub-agents.md` |
+| **LIGHT** | `workflow_mode` ∈ {micro, fast} AND `source_mode = C` (brief in the message only) AND `graph_impact = low` | mandatory stage refs only; no optional/deep refs |
+| **MEDIUM** | everything else — e.g. `standard` with B or C, `fast`/`micro` with B, any mode with `graph_impact ≥ medium` | + `refs/clarification-workflow.md` |
+
+**When it is decided.** Stage 0 records `preliminary_ref_tier` from `preliminary_mode` + `source_mode`, treating `graph_impact` as `low` (it is not known yet). Stage 1 records the final `ref_tier` from `workflow_mode` + `source_mode` + `graph_impact`. If the final tier is higher, load the added refs before the next stage; if it is lower, simply stop loading the optional refs.
 
 Always load the referenced file before acting on any stage pointer below. Load `refs/compliance-policy.md` before any skip. Load `refs/contracts-and-artifacts.md` before writing any artifact.
 
@@ -148,7 +150,7 @@ If `TEAM_DOCS_PATH` is set, load `refs/team-docs.md` and read only `active-tasks
 
 Derive task id, source mode, task continuity, preliminary mode, and project/team policy. Load `refs/clarification-workflow.md § Source integrations` and `refs/stage-contracts.md § Stage 0`.
 
-Source mode: A = Jira/Figma/Confluence links present; B = local docs only; C = no sources → **BLOCK here, ask human for task brief** before proceeding to Stage 1.
+Source mode: A = Jira/Figma/Confluence links present; B = local docs in `docs/ai/inputs/`; C = no links and no local docs — **the user's message is the task brief**. In any mode, block before Stage 1 only when the brief cannot yield a goal and at least one testable acceptance criterion; then ask the human for exactly the missing parts.
 
 If team docs is active and `TEAM_DOCS_MODE: coordination` and this is a new task, write the team task file and planning locks via `refs/team-docs.md`. In `knowledge` mode, skip task file and lock writes.
 

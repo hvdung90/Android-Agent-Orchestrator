@@ -154,5 +154,51 @@ class StageMinusOneStateTests(LintFixture):
         self.assert_flagged("stage-1-state", "refs/stage-contracts.md:")
 
 
+
+class StageIdTests(LintFixture):
+    """AOO-008: every persisted state names its stage unambiguously."""
+
+    def stage_section(self, header):
+        content = self.read("refs/stage-contracts.md")
+        start = content.index(header)
+        end = content.index("\n## ", start + 1)
+        return content, start, end
+
+    def edit_section(self, header, old, new):
+        content, start, end = self.stage_section(header)
+        block = content[start:end]
+        self.assertIn(old, block)
+        self.write("refs/stage-contracts.md",
+                   content[:start] + block.replace(old, new, 1) + content[end:])
+
+    def test_missing_stage_id(self):
+        self.edit_section("## Stage 2 — Requirements", '  stage_id: "2_requirements"\n', "")
+        self.assert_flagged("stage-id", "refs/stage-contracts.md:")
+
+    def test_wrong_stage_id_for_clarification(self):
+        self.edit_section("## Stage 1.5", 'stage_id: "1.5_clarification"', 'stage_id: "1_discovery"')
+        self.assert_flagged("stage-id", "refs/stage-contracts.md:")
+
+    def test_clarification_back_to_stage_reached_1(self):
+        self.edit_section("## Stage 1.5", "stage_reached: 1.5", "stage_reached: 1")
+        self.assert_flagged("stage-id", "refs/stage-contracts.md:")
+
+    def test_order_table_must_list_every_stage(self):
+        self.replace("refs/stage-contracts.md", "| 5 | `2.5_decision_gate` | 2.5 |\n", "")
+        self.assert_flagged("stage-order", "refs/stage-contracts.md:")
+
+
+class RefTierTests(LintFixture):
+    """AOO-015: Stage 0 only has a preliminary tier; Stage 1 finalizes it."""
+
+    def test_final_tier_at_stage_0_is_flagged(self):
+        self.replace("refs/stage-contracts.md", "  - preliminary_ref_tier",
+                     "  - ref tier determined (LIGHT / MEDIUM / HEAVY / FULL)\n  - preliminary_ref_tier")
+        self.assert_flagged("ref-tier", "refs/stage-contracts.md:")
+
+    def test_stage_1_must_finalize_tier(self):
+        self.replace("refs/stage-contracts.md", "  - ref_tier finalized", "  - tier maybe")
+        self.assert_flagged("ref-tier", "refs/stage-contracts.md:")
+
 if __name__ == "__main__":
     unittest.main()

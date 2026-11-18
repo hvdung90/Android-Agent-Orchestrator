@@ -851,6 +851,7 @@ Purpose: project-level index of all tasks. Readable by any developer or agent in
     {
       "task_id": "ANDROID-42",
       "title": "<short task title>",
+      "stage_id": "4_implementation",
       "stage_reached": 4,
       "stage_status": "in_progress",
       "assignee": "dev-a",
@@ -866,7 +867,7 @@ Purpose: project-level index of all tasks. Readable by any developer or agent in
 }
 ```
 
-**Update rule:** On every stage transition, find the task's entry by `task_id` and update `stage_reached`, `stage_status`, `assignee`, `blocker`, and `updated_at`. Add a new entry if this `task_id` is not yet listed. Never remove entries (use `stage_status: complete` to mark done tasks).
+**Update rule:** On every stage transition, find the task's entry by `task_id` and update `stage_id`, `stage_reached`, `stage_status`, `assignee`, `blocker`, and `updated_at`. Add a new entry if this `task_id` is not yet listed. Never remove entries (use `stage_status: complete` to mark done tasks).
 At Stage 7, also set `summary_doc` once `task-summary.md` exists.
 
 ---
@@ -1204,9 +1205,13 @@ In-progress task state — allows resume after an interruption.
   "task_id": "ANDROID-42 | task-slug",
   "started_at": "2026-05-07T09:00:00Z",
   "updated_at": "2026-05-07T11:30:00Z",
-  "stage_reached": -1,
+  "stage_id": "0_intake | 1_discovery | 1.5_clarification | 2_requirements | 2.5_decision_gate | 3_design | 4_implementation | 5_verify | 6_qa_gate | 7_docs_decision_finalization",
+  "stage_reached": 0,   // must match stage_id per refs/stage-contracts.md § Stage order (1.5 and 2.5 included)
   "stage_status": "complete | in_progress | blocked",
   "source_mode": "A | B | C",
+  "preflight": { "ran_at": "2026-05-07T08:59:00Z", "ready_for_stage_0": true, "report": ".project-orchestration/reports/preflight.md" },
+  "preliminary_ref_tier": "LIGHT | MEDIUM | HEAVY | FULL",
+  "ref_tier": "LIGHT | MEDIUM | HEAVY | FULL | null",
   "task_continuity": "new | continuation | unknown",
   "history_scan": {
     "performed": true,
@@ -1244,7 +1249,7 @@ In-progress task state — allows resume after an interruption.
 
 **Path:** `.project-orchestration/tasks/{task_id}/session.json`
 
-**Resume rule:** At Stage -1, scan `.project-orchestration/tasks/` for any `session.json` with `stage_status: in_progress`. Ask user: "Resume task `<task_id>` from Stage `<stage_reached>`?" If yes, skip stages already completed per compliance matrix. If no, overwrite session.
+**Resume rule:** see `refs/stage-contracts.md` (Resume rule, Integrity reconciliation, § Stage order, § Legacy sessions). The scan is read-only: list every `in_progress` task and let the human pick; never overwrite a session the human did not choose.
 
 **Interrupt safety:** On any error or interruption, write interrupt state before stopping. `partial_outputs` lists artifact paths written before the interrupt — agent must not re-run those steps on resume unless explicitly asked. See `refs/stage-contracts.md` for per-stage interrupt state and `resume_entry_point`.
 

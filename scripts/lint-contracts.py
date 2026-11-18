@@ -10,7 +10,10 @@ that has already happened at least once (see docs review AOO-004/016/019/020):
   4. task session path    — only `tasks/{task_id}/session.json`; Stage -1 must
                             not write a task session (task_id is born in Stage 0):
                             its state persists to reports/preflight.md
-  5. version headers      — SKILL frontmatter == SKILL heading == README ==
+  5. stage ids            — every state block sets stage_id/stage_reached of its
+                            stage; § Stage order lists all stages (AOO-008)
+  6. ref tier             — Stage 0 preliminary only, Stage 1 finalizes (AOO-015)
+  7. version headers      — SKILL frontmatter == SKILL heading == README ==
                             FLOW == every refs/*.md header == latest CHANGELOG
 
 A line may mention a retired path only when it also contains the word
@@ -119,6 +122,86 @@ def check_stage_minus_one_state(root: str) -> Iterable[Finding]:
                       f"`{PREFLIGHT_STATE}`", "")
 
 
+STAGE_HEADER = re.compile(r"^## Stage ")
+STAGE_DECL = re.compile(r'^stage: "([^"]+)"')
+ORDER_ROW = re.compile(r"^\|\s*\d+\s*\|\s*`([^`]+)`\s*\|\s*(-?[0-9.]+)\s*\|")
+
+
+def stage_sections(lines: List[str]) -> List[Tuple[int, List[Tuple[int, str]]]]:
+    """[(header line no, [(no, line), ...]), ...] for each '## Stage ...' section."""
+    sections: List[Tuple[int, List[Tuple[int, str]]]] = []
+    current: Optional[List[Tuple[int, str]]] = None
+    for no, line in enumerate(lines, 1):
+        if STAGE_HEADER.match(line):
+            current = []
+            sections.append((no, current))
+        elif line.startswith("## "):
+            current = None
+        if current is not None:
+            current.append((no, line))
+    return sections
+
+
+def state_blocks(section: List[Tuple[int, str]]) -> List[Tuple[int, str, List[str]]]:
+    """[(line no, 'state_on_complete'|'state_on_interrupt', body lines), ...]"""
+    blocks: List[Tuple[int, str, List[str]]] = []
+    for i, (no, line) in enumerate(section):
+        name = line.split(":", 1)[0]
+        if name in ("state_on_complete", "state_on_interrupt"):
+            body = []
+            for _, nxt in section[i + 1:]:
+                if nxt and not nxt[0].isspace():
+                    break
+                body.append(nxt.strip())
+            blocks.append((no, name, body))
+    return blocks
+
+
+def check_stage_ids(root: str) -> Iterable[Finding]:
+    """AOO-008: every state block carries stage_id == its section's stage and the
+    matching stage_reached; the § Stage order table lists every stage in order."""
+    rel_path = "refs/stage-contracts.md"
+    lines = read_lines(os.path.join(root, rel_path))
+    declared: List[str] = []
+    for header_no, section in stage_sections(lines):
+        stage = next((m.group(1) for _, l in section for m in [STAGE_DECL.match(l)] if m), None)
+        if stage is None:
+            continue
+        declared.append(stage)
+        reached = stage.split("_", 1)[0]
+        for no, name, body in state_blocks(section):
+            if f'stage_id: "{stage}"' not in body:
+                yield Finding(rel_path, no, f"stage-id: {name} of {stage} must set stage_id: \"{stage}\"", "")
+            if f"stage_reached: {reached}" not in body:
+                yield Finding(rel_path, no, f"stage-id: {name} of {stage} must set stage_reached: {reached}", "")
+    table = [(no, m.group(1), m.group(2)) for no, l in enumerate(lines, 1) for m in [ORDER_ROW.match(l)] if m]
+    if [sid for _, sid, _ in table] != declared:
+        anchor = table[0][0] if table else 0
+        yield Finding(rel_path, anchor,
+                      f"stage-order: § Stage order must list {declared} in that order", "")
+    for no, sid, reached in table:
+        if sid.split("_", 1)[0] != reached:
+            yield Finding(rel_path, no, f"stage-order: {sid} must have stage_reached {sid.split('_', 1)[0]}", "")
+
+
+def check_ref_tier(root: str) -> Iterable[Finding]:
+    """AOO-015: Stage 0 records only a preliminary tier; Stage 1 finalizes it."""
+    rel_path = "refs/stage-contracts.md"
+    lines = read_lines(os.path.join(root, rel_path))
+    stage0 = section(lines, "## Stage 0", "## Stage 1")
+    stage1 = section(lines, "## Stage 1 ", "## Stage 1.5")
+    for no, line in stage0:
+        if re.search(r"\bref[ _]tier\b", line, re.I) and "preliminary" not in line.lower():
+            yield Finding(rel_path, no, "ref-tier: Stage 0 may only set preliminary_ref_tier "
+                          "(workflow_mode and graph_impact are final only after Stage 1)", line.strip())
+    if not any("preliminary_ref_tier" in line for _, line in stage0):
+        yield Finding(rel_path, stage0[0][0] if stage0 else 0,
+                      "ref-tier: Stage 0 must record preliminary_ref_tier", "")
+    if not any("ref_tier finalized" in line for _, line in stage1):
+        yield Finding(rel_path, stage1[0][0] if stage1 else 0,
+                      "ref-tier: Stage 1 output must include 'ref_tier finalized'", "")
+
+
 def first_match(path: str, pattern: str) -> Tuple[Optional[str], int]:
     regex = re.compile(pattern)
     for no, line in enumerate(read_lines(path), 1):
@@ -148,7 +231,8 @@ def check_versions(root: str) -> Iterable[Finding]:
 
 
 CHECKS: Tuple[Callable[[str], Iterable[Finding]], ...] = (
-    check_retired, check_stage_minus_one_session, check_stage_minus_one_state, check_versions,
+    check_retired, check_stage_minus_one_session, check_stage_minus_one_state,
+    check_stage_ids, check_ref_tier, check_versions,
 )
 
 

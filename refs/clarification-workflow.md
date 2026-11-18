@@ -94,7 +94,9 @@ If the developer provides a Confluence page URL, the agent fetches and runs the 
 |---|---|
 | At least one Jira / Figma / Confluence link | Mode A |
 | Only local docs in `docs/ai/inputs/` | Mode B |
-| Nothing | Mode C |
+| Only a plain-text brief in the message | Mode C |
+
+A brief is **usable** when it yields a goal and at least one testable acceptance criterion. If it does not — in any mode — Stage 0 stops and asks for exactly the missing parts (`state_on_interrupt.blocker`), then re-derives the source mode from what the human adds.
 
 ---
 
@@ -115,9 +117,18 @@ Ambiguity Detector
 Missing-info Detector
 ```
 
-### Mode C — No sources
+### Mode C — Brief in the message
 
-Block and ask the human for a task brief.
+No links and no `docs/ai/inputs/`: the user's message is the source. Treat it like a single input doc:
+
+```text
+Doc Reader (on the message)
+Graph Impact Reader if graph exists
+Ambiguity Detector
+Missing-info Detector
+```
+
+Block only when the message is not a usable brief (no goal, or no testable acceptance criterion); ask for the missing parts instead of a whole new brief.
 
 ---
 
