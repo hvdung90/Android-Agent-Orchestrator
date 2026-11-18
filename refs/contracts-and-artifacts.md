@@ -958,10 +958,7 @@ Required:
 - RED evidence observed and path recorded in `evidence/red-<task-id>.txt`,
 - failure confirmed to be for the right reason (feature missing, not import/syntax error).
 
-TDD exemption (CONFIRM-SKIP only):
-- Human explicitly approves bypass for this specific task.
-- Reason recorded in `skip-log.json` with tier: CONFIRM-SKIP.
-- Even with exemption: spec-compliance and code-quality reviews are still required.
+Exemptions: only the rows of `refs/compliance-policy.md § TDD exemption table`, with the tier that row gives (AUTO-SKIP rows are logged without asking; CONFIRM-SKIP rows need the human's yes for this task). Each exemption records `reason`, `tier`, `scope_check` and the row's replacement evidence in `skip-log.json`. Spec-compliance and code-quality reviews are always still required.
 
 ### Gate F — Verification ready
 

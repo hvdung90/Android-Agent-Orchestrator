@@ -70,7 +70,7 @@ Mode is derived at Stage 0 and finalized at the end of Stage 1. Human override i
 
 _Stage suffix legend: `(inline)` = artifact inlined into `session.json` instead of a separate file; `(micro)`/`(lite)`/`(mini)` = reduced artifact depth. Full definitions: `refs/contracts-and-artifacts.md § Artifact budget`._
 
-Never skipped in any mode: auth init, team docs lock check when active, human requirements approval, ADR trigger check, Gate E.5 RED evidence, Evidence Gate Matrix, Karpathy diff review, `session.json`, `status.json`, and applicable finalization checks. Micro/fast reduce artifact depth only.
+Never skipped in any mode: auth init, team docs lock check when active, human requirements approval, ADR trigger check, Gate E.5 RED evidence (only the rows of `refs/compliance-policy.md § TDD exemption table` may replace it), Evidence Gate Matrix, Karpathy diff review, `session.json`, `status.json`, and applicable finalization checks. Micro/fast reduce artifact depth only.
 
 **Override rules (priority order):**
 1. Any ADR trigger fires → minimum `governed`
@@ -178,7 +178,7 @@ If team docs is active and `TEAM_DOCS_MODE: coordination`, reconcile `locks.json
 
 ### Stage 4 — Implementation Lock with Android TDD
 
-Single code owner. Gate E.5 RED evidence is mandatory per task before product code. Load `refs/stage-contracts.md § Stage 4`, `refs/contracts-and-artifacts.md § Gate E.5`, `refs/compliance-policy.md` for TDD exemptions, and `refs/android-cli-compatibility.md` before Android Studio commands.
+Single code owner. Gate E.5 RED evidence is mandatory per task before product code unless a row of `refs/compliance-policy.md § TDD exemption table` applies (that table is the only definition of exemptions and their AUTO-SKIP/CONFIRM-SKIP tier). Load `refs/stage-contracts.md § Stage 4`, `refs/contracts-and-artifacts.md § Gate E.5`, `refs/compliance-policy.md`, and `refs/android-cli-compatibility.md` before Android Studio commands.
 
 ### Stage 5 — Verify
 
@@ -253,7 +253,7 @@ The parent orchestrator must wait:
 3. Before Design: wait for human approval of requirements.
 4. Before Design: wait for approved or explicitly deferred ADR-lite when Stage 2.5 requires one.
 5. Before Implementation: wait for approved requirements, decision gate result, design doc, executable `implementation-plan.md`, Android memo if Android-specific, and chosen single code owner with branch set.
-6. **Gate E.5 — Test-first ready (before each task in Stage 4):** wait for failing test written + RED evidence recorded. Per-task, not per-stage.
+6. **Gate E.5 — Test-first ready (before each task in Stage 4):** wait for failing test written + RED evidence recorded, or a recorded exemption from `refs/compliance-policy.md § TDD exemption table`. Per-task, not per-stage.
 7. Before Close: wait for runtime evidence, graph update if needed, spec-compliance ✅, Karpathy diff review ✅, acceptance coverage check, and Stage 7 finalization.
 
 ---

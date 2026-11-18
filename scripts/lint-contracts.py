@@ -15,7 +15,10 @@ that has already happened at least once (see docs review AOO-004/016/019/020):
   6. ref tier             — Stage 0 preliminary only, Stage 1 finalizes (AOO-015)
   7. read-phase git       — no pull/rebase/merge/checkout/reset/stash in the
                             Stage -1 team-docs reads (AOO-013)
-  8. version headers      — SKILL frontmatter == SKILL heading == README ==
+  8. TDD exemptions       — one table in compliance-policy; no "no exceptions" /
+                            "CONFIRM-SKIP only" elsewhere; tiers and skip-log
+                            reasons match the rows (AOO-007/017)
+  9. version headers      — SKILL frontmatter == SKILL heading == README ==
                             FLOW == every refs/*.md header == latest CHANGELOG
 
 A line may mention a retired path only when it also contains the word
@@ -281,6 +284,55 @@ def check_team_docs_lifecycle(root: str) -> Iterable[Finding]:
                           "(like fetch_failed)", line.strip())
 
 
+TDD_TABLE_HEADING = "### TDD exemption table"
+TDD_ROW = re.compile(r"^\|\s*`([a-z-]+)`\s*\|\s*([^|]+?)\s*\|")
+TDD_TIERS = {"AUTO-SKIP", "CONFIRM-SKIP"}
+
+
+def check_tdd_exemptions(root: str) -> Iterable[Finding]:
+    """AOO-007/017: exactly one exemption table (compliance-policy), every other
+    file defers to it, and its rows, tiers and skip-log reasons agree."""
+    canonical = "refs/compliance-policy.md"
+    headings: List[Tuple[str, int]] = []
+    for path in scanned_files(root):
+        rel_path = rel(root, path)
+        for no, line in enumerate(read_lines(path), 1):
+            low = line.lower()
+            if line.startswith(TDD_TABLE_HEADING):
+                headings.append((rel_path, no))
+            if "no exceptions" in low:
+                yield Finding(rel_path, no, "tdd-exemption: say which § TDD exemption table rows apply "
+                              "instead of 'no exceptions'", line.strip())
+            if "confirm-skip only" in low:
+                yield Finding(rel_path, no, "tdd-exemption: tiers come from § TDD exemption table "
+                              "(some rows are AUTO-SKIP)", line.strip())
+            if (rel_path == canonical and "never skippable" in low
+                    and ("gate e.5" in low or "green evidence" in low)):
+                yield Finding(rel_path, no, "tdd-exemption: RED/GREEN are mandatory *unless* a "
+                              "§ TDD exemption table row applies", line.strip())
+    for rel_path, no in headings:
+        if rel_path != canonical:
+            yield Finding(rel_path, no, f"tdd-exemption: the only exemption table lives in {canonical}", "")
+    if (canonical, ) not in [(r,) for r, _ in headings]:
+        yield Finding(canonical, 0, f"tdd-exemption: `{TDD_TABLE_HEADING}` missing", "")
+        return
+    table = section(read_lines(os.path.join(root, canonical)), TDD_TABLE_HEADING, "### ")
+    rows = [(no, m.group(1), m.group(2)) for no, l in table for m in [TDD_ROW.match(l)]
+            if m and m.group(2) != "Tier"]  # skip the header row
+    for no, reason, tier in rows:
+        if tier not in TDD_TIERS:
+            yield Finding(canonical, no, f"tdd-exemption: tier of `{reason}` must be AUTO-SKIP or "
+                          f"CONFIRM-SKIP, found {tier!r}", "")
+    enum_line = next(((no, l) for no, l in table if '"reason":' in l), None)
+    if enum_line is None:
+        yield Finding(canonical, table[0][0], "tdd-exemption: exemption record has no reason enum", "")
+        return
+    listed = {r.strip() for r in enum_line[1].split('"reason":', 1)[1].strip(' ",').split("|")}
+    if listed != {reason for _, reason, _ in rows}:
+        yield Finding(canonical, enum_line[0], "tdd-exemption: skip-log reason enum must list exactly "
+                      f"the table rows {sorted(r for _, r, _ in rows)}", "")
+
+
 def first_match(path: str, pattern: str) -> Tuple[Optional[str], int]:
     regex = re.compile(pattern)
     for no, line in enumerate(read_lines(path), 1):
@@ -312,7 +364,8 @@ def check_versions(root: str) -> Iterable[Finding]:
 CHECKS: Tuple[Callable[[str], Iterable[Finding]], ...] = (
     check_retired, check_stage_minus_one_session, check_stage_minus_one_state,
     check_stage_ids, check_ref_tier, check_readiness_scope, check_source_mode_inputs,
-    check_skipped_stage, check_read_phase_git, check_team_docs_lifecycle, check_versions,
+    check_skipped_stage, check_read_phase_git, check_team_docs_lifecycle,
+    check_tdd_exemptions, check_versions,
 )
 
 

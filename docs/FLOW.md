@@ -510,6 +510,8 @@ All task types start with Stage -1.
   │  ① Write smallest failing test (RED)                         │
   │     Run → record RED to evidence/red-<task-id>.txt           │
   │     Gate E.5: RED evidence MUST exist before product code     │
+  │     (only exception: a row of compliance-policy               │
+  │      § TDD exemption table, recorded + replacement evidence)  │
   │                                                               │
   │  ② Write minimum code to pass (GREEN)                        │
   │     Run → record GREEN to evidence/green-<task-id>.txt       │
@@ -894,7 +896,8 @@ Docs finalization (Stage 7)
 ⑦  Stage 3 → Stage 4   :  Missing design doc + single code owner
                            Missing branch name or assignee (must be set before coding)
                            implementation-plan.md missing or contains placeholders (Gate E)
-⑧  Stage 4 per-task    :  Product code written before RED evidence exists (Gate E.5)
+⑧  Stage 4 per-task    :  Product code written before RED evidence exists (Gate E.5),
+                           with no recorded exemption from compliance-policy § TDD exemption table
                            Spec-compliance review skipped or run after quality review
 ⑨  Stage 4 interrupt   :  handoff.md not updated before stopping (MANDATORY)
 ⑩  Stage 5 → Stage 6   :  Missing runtime evidence + graph update

@@ -84,7 +84,7 @@ One code owner at a time. All other agents are advisory only.
 
 ## TDD enforcement
 
-Every task in the implementation plan follows this loop — no exceptions:
+Every task in the implementation plan follows this loop. The only exceptions are the rows of `refs/compliance-policy.md § TDD exemption table` (e.g. a pure Gradle version bump or a colour/dimen-only resource change); an exempt task still records the replacement evidence that row requires:
 
 1. Write the failing test → run it → save `evidence/red-<task>.txt`
 2. Write minimum code to pass → run → save `evidence/green-<task>.txt`
@@ -96,7 +96,7 @@ Every task in the implementation plan follows this loop — no exceptions:
 
 For Kotlin product-code changes, the quality gate also requires the Kotlin / Android rule checklist and repo-native static analysis evidence (`lint`, `ktlint`, `detekt`, `spotless`, or the project's equivalent check tasks when configured).
 
-Product code cannot be written before RED evidence exists for that task.
+Product code cannot be written before RED evidence exists for that task, unless an exemption from that table is recorded in `skip-log.json`.
 
 ---
 

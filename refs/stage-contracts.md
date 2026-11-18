@@ -419,7 +419,7 @@ guard_conditions:
   - exactly one code owner — all other lanes advisory only
   - Karpathy guidelines applied to every code change
   - screenshot_before captured BEFORE first code change (if change_type includes ui_change)
-  - Gate E.5 enforced per task: RED evidence must exist before any product code for that task
+  - Gate E.5 enforced per task: RED evidence must exist before any product code for that task, unless a row of refs/compliance-policy.md § TDD exemption table applies (recorded in skip-log.json with its replacement evidence)
 
 output_produces:
   - product code changes (owned by code_owner)
@@ -436,7 +436,7 @@ state_on_complete:
   stage_id: "4_implementation"
   stage_reached: 4
   stage_status: complete
-  tdd_evidence_complete: true   # all tasks have red + green evidence
+  tdd_evidence_complete: true   # every task has red + green evidence, or a recorded exemption + its replacement evidence
   blocker: null
 
 state_on_interrupt:

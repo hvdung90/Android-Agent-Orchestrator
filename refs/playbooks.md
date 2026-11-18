@@ -217,7 +217,7 @@ Activate the relevant skill only when its signal is confirmed.
 
 | Situation | Provisioning mode | Source mode | Clarification |
 |---|---|---|---|
-| UI copy/pixel tweak (no layout/logic change) | audit | N/A | No — fast-eligible; see the pixel-tweak TDD exemption in `refs/compliance-policy.md` § TDD exemption categories |
+| UI copy/pixel tweak (no layout/logic change) | audit | N/A | No — fast-eligible; see the `ui-pixel-tweak` (CONFIRM-SKIP) and `resource-presentation` (AUTO-SKIP) rows of `refs/compliance-policy.md § TDD exemption table` |
 | Dependency patch/minor version bump (no code change) | audit | N/A | No — fast-eligible; see `dependency_change` in the Evidence Gate Matrix (`refs/contracts-and-artifacts.md`) |
 | Analyze repo | audit | N/A | No, unless task docs are analyzed |
 | Setup repo | bootstrap | N/A | No |

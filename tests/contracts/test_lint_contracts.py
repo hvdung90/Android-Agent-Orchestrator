@@ -306,5 +306,42 @@ class TeamDocsWriteLifecycleTests(LintFixture):
                      "   - `sync: no_upstream` → read the checkout; fine.\n   - `sync: fetch_failed` →")
         self.assert_flagged("write-lifecycle", "refs/team-docs.md:")
 
+
+class TddExemptionTests(LintFixture):
+    """AOO-007/017: one canonical TDD exemption table; everything else points to it."""
+
+    def test_no_exceptions_wording_is_flagged(self):
+        self.append("README.md", "Every task follows this loop — no exceptions:")
+        self.assert_flagged("tdd-exemption", "README.md:")
+
+    def test_confirm_skip_only_outside_table_is_flagged(self):
+        self.append("refs/contracts-and-artifacts.md", "TDD exemption (CONFIRM-SKIP only):")
+        self.assert_flagged("tdd-exemption", "refs/contracts-and-artifacts.md:")
+
+    def test_matrix_never_skippable_for_red_is_flagged(self):
+        self.append("refs/compliance-policy.md",
+                    "| Stage 4 Gate E.5 RED evidence per task | **MANDATORY — never skippable** | — |")
+        self.assert_flagged("tdd-exemption", "refs/compliance-policy.md:")
+
+    def test_other_never_skippable_rows_are_fine(self):
+        self.assertIn("| Stage -1 Auth init | **MANDATORY — never skippable** | — |",
+                      self.read("refs/compliance-policy.md"))
+        self.assert_clean()
+
+    def test_second_exemption_table_is_flagged(self):
+        self.append("refs/contracts-and-artifacts.md", "### TDD exemption table\n\n| a | b |")
+        self.assert_flagged("tdd-exemption", "refs/contracts-and-artifacts.md:")
+
+    def test_skip_log_reason_must_list_every_category(self):
+        self.replace("refs/compliance-policy.md", "| pure-refactor |", "|")
+        self.assert_flagged("tdd-exemption", "refs/compliance-policy.md:")
+
+    def test_tier_must_be_auto_or_confirm(self):
+        content = self.read("refs/compliance-policy.md")
+        start = content.index("### TDD exemption table")
+        block = content[start:start + 6000].replace("| AUTO-SKIP |", "| MAYBE |", 1)
+        self.write("refs/compliance-policy.md", content[:start] + block + content[start + 6000:])
+        self.assert_flagged("tdd-exemption", "refs/compliance-policy.md:")
+
 if __name__ == "__main__":
     unittest.main()
