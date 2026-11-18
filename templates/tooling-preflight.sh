@@ -52,6 +52,34 @@ def support_from_help(help_text, *needles):
     text = help_text.lower()
     return "supported" if all(n.lower() in text for n in needles) else "missing"
 
+def yaml_section_key(content, section, key):
+    """Return the string value of section.key in a 2-level YAML file.
+    Returns '' if the key is present but empty, None if the key is absent.
+    Skips blank lines and full-line comments; strips inline comments."""
+    current_section = None
+    for raw in content.splitlines():
+        stripped = raw.lstrip()
+        if not stripped or stripped.startswith('#'):
+            continue
+        # Top-level key: no leading whitespace
+        if raw and not raw[0].isspace() and ':' in stripped:
+            current_section = stripped.split(':', 1)[0].strip()
+        # Nested key under the target section
+        elif current_section == section and raw[0:1].isspace():
+            kv = stripped.split(':', 1)
+            if len(kv) == 2 and kv[0].strip() == key:
+                val = kv[1].strip()
+                # Drop inline comment (space + # outside the value)
+                if ' #' in val:
+                    val = val[:val.index(' #')].strip()
+                return val.strip('"\'')   # '' means present-but-empty
+    return None   # key not found
+
+def tok_status(val):
+    if val is None: return "missing_key"
+    if val == "":   return "empty"
+    return "set"
+
 result = {
     "timestamp": datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
     "mode": MODE,
@@ -73,14 +101,17 @@ t["auth_file"] = "present" if auth_present else "missing"
 if auth_present:
     try:
         content = open(".agent-auth.yaml").read()
-        t["atlassian_token"] = "set" if ("api_token:" in content and len([l for l in content.splitlines() if "api_token:" in l and l.split("api_token:")[-1].strip().strip("\"'")]) > 0) else "empty"
-        t["figma_token"] = "set" if ("personal_access_token:" in content and len([l for l in content.splitlines() if "personal_access_token:" in l and l.split("personal_access_token:")[-1].strip().strip("\"'")]) > 0) else "empty"
+        t["atlassian_token"] = tok_status(yaml_section_key(content, "atlassian", "api_token"))
+        t["figma_token"]     = tok_status(yaml_section_key(content, "figma",     "personal_access_token"))
+        t["github_token"]    = tok_status(yaml_section_key(content, "github",    "personal_access_token"))
     except Exception:
         t["atlassian_token"] = "unknown"
-        t["figma_token"] = "unknown"
+        t["figma_token"]     = "unknown"
+        t["github_token"]    = "unknown"
 else:
     t["atlassian_token"] = "unknown"
-    t["figma_token"] = "unknown"
+    t["figma_token"]     = "unknown"
+    t["github_token"]    = "unknown"
     gaps_warn.append("auth_file_missing")
 
 # ── Android CLI ───────────────────────────────────────────────────────────────
@@ -175,8 +206,37 @@ result["cache"]["present"] = cache_present
 if cache_present:
     try:
         d = json.load(open(cache_path))
-        result["cache"]["valid_until"]  = d.get("valid_until")
-        result["cache"]["graph_commit"] = d.get("graph_commit")
+        valid_until  = d.get("valid_until")
+        graph_commit = d.get("graph_commit")
+        result["cache"]["valid_until"]  = valid_until
+        result["cache"]["graph_commit"] = graph_commit
+
+        # Freshness: compare valid_until with now
+        cache_status = "unknown"
+        if valid_until:
+            try:
+                exp = datetime.fromisoformat(valid_until.replace("Z", "+00:00"))
+                cache_status = "fresh" if datetime.now(timezone.utc) < exp else "stale"
+            except Exception:
+                cache_status = "unparseable"
+
+        # Graph staleness: compare graph_commit with git HEAD
+        try:
+            head = subprocess.run("git rev-parse HEAD", shell=True,
+                                  capture_output=True, text=True, timeout=5)
+            if head.returncode == 0:
+                head_sha = head.stdout.strip()
+                result["cache"]["head_commit"] = head_sha
+                if graph_commit and graph_commit != head_sha:
+                    result["cache"]["graph_stale"] = True
+                    if cache_status == "fresh":
+                        cache_status = "graph_stale"
+                else:
+                    result["cache"]["graph_stale"] = False
+        except Exception:
+            pass
+
+        result["cache"]["cache_status"] = cache_status
     except Exception:
         result["cache"]["readable"] = False
 
@@ -221,16 +281,40 @@ write_section() {
   out="$TMPDIR_PREFIX/auth"
   if [ -f ".agent-auth.yaml" ]; then
     echo "- .agent-auth.yaml: present" > "$out"
-    grep -q "api_token:.*[^\"' ]" .agent-auth.yaml 2>/dev/null \
-      && echo "- atlassian.api_token: set" >> "$out" \
-      || echo "- atlassian.api_token: empty" >> "$out"
-    grep -q "personal_access_token:.*[^\"' ]" .agent-auth.yaml 2>/dev/null \
-      && echo "- figma.personal_access_token: set" >> "$out" \
-      || echo "- figma.personal_access_token: empty" >> "$out"
+    python3 - <<'PYEOF' >> "$out" 2>/dev/null || echo "- token detection: unavailable (python3 missing)" >> "$out"
+def yaml_section_key(content, section, key):
+    """Return value of section.key; '' = present-but-empty; None = key absent."""
+    current_section = None
+    for raw in content.splitlines():
+        stripped = raw.lstrip()
+        if not stripped or stripped.startswith('#'):
+            continue
+        if raw and not raw[0].isspace() and ':' in stripped:
+            current_section = stripped.split(':', 1)[0].strip()
+        elif current_section == section and raw[0:1].isspace():
+            kv = stripped.split(':', 1)
+            if len(kv) == 2 and kv[0].strip() == key:
+                val = kv[1].strip()
+                if ' #' in val:
+                    val = val[:val.index(' #')].strip()
+                return val.strip('"\'')
+    return None
+
+def tok_status(v):
+    if v is None: return 'missing_key'
+    if v == '':   return 'empty'
+    return 'set'
+
+content = open('.agent-auth.yaml').read()
+print('- atlassian.api_token:', tok_status(yaml_section_key(content, 'atlassian', 'api_token')))
+print('- figma.personal_access_token:', tok_status(yaml_section_key(content, 'figma', 'personal_access_token')))
+print('- github.personal_access_token:', tok_status(yaml_section_key(content, 'github', 'personal_access_token')))
+PYEOF
   else
     echo "- .agent-auth.yaml: missing (will be auto-created on first run)" > "$out"
     echo "- atlassian.api_token: unknown" >> "$out"
     echo "- figma.personal_access_token: unknown" >> "$out"
+    echo "- github.personal_access_token: unknown" >> "$out"
   fi
 ) &
 
@@ -363,15 +447,41 @@ PYEOF
   out="$TMPDIR_PREFIX/memory"
   if [ -f ".project-orchestration/memory/tooling-cache.json" ]; then
     echo "- tooling-cache.json: present" > "$out"
-    python3 -c "
-import json, sys
+    python3 - <<'PYEOF' >> "$out" 2>/dev/null || echo "- cache: python not available" >> "$out"
+import json, subprocess
+from datetime import datetime, timezone
 try:
-  d = json.load(open('.project-orchestration/memory/tooling-cache.json'))
-  print('- cached_at:', d.get('checked_at','?'))
-  print('- valid_until:', d.get('valid_until','?'))
-  print('- graph_commit:', d.get('graph_commit','?'))
-except: print('- cache: unreadable')
-" 2>/dev/null >> "$out" || echo "- cache: python not available" >> "$out"
+    d = json.load(open('.project-orchestration/memory/tooling-cache.json'))
+    valid_until  = d.get('valid_until')
+    graph_commit = d.get('graph_commit')
+    print('- cached_at:', d.get('checked_at', '?'))
+    print('- valid_until:', valid_until or '?')
+    print('- graph_commit:', graph_commit or '?')
+
+    # Freshness: compare valid_until with now
+    cache_status = 'unknown'
+    if valid_until:
+        try:
+            exp = datetime.fromisoformat(valid_until.replace('Z', '+00:00'))
+            cache_status = 'fresh' if datetime.now(timezone.utc) < exp else 'stale'
+        except Exception:
+            cache_status = 'unparseable'
+
+    # Graph staleness: compare graph_commit with HEAD
+    head = subprocess.run('git rev-parse HEAD', shell=True, capture_output=True, text=True, timeout=5)
+    if head.returncode == 0:
+        head_sha = head.stdout.strip()
+        if graph_commit and graph_commit != head_sha:
+            print(f'- graph_commit vs HEAD: stale ({graph_commit[:8]} != {head_sha[:8]})')
+            if cache_status == 'fresh':
+                cache_status = 'graph_stale'
+        else:
+            print(f'- graph_commit vs HEAD: current')
+
+    print(f'- cache_status: {cache_status}')
+except Exception as e:
+    print('- cache: unreadable:', e)
+PYEOF
   else
     echo "- tooling-cache.json: missing (fresh check required)" > "$out"
   fi
