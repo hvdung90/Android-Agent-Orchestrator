@@ -228,25 +228,27 @@ Optional, non-blocking, never reopens a complete Stage 7 task. Append best-effor
 
 ## Model routing
 
-Model tier per stage. Override the session default only when cognitive load warrants it.
+Claude Code only (ADR-0001). Two capability tiers — never a pinned model ID or a versioned model name, because those go stale and the developer chooses which models are available:
 
-| Stage | Task | Default tier | Upgrade condition |
+- **`default`** — the session's model, as selected by the developer. Every stage in every mode runs here unless the table says otherwise, including all code writing.
+- **`deep-reasoning`** — the most capable model the developer has enabled. Only for the `governed` reasoning stages below, and only at a stage boundary: switching models mid-stage loses context and cache. If it is unavailable or the developer declines, stay on `default` and note it in `session.json.mode_reasons`.
+
+| Stage | Task | Tier | Step-up |
 |---|---|---|---|
-| -1 Preflight | bash checks, cache reads | **Haiku 4.5** | — |
-| 0 Intake | classify, derive source mode | **Haiku 4.5** | — |
-| 1 Discovery | read sources, derive impact + `workflow_mode` | **Sonnet 4.6** | — |
-| 1.5 Clarification | identify ambiguity, synthesize context-pack | **Sonnet 4.6** | — |
-| 2 Requirements | write canonical requirements + acceptance criteria | **Sonnet 4.6** | **Opus 5** when `governed` |
-| 2.5 ADR Decision | architectural trade-off, cross-repo impact | **Sonnet 4.6** | **Opus 5** when `governed` |
-| 3 Design + Plan | design-doc, implementation-plan.md | **Sonnet 4.6** | **Opus 5** when `governed` |
-| 4 Implementation | code, Android TDD | **Sonnet 4.6** | Never — Sonnet is optimal for code |
-| 5 Verify | run tests, check evidence gates | **Sonnet 4.6** | — |
-| 6 QA gate | Karpathy diff, acceptance coverage | **Sonnet 4.6** | — |
-| 7 Finalize | ADR status, task summary, archive | **Haiku 4.5** | — |
-| 8 Retro | reflection, telemetry append | **Haiku 4.5** | — |
+| -1 Preflight | bash checks, cache reads | `default` | — |
+| 0 Intake | classify, derive source mode | `default` | — |
+| 1 Discovery | read sources, derive impact + `workflow_mode` | `default` | — |
+| 1.5 Clarification | identify ambiguity, synthesize context-pack | `default` | — |
+| 2 Requirements | write canonical requirements + acceptance criteria | `default` | `deep-reasoning` when `governed` |
+| 2.5 ADR Decision | architectural trade-off, cross-repo impact | `default` | `deep-reasoning` when `governed` |
+| 3 Design + Plan | design-doc, implementation-plan.md | `default` | `deep-reasoning` when `governed` |
+| 4 Implementation | code, Android TDD | `default` | — |
+| 5 Verify | run tests, check evidence gates | `default` | — |
+| 6 QA gate | Karpathy diff, acceptance coverage | `default` | — |
+| 7 Finalize | ADR status, task summary, archive | `default` | — |
+| 8 Retro | reflection, telemetry append | `default` | — |
 
-
-Model IDs: `claude-haiku-4-5-20251001` · `claude-sonnet-4-6` · `claude-opus-5`
+`fast` never steps up. Read-only sub-agents run on `default` too. Correctness is decided by the evidence gates, never by which model wrote the code.
 
 ---
 

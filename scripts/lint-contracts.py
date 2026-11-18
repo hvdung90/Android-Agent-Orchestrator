@@ -418,6 +418,48 @@ def check_single_session_schema(root: str) -> Iterable[Finding]:
                               "refs/contracts-and-artifacts.md § session.json", line.strip())
 
 
+PINNED_MODEL = re.compile(r"\bclaude-(?:haiku|sonnet|opus)[\w.-]*\d", re.I)
+VERSIONED_MODEL = re.compile(r"\b(?:Haiku|Sonnet|Opus)\s*\d")
+OTHER_HOST = re.compile(r"\b(?:Cursor|Codex)\b")
+MODEL_TIERS = ("`default`", "`deep-reasoning`")
+
+
+def check_model_routing(root: str) -> Iterable[Finding]:
+    """PR8b / ADR-0001 decision 5: Claude Code only; no pinned IDs or versioned
+    model names; `default` everywhere, `deep-reasoning` only for governed."""
+    for path in scanned_files(root):
+        rel_path = rel(root, path)
+        for no, line in enumerate(read_lines(path), 1):
+            low = line.lower()
+            if PINNED_MODEL.search(line) or VERSIONED_MODEL.search(line):
+                yield Finding(rel_path, no, "model-routing: use the `default` / `deep-reasoning` "
+                              "tiers, not a model ID or versioned name", line.strip())
+            if OTHER_HOST.search(line) and "not supported" not in low and "unsupported" not in low:
+                yield Finding(rel_path, no, "model-routing: Claude Code only (ADR-0001); other hosts "
+                              "may only be mentioned as not supported", line.strip())
+    lines = read_lines(os.path.join(root, "SKILL.md"))
+    routing = section(lines, "## Model routing", "## ")
+    if not routing:
+        yield Finding("SKILL.md", 0, "model-routing: `## Model routing` section missing", "")
+        return
+    text = "\n".join(l for _, l in routing)
+    for tier in MODEL_TIERS:
+        if tier not in text:
+            yield Finding("SKILL.md", routing[0][0], f"model-routing: tier {tier} not defined", "")
+    for no, line in routing:
+        cells = [c.strip() for c in line.split("|")]
+        is_stage_row = len(cells) > 4 and (cells[1][:1].isdigit() or cells[1].startswith("-1"))
+        if is_stage_row:
+            tier = cells[3]
+            if "deep-reasoning" in tier:
+                yield Finding("SKILL.md", no, "model-routing: the default tier column must be "
+                              "`default`; step up only in the governed column", line.strip())
+            step_up = cells[4]
+            if "deep-reasoning" in step_up and "governed" not in step_up:
+                yield Finding("SKILL.md", no, "model-routing: `deep-reasoning` only when `governed`",
+                              line.strip())
+
+
 def first_match(path: str, pattern: str) -> Tuple[Optional[str], int]:
     regex = re.compile(pattern)
     for no, line in enumerate(read_lines(path), 1):
@@ -450,7 +492,8 @@ CHECKS: Tuple[Callable[[str], Iterable[Finding]], ...] = (
     check_retired, check_stage_minus_one_session, check_stage_minus_one_state,
     check_stage_ids, check_ref_tier, check_readiness_scope, check_source_mode_inputs,
     check_skipped_stage, check_read_phase_git, check_team_docs_lifecycle,
-    check_tdd_exemptions, check_fast_path, check_single_session_schema, check_versions,
+    check_tdd_exemptions, check_fast_path, check_single_session_schema, check_model_routing,
+    check_versions,
 )
 
 

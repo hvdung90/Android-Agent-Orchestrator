@@ -11,7 +11,7 @@ _Current skill version: 6.1.3_
 
 ## What this repo is
 
-This repository does **not** contain an Android app, Gradle plugin, SDK, or executable CLI. It is a reusable instruction pack for AI agents such as Claude Code, Cursor, Codex, and other tools that can consume markdown skill files.
+This repository does **not** contain an Android app, Gradle plugin, SDK, or executable CLI. It is a reusable instruction pack for **Claude Code**: written for and tested with Claude Code only (`docs/decisions/0001-adaptive-workflow-pr8.md`). Other agents may be able to read the markdown, but they are not supported — their skill loading, sub-agents and tools behave differently and are untested.
 
 The agent entry point is `SKILL.md`. The refs, templates, and examples support it — use the whole pack, not just this README.
 
