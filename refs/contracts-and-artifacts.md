@@ -1209,6 +1209,8 @@ In-progress task state — allows resume after an interruption.
   "stage_reached": 0,   // must match stage_id per refs/stage-contracts.md § Stage order (1.5 and 2.5 included)
   "stage_status": "complete | in_progress | blocked",
   "source_mode": "A | B | C",
+  "task_brief": "<the user's task message as given at Stage 0 — the only source in Mode C>",
+  "brief_usable": true,
   "preflight": { "ran_at": "2026-05-07T08:59:00Z", "ready_for_stage_0": true, "report": ".project-orchestration/reports/preflight.md" },
   "preliminary_ref_tier": "LIGHT | MEDIUM | HEAVY | FULL",
   "ref_tier": "LIGHT | MEDIUM | HEAVY | FULL | null",

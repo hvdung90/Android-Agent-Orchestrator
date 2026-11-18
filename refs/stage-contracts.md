@@ -39,7 +39,9 @@ Each stage defines a typed contract: what it requires as input, what it must pro
 | 9 | `6_qa_gate` | 6 |
 | 10 | `7_docs_decision_finalization` | 7 |
 
-A stage skipped by policy (e.g. 1.5 or 2.5 recorded as AUTO-SKIP / CONFIRM-SKIP in `skip-log.json`) counts as passed for reconciliation; it never becomes the task's `stage_id`.
+A stage skipped by policy (e.g. 1.5 or 2.5 recorded as AUTO-SKIP / CONFIRM-SKIP in `skip-log.json`) counts as passed for reconciliation; it never becomes the task's `stage_id` — `stage_id` always names the last stage that actually ran.
+
+**Next stage** (resume and continuation): with `stage_status: in_progress`, resume `stage_id` itself at its `resume_entry_point`; with `stage_status: complete`, continue at the first stage after `stage_id` in this table that is not recorded as skipped in `skip-log.json`. Example: `1_discovery` complete + Clarification skipped → `2_requirements`.
 
 ### Legacy sessions (no `stage_id`)
 
@@ -48,7 +50,7 @@ Sessions written before `stage_id` existed are migrated **on resume only**, neve
 - `stage_reached` other than `1` → the matching `stage_id` from § Stage order.
 - `stage_reached: 1` is ambiguous (older contracts wrote `1` for both Discovery and Clarification):
   - `docs/ai/tasks/{task_id}/clarification/clarification-brief.md` exists → `1.5_clarification` (same `stage_status`);
-  - else `skip-log.json` records a Stage 1.5 skip → `1.5_clarification`, `stage_status: complete`;
+  - else `skip-log.json` records the Clarification skip → `1_discovery`, `stage_status: complete` (1.5 counts as passed; § Stage order **Next stage** resolves to `2_requirements`);
   - else `stage_status: complete` → `1_discovery`;
   - else (`in_progress`, no brief) → still ambiguous: show the human both resume points (re-run the failed source reader, or re-run the blocked clarification worker) and let them choose.
 - Write the derived `stage_id` (and `stage_reached: 1.5` where it applies) only after the human confirms resuming that task.
@@ -109,7 +111,7 @@ input_requires:
   - user task description (Jira URL / Figma URL / plain text)
 
 guard_conditions:
-  - preflight.md Summary must have ready_for_stage_0: true (same field name as `tooling-preflight.sh --json`)
+  - preflight.md Summary must have ready_for_stage_0: true — the only Stage 0 gate, written by the agent as tooling_ready (from `tooling-preflight.sh --json`) AND the task-level blocking rules
   - if preflight has blocking gaps → show gaps, ask user to resolve before continuing
   - Task History Relevance Gate runs before source mode is finalized:
       default full-history behavior: skipped
@@ -122,6 +124,8 @@ output_produces:
   - if TEAM_DOCS_PATH active and coordination mode and starting a new task: <TEAM_DOCS_PATH>/active-tasks/<repo>/locks.json appended with planning locks  [C]
   - if TEAM_DOCS_PATH active and coordination mode and starting a new task: team task markdown + board rows updated for human visibility  [C]
   - link list recorded (Jira, Figma, Confluence URLs if provided)
+  - session.json task_brief: the user's task message as given (every mode; the only source in Mode C)
+  - session.json brief_usable: true | false — true when the brief (plus links/docs) yields a goal and at least one testable acceptance criterion; false → interrupt with a blocker naming the missing parts
   - task_continuity: "new | continuation | unknown"
   - history_scan:
       performed: true | false
@@ -163,7 +167,10 @@ stage: "1_discovery"
 input_requires:
   - session.json stage_reached >= 0
   - .project-orchestration/reports/preflight.md
-  - source links or docs/ai/inputs/ (per source_mode)
+  - source input per source_mode:
+      A = Jira / Figma / Confluence links recorded at Stage 0
+      B = docs/ai/inputs/
+      C = session.json task_brief (the user's message recorded at Stage 0; no links or local docs needed)
   - matched task history docs only when session.json history_scan.decision = read_full
 
 guard_conditions:

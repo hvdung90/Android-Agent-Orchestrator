@@ -207,7 +207,8 @@ Required sections:
 audit | bootstrap | update | refresh-graph | force-reinstall
 
 ## Summary
-- `ready_for_stage_0`: true | false
+- `tooling_ready` (from `tooling-preflight.sh --json`): true | false
+- `ready_for_stage_0`: true | false — the only Stage 0 gate: `tooling_ready` AND task-level Blocking rules
 - Blocking gaps:
 - Non-blocking gaps:
 

@@ -6,7 +6,8 @@
 
 ## Summary
 
-- `ready_for_stage_0`: true (with caveats below)
+- `tooling_ready`: true
+- `ready_for_stage_0`: true (with caveats below; no task-level blocking rule applies)
 - Blocking gaps: none for read-only analysis
 - Non-blocking gaps:
   - Understand-Anything not installed; falling back to Graphify (graph missing, will build if approved)

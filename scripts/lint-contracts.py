@@ -42,6 +42,8 @@ RETIRED_PATTERNS: Tuple[Tuple[str, "re.Pattern[str]"], ...] = (
     ("lock-path: use active-tasks/<repo>/locks.json", re.compile(r"active-tasks/locks\.json")),
     ("board-path: use active-tasks/shared/README.md", re.compile(r"active-tasks/README\.md")),
     ("readiness-field: use ready_for_stage_0", re.compile(r"proceed_to_stage_0")),
+    ("readiness-field: the script reports tooling_ready; only preflight.md has the final ready_for_stage_0",
+     re.compile(r"same field name as `tooling-preflight\.sh --json`")),
     ("session-path: use .project-orchestration/tasks/{task_id}/session.json",
      re.compile(r"memory/session\.json")),
 )
@@ -202,6 +204,47 @@ def check_ref_tier(root: str) -> Iterable[Finding]:
                       "ref-tier: Stage 1 output must include 'ref_tier finalized'", "")
 
 
+def check_readiness_scope(root: str) -> Iterable[Finding]:
+    """Sub-agents report tooling scope only; the parent owns the final gate."""
+    rel_path = "refs/sub-agents.md"
+    for no, line in enumerate(read_lines(os.path.join(root, rel_path)), 1):
+        if line.strip().startswith("ready_for_stage_0:"):
+            yield Finding(rel_path, no, "readiness-field: sub-agents report tooling_ready; the parent "
+                          "writes the final ready_for_stage_0 into preflight.md", line.strip())
+
+
+def check_source_mode_inputs(root: str) -> Iterable[Finding]:
+    """A Mode C task has no links and no local docs: Stage 0 must record the brief
+    and Stage 1 must accept it as its input."""
+    rel_path = "refs/stage-contracts.md"
+    lines = read_lines(os.path.join(root, rel_path))
+    stage0 = section(lines, "## Stage 0", "## Stage 1 ")
+    stage1 = section(lines, "## Stage 1 ", "## Stage 1.5")
+    if not any("task_brief" in l for _, l in stage0):
+        yield Finding(rel_path, stage0[0][0] if stage0 else 0,
+                      "source-mode-inputs: Stage 0 must record session.json task_brief", "")
+    if not any("C =" in l and "task_brief" in l for _, l in stage1):
+        yield Finding(rel_path, stage1[0][0] if stage1 else 0,
+                      "source-mode-inputs: Stage 1 input_requires must name the Mode C input "
+                      "(C = session.json task_brief)", "")
+
+
+SKIP_TO_SAME_STAGE = re.compile(r"Stage ([0-9.]+) skip.*→ `\1_")
+
+
+def check_skipped_stage(root: str) -> Iterable[Finding]:
+    """A skipped stage never becomes stage_id (legacy migration included), and
+    § Stage order defines how the next stage is resolved past skips."""
+    rel_path = "refs/stage-contracts.md"
+    lines = read_lines(os.path.join(root, rel_path))
+    for no, line in enumerate(lines, 1):
+        if SKIP_TO_SAME_STAGE.search(line):
+            yield Finding(rel_path, no, "skipped-stage: a skipped stage must not become stage_id; "
+                          "keep the last stage that ran and resolve § Stage order Next stage", line.strip())
+    if not any("**Next stage**" in l for _, l in section(lines, "### Stage order", "### ")):
+        yield Finding(rel_path, 0, "skipped-stage: § Stage order must define **Next stage**", "")
+
+
 def first_match(path: str, pattern: str) -> Tuple[Optional[str], int]:
     regex = re.compile(pattern)
     for no, line in enumerate(read_lines(path), 1):
@@ -232,7 +275,8 @@ def check_versions(root: str) -> Iterable[Finding]:
 
 CHECKS: Tuple[Callable[[str], Iterable[Finding]], ...] = (
     check_retired, check_stage_minus_one_session, check_stage_minus_one_state,
-    check_stage_ids, check_ref_tier, check_versions,
+    check_stage_ids, check_ref_tier, check_readiness_scope, check_source_mode_inputs,
+    check_skipped_stage, check_versions,
 )
 
 

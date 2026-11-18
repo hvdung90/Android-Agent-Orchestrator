@@ -200,5 +200,55 @@ class RefTierTests(LintFixture):
         self.replace("refs/stage-contracts.md", "  - ref_tier finalized", "  - tier maybe")
         self.assert_flagged("ref-tier", "refs/stage-contracts.md:")
 
+
+class SourceModeInputTests(LintFixture):
+    """AOO-014 (review): a Mode C task has no links and no local docs, so the
+    Discovery input contract must name the recorded brief for C."""
+
+    def test_stage_1_input_without_mode_c_is_flagged(self):
+        content = self.read("refs/stage-contracts.md")
+        start = content.index("## Stage 1 — Discovery")
+        end = content.index("guard_conditions:", start)
+        block = "\n".join(l for l in content[start:end].splitlines() if "task_brief" not in l)
+        self.write("refs/stage-contracts.md", content[:start] + block + "\n" + content[end:])
+        self.assert_flagged("source-mode-inputs", "refs/stage-contracts.md:")
+
+    def test_stage_0_must_record_task_brief(self):
+        content = self.read("refs/stage-contracts.md")
+        start = content.index("## Stage 0")
+        end = content.index("## Stage 1 ")
+        block = "\n".join(l for l in content[start:end].splitlines() if "task_brief" not in l)
+        self.write("refs/stage-contracts.md", content[:start] + block + "\n" + content[end:])
+        self.assert_flagged("source-mode-inputs", "refs/stage-contracts.md:")
+
+
+class SkippedStageMigrationTests(LintFixture):
+    """AOO-008 (review): a skipped stage never becomes stage_id, legacy migration included."""
+
+    def test_skip_mapped_to_skipped_stage_id_is_flagged(self):
+        self.replace("refs/stage-contracts.md", "### Legacy sessions (no `stage_id`)\n",
+                     "### Legacy sessions (no `stage_id`)\n\n"
+                     "  - `skip-log.json` records a Stage 1.5 skip → `1.5_clarification`, complete;\n")
+        self.assert_flagged("skipped-stage", "refs/stage-contracts.md:")
+
+    def test_next_stage_rule_required(self):
+        content = self.read("refs/stage-contracts.md")
+        self.assertIn("**Next stage**", content)
+        self.write("refs/stage-contracts.md", content.replace("**Next stage**", "**Later**", 1))
+        self.assert_flagged("skipped-stage", "refs/stage-contracts.md:")
+
+
+class ToolingReadinessNameTests(LintFixture):
+    """PR2 review: only preflight.md carries the final ready_for_stage_0."""
+
+    def test_same_field_name_claim_is_flagged(self):
+        self.append("refs/stage-contracts.md",
+                    "  - preflight.md must have ready_for_stage_0: true (same field name as `tooling-preflight.sh --json`)")
+        self.assert_flagged("readiness-field", "refs/stage-contracts.md:")
+
+    def test_tooling_auditor_must_not_emit_final_gate(self):
+        self.append("refs/sub-agents.md", "ready_for_stage_0: true | false")
+        self.assert_flagged("readiness-field", "refs/sub-agents.md:")
+
 if __name__ == "__main__":
     unittest.main()

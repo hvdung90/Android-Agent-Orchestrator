@@ -362,7 +362,7 @@ karpathy:
   action_recommended: none | install-plugin | append-guidance
 blockers: []
 warnings: []
-ready_for_stage_0: true | false
+tooling_ready: true | false   # tooling scope only; the parent writes the final ready_for_stage_0 into preflight.md
 ```
 
 ---
