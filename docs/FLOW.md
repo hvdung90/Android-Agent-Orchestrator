@@ -1,6 +1,6 @@
 # Android Agent Orchestrator — Complete Flow
 
-_Reflects skill v6.1.1. Update when SKILL.md changes._
+_Reflects skill v6.1.3. Update when SKILL.md changes._
 
 ---
 
@@ -68,7 +68,9 @@ All task types start with Stage -1.
     │  CACHE HIT   Run full preflight.sh (parallel)        │
     │  → use cached → write tooling-cache.json incl.       │
     │    tool/command Android command discovery            │
-    │    checks     → write/update session.json            │
+    │    checks     → write reports/preflight.md           │
+    │                  (ready_for_stage_0; no task session │
+    │                   yet — Stage 0 creates it)          │
     └───────────────────────────────────────────────────────┘
                             │
                             ▼
@@ -85,8 +87,9 @@ All task types start with Stage -1.
     └───────────────────────────────────────────────────────┘
                             │
     ┌───────────────────────┴───────────────────────────────┐
-    │  session.json: interrupted task present?              │
+    │  tasks/*/session.json: interrupted task present?      │
     │    Yes → offer user: "Resume <task_id> from Stage N?" │
+    │          (several → list all, human picks)            │
     │          surface handoff.md if present               │
     │    No  → continue                                     │
     └───────────────────────────────────────────────────────┘

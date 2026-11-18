@@ -26,7 +26,7 @@ metadata:
     - refs/android-cli-compatibility.md
 ---
 
-# Android Agent Orchestrator v6.1.1
+# Android Agent Orchestrator v6.1.3
 
 ## Activation
 
@@ -111,9 +111,9 @@ Always load the referenced file before acting on any stage pointer below. Load `
 8. **Every skip is logged.** Write to `skip-log.json` on every auto-skip and confirm-skip. Load `refs/compliance-policy.md` before any skip decision. MANDATORY steps cannot be skipped.
 9. **ADR ledger is global and immutable.** Never edit Accepted ADR text. When a decision changes, create a new superseding ADR.
 10. **`handoff.md` when code owner changes or Stage 4 interrupts.** `branch` and `assignee` must be set before Stage 4 begins.
-11. **Team docs first, lazy.** If `TEAM_DOCS_PATH` is set, read `active-tasks/locks.json` at Stage -1 `[both modes]`. Open markdown boards/tasks only on conflict, write, or explicit team status work. Load `refs/team-docs.md`. Check `TEAM_DOCS_MODE` (default: `coordination`) — it controls which write operations run.
+11. **Team docs first, lazy.** If `TEAM_DOCS_PATH` is set, read `active-tasks/<repo>/locks.json` at Stage -1 `[coordination mode only]` (knowledge mode reads only `active-tasks/shared/README.md` and ADRs). Open markdown boards/tasks only on conflict, write, or explicit team status work. Load `refs/team-docs.md`. Check `TEAM_DOCS_MODE` (default: `coordination`) — it controls which write operations run.
 12. **Task file follows the task `[coordination mode only]`.** When `TEAM_DOCS_PATH` is set and `TEAM_DOCS_MODE: coordination`, create/update the team task file at Stage 0. Write pending `locks.json` entries immediately with `status: planning` — do not defer the initial write to Stage 3 (Stage 3 upgrades `planning → locked`, it does not create them). Update on stage transitions. Archive at Stage 7. In `knowledge` mode, skip all of the above (no task files, no locks, no boards).
-13. **Decisions leave a trace `[both modes]`.** Any decision affecting other repos → create ADR in `<TEAM_DOCS_PATH>/ADRs/` + append row to `active-tasks/README.md § Cross-repo Impacts`. In `coordination` mode, also write in team task file `## Decisions`.
+13. **Decisions leave a trace `[both modes]`.** Any decision affecting other repos → create ADR in `<TEAM_DOCS_PATH>/ADRs/` + append row to `active-tasks/shared/README.md § Cross-repo Impacts`. In `coordination` mode, also write in team task file `## Decisions`.
 14. **Warn on session end if docs have unpushed changes.** When `TEAM_DOCS_PATH` is set and the session ends or interrupts before Stage 7, run `git -C <TEAM_DOCS_PATH> status --porcelain`; warn if non-empty. Do not auto-push unless the stage contract requires it.
 
 ---
@@ -142,7 +142,7 @@ Use sub-agents only as read-only/advisory workers. Load `refs/sub-agents.md` for
 
 Auth and readiness before any task work. Load `refs/auth-bootstrap.md`, `refs/provisioning-preflight.md`, `refs/android-cli-compatibility.md`, and `refs/stage-contracts.md § Stage -1`.
 
-If `TEAM_DOCS_PATH` is set, load `refs/team-docs.md` and read only `active-tasks/locks.json` for conflict detection unless a conflict/write requires more.
+If `TEAM_DOCS_PATH` is set, load `refs/team-docs.md` and read only `active-tasks/<repo>/locks.json` (coordination mode) for conflict detection unless a conflict/write requires more.
 
 ### Stage 0 — Intake
 
@@ -325,7 +325,7 @@ graphify-out/
 ## Minimal operating algorithm
 
 1. **Auth init** — check `.agent-auth.yaml`; auto-create if missing (`refs/auth-bootstrap.md` Step 1). Cannot be skipped.
-2. **Team lock check** — if `TEAM_DOCS_PATH` is set, read `active-tasks/locks.json`; hard-stop or reclaim stale locks per `refs/team-docs.md`.
+2. **Team lock check** — if `TEAM_DOCS_PATH` is set and `TEAM_DOCS_MODE: coordination`, read `active-tasks/<repo>/locks.json`; hard-stop or reclaim stale locks per `refs/team-docs.md`.
 3. **Cache + resume check** — read `tooling-cache.json`; if valid, use cached tool/command state. Scan in-progress sessions and run `refs/stage-contracts.md § Integrity reconciliation` before trusting `stage_reached`.
 4. **Tooling Preflight** — on cache miss, run `templates/tooling-preflight.sh` JSON + markdown, then write cache including Android command discovery.
 5. **Intake + discovery** — derive source mode, task continuity, change type, impact, and finalized workflow mode.

@@ -206,6 +206,7 @@ Steps marked `[C]` run in `coordination` mode only. Steps marked `[both]` run in
 1. `[both]` `git pull --rebase` on docs repo before reading any file.
 2. `[both]` Read `<TEAM_DOCS_PATH>/active-tasks/shared/README.md` — scan Cross-repo Impacts for decisions affecting the current repo.
 3. `[C]` Read `<TEAM_DOCS_PATH>/active-tasks/<repo>/locks.json` if present; if missing, treat as `{ "version": 1, "locks": [] }`.
+   - **Legacy global index (pre-6.1.3):** if `<TEAM_DOCS_PATH>/active-tasks/locks.json` also exists, do **not** merge it in or use it as a silent fallback. Report it as `team_docs.legacy_lock_index: present` in `session.json`, list any entries whose `repo` matches the current repo, and ask the human to move them into `active-tasks/<repo>/locks.json` (then delete the legacy file once no repo still references it). Until migrated, treat matching legacy entries as conflicts, not as clean.
 4. `[C]` Match planned scope against `locks[]`:
    - If overlap AND matching lock's `locked_at` is **not stale** (see § Stale lock reclaim policy) → HARD STOP, print conflict table with owner @github-handle and `locked_at` timestamp.
    - If overlap AND matching lock's `locked_at` **is stale** → do not hard-stop; follow § Stale lock reclaim policy (CONFIRM-SKIP, human must approve reclaim).
@@ -226,7 +227,7 @@ Locks are written once at Stage 0 and never touched again until Stage 3 (upgrade
 1. When Stage -1's conflict check finds an overlapping lock whose `locked_at` is stale, do not hard-stop. Instead ask:
    > "Lock on `<file>` by @`<owner>` (Task `<task-id>`) is `<N>` days old — stale threshold is `<threshold>`. It may be abandoned, or the owner may just not have reached Stage 7 yet. Reclaim this lock and proceed? (y/n)"
 2. If the human confirms reclaim:
-   - Remove the stale lock object from `active-tasks/locks.json` and let the current task's Stage 0 write its own lock.
+   - Remove the stale lock object from `active-tasks/<repo>/locks.json` and let the current task's Stage 0 write its own lock.
    - Append an audit line to the current task file `## Notes/Gotchas`: `Reclaimed stale lock on <file> from <old-task-id> (@<old-owner>, locked since <old-locked_at>).`
    - `git push`.
 3. If the human declines → treat as a normal HARD STOP; do not proceed with the overlapping file.
@@ -234,7 +235,7 @@ Locks are written once at Stage 0 and never touched again until Stage 3 (upgrade
 
 **Tiebreak for genuine concurrent races** (both locks fresh — this is the residual window described in the anti-race protocol above, where two devs start within seconds of each other and both pass Stage -1 before either's Stage 0 write lands):
 - **Earliest `locked_at` wins.** The task with the later `locked_at` timestamp must yield: replan scope to avoid the contested file(s), or pause and contact the earlier owner directly.
-- **Post-push re-verification (closes the residual window):** immediately after Stage 0's `git push` succeeds, re-`git pull --rebase` and re-read `active-tasks/locks.json`. If an object for the same file now has an earlier `locked_at` than the current task's own lock → the current task lost the tiebreak; remove its own pending lock, `git push`, and follow the tiebreak rule above.
+- **Post-push re-verification (closes the residual window):** immediately after Stage 0's `git push` succeeds, re-`git pull --rebase` and re-read `active-tasks/<repo>/locks.json`. If an object for the same file now has an earlier `locked_at` than the current task's own lock → the current task lost the tiebreak; remove its own pending lock, `git push`, and follow the tiebreak rule above.
 
 ---
 
@@ -352,6 +353,6 @@ Used when `TASK_TEMPLATE.md` is not found in the docs repo.
 ## What NOT to do
 
 - Do NOT write `session.json`, `context-pack.json`, or other operational artifacts into `TEAM_DOCS_PATH`. Those stay in `.project-orchestration/`.
-- Do NOT rewrite historical entries in `active-tasks/README.md`. Append-only for Cross-repo Impacts; overwrite-in-place only for the Overview count table.
+- Do NOT rewrite historical entries in `active-tasks/shared/README.md`. Append-only for Cross-repo Impacts; overwrite-in-place only for the Overview count table.
 - Do NOT create files in `TEAM_DOCS_PATH/orchestration/` (that path does not exist — team docs is human-readable coordination, not agent state).
 - Do NOT commit docs repo changes with `--no-verify` or force-push. Treat docs repo the same as any production branch.

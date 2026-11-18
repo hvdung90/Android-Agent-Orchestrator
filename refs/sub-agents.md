@@ -362,7 +362,7 @@ karpathy:
   action_recommended: none | install-plugin | append-guidance
 blockers: []
 warnings: []
-proceed_to_stage_0: true | false
+ready_for_stage_0: true | false
 ```
 
 ---

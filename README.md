@@ -1,6 +1,6 @@
 # Android Agent Orchestrator
 
-_Current skill version: 6.1.1_
+_Current skill version: 6.1.3_
 
 > **A meta-skill for Android projects.**  
 > Audit the tooling. Read the architecture map. Clarify the task. Approve requirements. Then code with one owner.
@@ -65,7 +65,7 @@ The agent **stops at Stage 2 and Stage 2.5** and will not write code without you
 
 Stage 7 always runs the task artifact integrity check. The heavier skill drift check runs only when orchestration files such as `SKILL.md`, `refs/**`, `templates/**`, `docs/FLOW.md`, or `CHANGELOG.md` changed.
 
-Android CLI commands are discovered at Stage -1 and cached in `tooling-cache.json`; unsupported commands must use the documented fallback matrix. When `TEAM_DOCS_PATH` is active, Stage -1 reads `active-tasks/locks.json` first and opens markdown boards only when needed.
+Android CLI commands are discovered at Stage -1 and cached in `tooling-cache.json`; unsupported commands must use the documented fallback matrix. When `TEAM_DOCS_PATH` is active, Stage -1 reads `active-tasks/<repo>/locks.json` first (coordination mode) and opens markdown boards only when needed.
 
 ---
 
@@ -141,6 +141,8 @@ templates/
 └── tooling-preflight.sh          ← parallel audit script
 examples/
 └── preflight-report.example.md   ← filled example with auth section
+scripts/
+└── lint-contracts.py             ← contract drift lint (paths, field names, version headers)
 docs/
 ├── FLOW.md                       ← complete flow diagram, all use cases
 └── ai/

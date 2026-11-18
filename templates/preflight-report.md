@@ -6,7 +6,7 @@
 
 ## Summary
 
-- Ready for Stage 0:
+- `ready_for_stage_0`: true | false
 - Blocking gaps:
 - Non-blocking gaps:
 
@@ -70,7 +70,7 @@
 
 ## Decisions
 
-- Proceed to Stage 0:
+- Stage 0 constraints (e.g. read-only analysis only):
 - Required human decisions:
 - Required installs/updates:
 - Required graph action:

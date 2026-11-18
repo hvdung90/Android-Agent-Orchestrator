@@ -4,7 +4,7 @@ _Skill version: 6.1.3 — update this when SKILL.md bumps a minor or major versi
 
 Each stage defines a typed contract: what it requires as input, what it must produce as output, and what state it writes to `session.json` on completion or interrupt.
 
-**Resume rule:** At Stage -1, read `session.json`. If `stage_status = in_progress`, the previous run was interrupted at `stage_reached`. Run the **Integrity reconciliation** check below before offering to resume. Offer to resume from `resume_entry_point`. If user declines, overwrite session and start fresh.
+**Resume rule:** At Stage -1, scan `.project-orchestration/tasks/*/session.json`. Any session with `stage_status = in_progress` was interrupted at its `stage_reached`; if more than one exists, list them all and let the human pick — never choose one silently. A session at the legacy path `.project-orchestration/memory/session.json` (pre-6.1.x) is reported as a legacy resume candidate and moved to `tasks/{task_id}/session.json` only after the human confirms the task id. Run the **Integrity reconciliation** check below before offering to resume. Offer to resume from `resume_entry_point`. If user declines, overwrite session and start fresh.
 
 **Integrity reconciliation (mandatory before any resume offer — do not skip even when `stage_status = complete`):** `session.json` records what the agent *believes* happened; it is not proof the artifacts actually exist — a crash between writing `session.json` and writing the stage's output file, a manual deletion, or a failed git operation can all leave them out of sync. Trusting `stage_reached` blindly risks starting Stage 4 with no `handoff.md`, or closing Stage 6 against evidence that was never collected.
 
@@ -38,11 +38,12 @@ output_produces:
   - if TEAM_DOCS_PATH active [both modes]: read <TEAM_DOCS_PATH>/active-tasks/shared/README.md (Cross-repo Impacts); ADRs/README.md scanned for relevant_adrs when workflow_mode ≥ standard
   - if TEAM_DOCS_PATH active [C only]: conflict check read from <TEAM_DOCS_PATH>/active-tasks/<repo>/locks.json (or treated missing as empty)
   - .project-orchestration/status.json (initialized if missing)    ← GLOBAL
-  - .project-orchestration/tasks/{task_id}/session.json (stage_reached: -1)
+  # No task session.json is written here: task_id does not exist until Stage 0, which creates it.
+  # Stage -1 outcome is evidenced by reports/preflight.md (`ready_for_stage_0`) and tooling-cache.json.
   - context fields: tooling_readiness, auth_status, provisioning_mode, blockers, architecture_map_staleness
   # skip-log.json is NOT pre-created here — lazy: created only on first skip entry
 
-state_on_complete:
+state_on_complete:            # carried into the session Stage 0 creates; not persisted on its own
   stage_reached: -1
   stage_status: complete
   blocker: null
@@ -67,7 +68,7 @@ input_requires:
   - user task description (Jira URL / Figma URL / plain text)
 
 guard_conditions:
-  - preflight.md must have proceed_to_stage_0: true
+  - preflight.md Summary must have ready_for_stage_0: true (same field name as `tooling-preflight.sh --json`)
   - if preflight has blocking gaps → show gaps, ask user to resolve before continuing
   - Task History Relevance Gate runs before source mode is finalized:
       default full-history behavior: skipped

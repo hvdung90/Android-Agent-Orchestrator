@@ -1301,7 +1301,7 @@ If either check fails → flag graph as stale in `preflight.md`. Commit-mismatch
 
 ### Team docs `locks.json`
 
-**Path:** `<TEAM_DOCS_PATH>/active-tasks/locks.json` — shared team-docs conflict index, active only when `TEAM_DOCS_PATH` is configured.
+**Path:** `<TEAM_DOCS_PATH>/active-tasks/<repo>/locks.json` — per-repo conflict index, active only when `TEAM_DOCS_PATH` is configured and `TEAM_DOCS_MODE: coordination`. Each coordination-mode repo has its own file; knowledge-mode repos have none.
 
 ```json
 {

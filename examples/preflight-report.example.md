@@ -6,7 +6,7 @@
 
 ## Summary
 
-- Ready for Stage 0: yes, with caveats
+- `ready_for_stage_0`: true (with caveats below)
 - Blocking gaps: none for read-only analysis
 - Non-blocking gaps:
   - Understand-Anything not installed; falling back to Graphify (graph missing, will build if approved)
@@ -83,7 +83,7 @@
 
 ## Decisions
 
-- Proceed to Stage 0: yes for read-only task analysis
+- Stage 0 constraints: read-only task analysis
 - Required human decisions:
   - Approve Understand-Anything install/build (or Graphify as fallback) if an architecture graph is required for this task
   - Approve Karpathy plugin install or confirm manual application is acceptable

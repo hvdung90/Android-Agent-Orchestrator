@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- **Lock index path unified to per-repo** (`SKILL.md` hard rule 11, Stage -1, operating algorithm; `README.md`; `refs/team-docs.md`; `refs/contracts-and-artifacts.md § Team docs locks.json`) — AOO-016. v6.1.3 moved locks to `active-tasks/<repo>/locks.json` but seven references still pointed at the retired global `active-tasks/locks.json`; a reader following those would see "no locks" while writers used the per-repo file. Hard rule 11 also said `[both modes]` although knowledge mode has no locks; it now says coordination mode only.
+- **Cross-repo board path** (`SKILL.md` hard rule 13, `refs/team-docs.md`): two references to the removed global `active-tasks/README.md` now point at `active-tasks/shared/README.md`.
+- **Legacy lock index**: `refs/team-docs.md` Stage -1 reads now say what to do when the pre-6.1.3 global `locks.json` still exists — report it, treat matching entries as conflicts, ask the human to migrate; never merge it in silently.
+- **One readiness field: `ready_for_stage_0`** (`refs/stage-contracts.md § Stage 0` guard, `refs/sub-agents.md`, `refs/provisioning-preflight.md`, `templates/preflight-report.md`, example report) — AOO-020. The Stage 0 guard and the sub-agent contract said `proceed_to_stage_0` while the script and JSON schema emit `ready_for_stage_0`. The report's old "Proceed to Stage 0" decision line is now "Stage 0 constraints" so it is not read as a second readiness flag.
+- **Task session path and Stage -1** (`refs/stage-contracts.md`, `refs/provisioning-preflight.md`, `docs/FLOW.md`) — AOO-019 (contract part). `provisioning-preflight.md` told Stage -1 to write `.project-orchestration/memory/session.json`, while every other contract uses `tasks/{task_id}/session.json` — and Stage -1 cannot know `task_id`, which Stage 0 assigns. Stage -1 now writes no task session (its result lives in `preflight.md` and `tooling-cache.json`); Stage 0 creates the session. The resume rule scans `tasks/*/session.json`, lists every interrupted task instead of picking one, and reports a legacy `memory/session.json` as a resume candidate. The preflight script's own session lookup is fixed separately (PR2).
+- **Version headers** (`SKILL.md` heading, `README.md`, `docs/FLOW.md`) now match the 6.1.3 frontmatter — AOO-004.
+
+### Added
+
+- **`scripts/lint-contracts.py`** + CI (`.github/workflows/contracts-lint.yml`): fails on the retired lock/board/session paths, `proceed_to_stage_0`, a task session in the Stage -1 contract, and any version header that differs from `SKILL.md` frontmatter. Lines containing "legacy" (migration guidance) are allowed; CHANGELOG and review docs are not scanned.
+
 ## v6.1.3
 
 ### Changed
