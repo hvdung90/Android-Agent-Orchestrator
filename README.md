@@ -138,9 +138,12 @@ templates/
 ├── architecture-domain.md        ← docs/ai/architecture/<domain>.md template
 ├── preflight-report.md           ← preflight output template
 ├── start-task-prompts.md         ← copy/paste prompts for starting tasks
-└── tooling-preflight.sh          ← parallel audit script
+├── tooling-preflight.sh          ← preflight entrypoint (thin wrapper, needs python3)
+└── tooling_preflight.py          ← preflight core: one implementation, Markdown or --json
 examples/
 └── preflight-report.example.md   ← filled example with auth section
+tests/
+└── preflight/test_preflight.py  ← fixture-based regression tests (python3 -m unittest discover -s tests/preflight)
 docs/
 ├── FLOW.md                       ← complete flow diagram, all use cases
 └── ai/

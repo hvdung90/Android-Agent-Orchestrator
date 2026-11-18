@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- **Preflight: one implementation for both output formats** (`templates/tooling-preflight.sh`, new `templates/tooling_preflight.py`) — AOO-023. The Markdown (bash) and `--json` (Python) paths were two copies of the same checks and had drifted (only Markdown read `session.json`; Karpathy and architecture-map reporting differed). All checks now run once in a stdlib-only Python core and are rendered as Markdown or JSON. `tooling-preflight.sh` stays the entrypoint (same arguments) and fails with exit 127 and a clear message when `python3` is missing. JSON keeps every existing key and adds `session`; Markdown keeps every section and adds `- Karpathy: <status>` and `- active architecture-map tool: <tool>` summary lines.
+- **Preflight: `graphifyy` package always reported missing on hosts without a `python` binary** — AOO-024. Detection now uses `importlib.metadata` in the running `python3` instead of `python -m pip show`.
+- **Preflight: commands run without a shell and with a 10 s timeout**; Markdown mode no longer depends on `mktemp`, `head`, `grep`, `find`, `awk`, or `sed`.
+
+### Added
+
+- **`tests/preflight/test_preflight.py`** — AOO-003 (first slice). Fixture-based black-box tests with PATH stubs for `android`, `adb`, `git`, `python3`: token detection regressions from AOO-012a (empty template, GitHub-only, inline comment, commented-out keys, values never printed), Android command discovery, `graphifyy` detection without `python`, cache status, JSON/Markdown parity, and missing `python3`. Set `AAO_PREFLIGHT_SCRIPT` to run the suite against another copy of the script.
+- **CI** (`.github/workflows/preflight-tests.yml`) runs the suite on Ubuntu and macOS.
+
 ## v6.1.3
 
 ### Changed
