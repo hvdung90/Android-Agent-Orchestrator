@@ -670,7 +670,7 @@ class CheckIsolationTests(unittest.TestCase):
 
     def test_failing_check_keeps_other_results(self):
         with open(".agent-auth.yaml", "w") as f:
-            f.write('github:\n  personal_access_token: "x"\n')
+            f.write('github:\n  personal_access_token: "ghp_fake_value"\n')
         self.patch_check("android")
         facts = self.core.collect("audit")
         self.assertEqual(facts["check_errors"], ["android: RuntimeError"])

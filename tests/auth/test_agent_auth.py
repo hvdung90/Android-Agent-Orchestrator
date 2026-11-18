@@ -243,6 +243,31 @@ class ExecTests(AuthFixture):
         self.assertIn("figma.personal_access_token is empty", r.stderr)
         self.assertIn("do not paste", r.stderr)
 
+    def test_short_credentials_are_refused_not_leaked(self):
+        """Exact-value redaction cannot safely cover 1-3 char values, so exec
+        refuses them before spawning the child; status names the state."""
+        marker = os.path.join(self.dir, "ran")
+        for value in ("a", "ab", "abc"):
+            with self.subTest(length=len(value)):
+                self.write_auth(f'github:\n  personal_access_token: "{value}"\n')
+                r = self.run_tool("exec", "github", "--", "sh", "-c",
+                                  f'echo "$AAO_GITHUB_TOKEN"; echo "$AAO_GITHUB_TOKEN" >&2; touch {marker}')
+                self.assertEqual(r.returncode, 3)
+                self.assertFalse(os.path.exists(marker))
+                self.assertIn("github.personal_access_token is too_short", r.stderr)
+                self.assertNotIn(f'"{value}"', r.stdout + r.stderr)
+                status = json.loads(self.run_tool("status", "--json").stdout)
+                self.assertEqual(status["services"]["github"]["fields"]["personal_access_token"],
+                                 "too_short")
+
+    def test_every_injected_value_is_redacted(self):
+        """Invariant: whatever exec injects never appears verbatim in output."""
+        self.write_auth(FILLED)
+        r = self.run_tool("exec", "atlassian", "--", "sh", "-c",
+                          'env | grep "^AAO_"; env | grep "^AAO_" >&2')
+        for value in ("acme.atlassian.net", "dev@acme.test", SECRET):
+            self.assertNotIn(value, r.stdout + r.stderr)
+
     def test_unknown_service(self):
         self.write_auth(FILLED)
         r = self.run_tool("exec", "slack", "--", "true")

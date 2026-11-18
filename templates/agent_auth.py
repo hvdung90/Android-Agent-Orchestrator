@@ -9,7 +9,7 @@ the only thing that opens the file:
   python3 templates/agent_auth.py status [--project KEY] [--json] [--fix-permissions]
   python3 templates/agent_auth.py exec <service> [--project KEY] -- <command...>
 
-`status` reports set / empty / missing_key per field — never values.
+`status` reports set / empty / missing_key / too_short per field — never values.
 `exec` passes credentials to the child as environment variables (see ENV
 below) and replaces every credential value in the child's stdout/stderr with
 `[REDACTED:<service>.<field>]`. Reference them in the command, e.g.:
@@ -42,6 +42,10 @@ SERVICES: Dict[str, Tuple[Tuple[str, str], ...]] = {
     "figma": (("personal_access_token", "AAO_FIGMA_TOKEN"),),
     "github": (("personal_access_token", "AAO_GITHUB_TOKEN"),),
 }
+# Exact-value redaction cannot safely cover very short values (they would
+# collide with ordinary text), so such values are reported as `too_short` and
+# `exec` refuses to inject them. Every value exec does inject is >= this length
+# and therefore always redacted.
 MIN_REDACT_LEN = 4
 
 EXIT_USAGE, EXIT_MISSING_CREDENTIAL, EXIT_AUTH_FILE = 2, 3, 4
@@ -169,9 +173,12 @@ def read_auth_file(path: str = AUTH_FILE) -> Dict[str, Any]:
 # ── Resolution ───────────────────────────────────────────────────────────────
 
 def field_state(value: Any) -> str:
+    """missing_key | empty | too_short | set — never the value itself."""
     if value is None:
         return "missing_key"
-    return "set" if isinstance(value, str) and value.strip() else "empty"
+    if not isinstance(value, str) or not value.strip():
+        return "empty"
+    return "too_short" if len(value) < MIN_REDACT_LEN else "set"
 
 
 def resolve(data: Dict[str, Any], service: str, project: Optional[str] = None
@@ -291,6 +298,8 @@ def cmd_exec(service: str, project: Optional[str], argv: List[str]) -> int:
             print(f"{service}.{name} is {field_state(fields[name])} in {AUTH_FILE}: ask the user "
                   f"to fill it in the file themselves — do not paste it in chat",
                   file=sys.stderr)
+        # too_short values are refused rather than injected: exact-value redaction
+        # could not hide them reliably, which would break the never-print invariant.
         return EXIT_MISSING_CREDENTIAL
     env = dict(os.environ)
     env.update({var: str(fields[name]) for name, var in SERVICES[service]})

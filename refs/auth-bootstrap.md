@@ -15,11 +15,11 @@ _Skill version: 6.1.3 — update this when SKILL.md bumps a minor or major versi
 | Need | Command | Shows |
 |---|---|---|
 | Create the file | `python3 templates/agent_auth.py init` | created / exists (never overwrites) |
-| Is a token there? | `python3 templates/agent_auth.py status [--project KEY] [--json]` | `set` / `empty` / `missing_key` per field, file permissions — never values |
+| Is a token there? | `python3 templates/agent_auth.py status [--project KEY] [--json]` | `set` / `empty` / `missing_key` / `too_short` per field, file permissions — never values |
 | Fix permissions | `python3 templates/agent_auth.py status --fix-permissions` | chmod 600 on the file only |
 | Call an API with a token | `python3 templates/agent_auth.py exec <atlassian\|figma\|github> [--project KEY] -- <command…>` | command output with every credential value replaced by `[REDACTED:<service>.<field>]` |
 
-`exec` sets: `AAO_ATLASSIAN_DOMAIN`, `AAO_ATLASSIAN_EMAIL`, `AAO_ATLASSIAN_API_TOKEN`, `AAO_FIGMA_TOKEN`, `AAO_GITHUB_TOKEN`. If a required field is empty it refuses to run the command (exit 3) and says which field the user must fill.
+`exec` sets: `AAO_ATLASSIAN_DOMAIN`, `AAO_ATLASSIAN_EMAIL`, `AAO_ATLASSIAN_API_TOKEN`, `AAO_FIGMA_TOKEN`, `AAO_GITHUB_TOKEN`. If a required field is not `set` it refuses to run the command (exit 3) and says which field the user must fill. `too_short` (1–3 characters) is refused too: redaction replaces exact values, and a value that short could not be hidden reliably — no real token is that short, so ask the user to check the entry. Redaction is a safety net for the injected values, not a guarantee against a command that transforms them (encodes, splits, hashes).
 
 ---
 
