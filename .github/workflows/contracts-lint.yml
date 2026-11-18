@@ -20,3 +20,5 @@ jobs:
         run: python3 scripts/lint-contracts.py
       - name: Test the linter
         run: python3 -m unittest discover -s tests/contracts -v
+      - name: Test the team-docs sync helper (real git)
+        run: python3 -m unittest discover -s tests/team_docs -v

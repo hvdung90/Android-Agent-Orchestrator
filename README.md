@@ -138,13 +138,15 @@ templates/
 ├── architecture-domain.md        ← docs/ai/architecture/<domain>.md template
 ├── preflight-report.md           ← preflight output template
 ├── start-task-prompts.md         ← copy/paste prompts for starting tasks
-└── tooling-preflight.sh          ← parallel audit script
+├── tooling-preflight.sh          ← parallel audit script
+└── team_docs_sync.py            ← team-docs git sync: read (no checkout changes) / begin / commit-push
 examples/
 └── preflight-report.example.md   ← filled example with auth section
 scripts/
 └── lint-contracts.py             ← contract drift lint (paths, field names, version headers)
 tests/
-└── contracts/test_lint_contracts.py ← linter regression tests (python3 -m unittest discover -s tests/contracts)
+├── contracts/test_lint_contracts.py ← linter regression tests (python3 -m unittest discover -s tests/contracts)
+└── team_docs/test_team_docs_sync.py ← real-git tests for the team-docs sync helper (python3 -m unittest discover -s tests/team_docs)
 docs/
 ├── FLOW.md                       ← complete flow diagram, all use cases
 └── ai/

@@ -76,7 +76,7 @@ output_produces:
   - .project-orchestration/memory/tooling-cache.json               ← GLOBAL
   - if TEAM_DOCS_PATH active [both modes]: read <TEAM_DOCS_PATH>/active-tasks/shared/README.md (Cross-repo Impacts); ADRs/README.md scanned for relevant_adrs when workflow_mode ≥ standard
   - if TEAM_DOCS_PATH active [C only]: conflict check read from <TEAM_DOCS_PATH>/active-tasks/<repo>/locks.json on the fetched upstream ref (or treated missing as empty); fetch failure → conflict_check: unknown
-  - if TEAM_DOCS_PATH active: docs checkout left untouched (fetch + read from upstream ref only; no pull/rebase/checkout in this stage)
+  - if TEAM_DOCS_PATH active: docs checkout left untouched (`team_docs_sync.py read`: fetch + read from upstream ref only; no_upstream or fetch_failed → lock data unknown)
   - .project-orchestration/status.json (initialized if missing)    ← GLOBAL
   # No task session.json is written here: task_id does not exist until Stage 0, which creates it.
   # Stage -1 outcome is evidenced by reports/preflight.md (`ready_for_stage_0`) and tooling-cache.json.

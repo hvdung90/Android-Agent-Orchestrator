@@ -261,6 +261,26 @@ def check_read_phase_git(root: str) -> Iterable[Finding]:
                           "belong to § Writes", line.strip())
 
 
+RAW_GIT_WRITE = re.compile(r"`git (push|pull --rebase|add (\.|-A|--all))")
+
+
+def check_team_docs_lifecycle(root: str) -> Iterable[Finding]:
+    """PR7 review: team-docs writes go through team_docs_sync.py begin/commit-push
+    (only the step's own paths), and an unverified lock source is `unknown`."""
+    rel_path = "refs/team-docs.md"
+    lines = read_lines(os.path.join(root, rel_path))
+    for no, line in enumerate(lines, 1):
+        low = line.lower()
+        if RAW_GIT_WRITE.search(line) and "never" not in low and "begin" not in low \
+                and "commit-push" not in low:
+            yield Finding(rel_path, no, "write-lifecycle: use `team_docs_sync.py begin` / "
+                          "`commit-push -- <paths>` instead of raw git", line.strip())
+    for no, line in section(lines, "## Reads (Stage -1", "## "):
+        if "no_upstream" in line and "unknown" not in line and "team_docs.sync" not in line:
+            yield Finding(rel_path, no, "write-lifecycle: no_upstream must make lock data `unknown` "
+                          "(like fetch_failed)", line.strip())
+
+
 def first_match(path: str, pattern: str) -> Tuple[Optional[str], int]:
     regex = re.compile(pattern)
     for no, line in enumerate(read_lines(path), 1):
@@ -292,7 +312,7 @@ def check_versions(root: str) -> Iterable[Finding]:
 CHECKS: Tuple[Callable[[str], Iterable[Finding]], ...] = (
     check_retired, check_stage_minus_one_session, check_stage_minus_one_state,
     check_stage_ids, check_ref_tier, check_readiness_scope, check_source_mode_inputs,
-    check_skipped_stage, check_read_phase_git, check_versions,
+    check_skipped_stage, check_read_phase_git, check_team_docs_lifecycle, check_versions,
 )
 
 

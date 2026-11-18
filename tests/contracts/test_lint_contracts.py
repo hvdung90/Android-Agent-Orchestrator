@@ -282,5 +282,29 @@ class TeamDocsReadPhaseTests(LintFixture):
         self.assertIn("pull --rebase", content[content.index("## Writes"):])
         self.assert_clean()
 
+
+class TeamDocsWriteLifecycleTests(LintFixture):
+    """PR7 review: writes go begin -> write -> commit-push(paths); no raw git."""
+
+    def inject_write(self, text):
+        self.replace("refs/team-docs.md", "### Stage 3 (files locked)\n", "### Stage 3 (files locked)\n\n" + text + "\n")
+
+    def test_raw_pull_rebase_in_writes_is_flagged(self):
+        self.inject_write("- `git pull --rebase` on docs repo before writing.")
+        self.assert_flagged("write-lifecycle", "refs/team-docs.md:")
+
+    def test_raw_push_is_flagged(self):
+        self.inject_write("- **`git push` docs repo after all writes complete.**")
+        self.assert_flagged("write-lifecycle", "refs/team-docs.md:")
+
+    def test_add_all_is_flagged(self):
+        self.inject_write("- `git add -A` then commit.")
+        self.assert_flagged("write-lifecycle", "refs/team-docs.md:")
+
+    def test_no_upstream_must_mean_unknown(self):
+        self.replace("refs/team-docs.md", "   - `sync: no_upstream` or `sync: fetch_failed` →",
+                     "   - `sync: no_upstream` → read the checkout; fine.\n   - `sync: fetch_failed` →")
+        self.assert_flagged("write-lifecycle", "refs/team-docs.md:")
+
 if __name__ == "__main__":
     unittest.main()
