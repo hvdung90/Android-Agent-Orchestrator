@@ -12,14 +12,17 @@ It prevents agents from assuming tool availability, inventing commands, reading 
 
 ## Cache check (run before anything else)
 
-Read `.project-orchestration/memory/tooling-cache.json`:
+Run `bash templates/tooling-preflight.sh --cache-check` (git + cache only, no tool probes) and use its `cache.cache_reusable`. Do not re-derive the decision by reading `tooling-cache.json` by hand.
 
-| Condition | Action |
-|---|---|
-| File missing | Run full preflight via `bash templates/tooling-preflight.sh` |
-| `valid_until` expired | Run full preflight; overwrite cache |
-| `graph_commit` ≠ `git rev-parse HEAD` | Run full preflight; overwrite cache |
-| `valid_until` in future AND `graph_commit` matches | **Skip tool checks**; load cached values; write brief preflight.md noting "cache hit"; go to Stage 0 |
+| `cache.cache_status` | `cache_reusable` | Action |
+|---|---|---|
+| `fresh` (TTL valid AND HEAD readable AND `graph_commit` == HEAD) | `true` | **Skip tool checks**; load cached values; write brief preflight.md noting "cache hit"; go to Stage 0 |
+| file missing / `readable: false` | `false` | Run full preflight; write cache |
+| `stale` (TTL expired) | `false` | Run full preflight; overwrite cache |
+| `graph_stale` (`graph_commit` ≠ HEAD) | `false` | Run full preflight; overwrite cache |
+| `no_commit` (`graph_commit` missing or empty) | `false` | Run full preflight; overwrite cache — no evidence the cache matches this commit |
+| `head_unavailable` (no git, or HEAD unresolvable) | `false` | Run full preflight; do not write a cache without `graph_commit` |
+| `unparseable` / `unknown` (bad or missing `valid_until`) | `false` | Run full preflight; overwrite cache |
 
 Cache TTL default: **24 hours**. Invalidated immediately after any install/update action.
 
@@ -228,6 +231,8 @@ Block Stage 0 when:
 - required setup action is needed but active mode is `audit`,
 - Android CLI is required for immediate runtime evidence and is missing,
 - user asked to verify device/runtime but no evidence can be produced.
+
+**Who decides.** `tooling-preflight.sh --json` reports `ready_for_stage_0` with `readiness_scope: "tooling"`: its `blocking_gaps` cover only what the script can decide alone (today: `not_a_git_work_tree`, from Stage -1 `input_requires`). The task-level rules above need the task, so the agent applies them and writes the final `ready_for_stage_0` into `preflight.md` as **script value AND task-level rules**. Never write `true` when the script said `false`, and never treat script `true` as "this task may proceed".
 
 Do not block Stage 0 when:
 - optional architecture-map tool (Understand-Anything or Graphify) is missing but docs/capture-knowledge can be used,

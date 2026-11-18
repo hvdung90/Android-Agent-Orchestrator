@@ -29,8 +29,9 @@ input_requires:
   - .agent-auth.yaml (auto-created if missing)
 
 guard_conditions:
-  - Cache check: if tooling-cache.json valid_until > now AND graph_commit matches HEAD
-      → skip bash script, load cached values, state_on_complete immediately
+  - Cache check: run `tooling-preflight.sh --cache-check`; only if cache.cache_reusable is true
+      (TTL valid AND HEAD readable AND graph_commit == HEAD)
+      → skip the full script, load cached values, state_on_complete immediately
 
 output_produces:
   - .project-orchestration/reports/preflight.md                    ← GLOBAL

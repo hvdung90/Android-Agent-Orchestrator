@@ -10,6 +10,7 @@ prints token values from `.agent-auth.yaml`.
 """
 from __future__ import annotations
 
+import glob
 import json
 import os
 import shutil
@@ -22,8 +23,9 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 AUTH_FILE = ".agent-auth.yaml"
 CACHE_PATH = ".project-orchestration/memory/tooling-cache.json"
-# NOTE: legacy location; moving to tasks/{task_id}/session.json is AOO-019 (PR2).
-SESSION_PATH = ".project-orchestration/memory/session.json"
+TASKS_DIR = ".project-orchestration/tasks"
+# Written by pre-6.1.x versions; reported as a resume candidate, never used.
+LEGACY_SESSION_PATH = ".project-orchestration/memory/session.json"
 PLUGINS_DIR = ".claude/plugins"
 CMD_TIMEOUT_S = 10
 PLUGIN_SEARCH_DEPTH = 3
@@ -226,12 +228,16 @@ def check_karpathy() -> Facts:
 
 # ── Memory ───────────────────────────────────────────────────────────────────
 
-def git_head() -> Optional[str]:
+def git_state() -> Facts:
+    """work_tree: inside a git work tree; head: HEAD sha or None."""
     git = shutil.which("git")
     if not git:
-        return None
+        return {"work_tree": False, "head": None}
+    code, out = run_command([git, "rev-parse", "--is-inside-work-tree"])
+    work_tree = code == 0 and out.strip().startswith("true")
     code, out = run_command([git, "rev-parse", "HEAD"])
-    return out.strip().splitlines()[0] if code == 0 and out.strip() else None
+    head = out.strip().splitlines()[0] if code == 0 and out.strip() else None
+    return {"work_tree": work_tree, "head": head}
 
 
 def cache_freshness(valid_until: Optional[str], now: datetime) -> str:
@@ -246,34 +252,57 @@ def cache_freshness(valid_until: Optional[str], now: datetime) -> str:
         return "unparseable"
 
 
+def cache_status(freshness: str, graph_commit: Any, head: Optional[str]) -> str:
+    """Only 'fresh' means reusable: valid TTL AND readable HEAD AND commit == HEAD."""
+    if freshness != "fresh":
+        return freshness
+    if head is None:
+        return "head_unavailable"
+    if not graph_commit:
+        return "no_commit"
+    return "fresh" if graph_commit == head else "graph_stale"
+
+
 def check_cache(now: datetime, head: Optional[str]) -> Facts:
-    """Current semantics preserved; AOO-018 (cache_reusable) lands in PR2."""
     present, data = read_json(CACHE_PATH)
     if not present:
-        return {"present": False}
+        return {"present": False, "cache_reusable": False}
     if data is None:
-        return {"present": True, "readable": False}
+        return {"present": True, "readable": False, "cache_reusable": False}
     valid_until = data.get("valid_until")
     graph_commit = data.get("graph_commit")
-    status = cache_freshness(valid_until, now)
+    status = cache_status(cache_freshness(valid_until, now), graph_commit, head)
     facts: Facts = {"present": True, "checked_at": data.get("checked_at"),
                     "valid_until": valid_until, "graph_commit": graph_commit}
     if head is not None:
-        stale = bool(graph_commit) and graph_commit != head
-        facts = {**facts, "head_commit": head, "graph_stale": stale}
-        if stale and status == "fresh":
-            status = "graph_stale"
-    return {**facts, "cache_status": status}
+        facts = {**facts, "head_commit": head,
+                 "graph_stale": bool(graph_commit) and graph_commit != head}
+    return {**facts, "cache_status": status, "cache_reusable": status == "fresh"}
 
 
-def check_session() -> Facts:
-    present, data = read_json(SESSION_PATH)
+def session_summary(data: dict) -> Facts:
+    return {"stage_reached": data.get("stage_reached"), "stage_status": data.get("stage_status")}
+
+
+def check_sessions() -> Facts:
+    """Every tasks/*/session.json is a candidate; never pick one here."""
+    tasks: List[Facts] = []
+    for path in sorted(glob.glob(os.path.join(TASKS_DIR, "*", "session.json"))):
+        dir_id = os.path.basename(os.path.dirname(path))
+        _, data = read_json(path)
+        if data is None:
+            tasks.append({"task_id": dir_id, "readable": False})
+        else:
+            tasks.append({"task_id": str(data.get("task_id") or dir_id), **session_summary(data)})
+    present, data = read_json(LEGACY_SESSION_PATH)
     if not present:
-        return {"present": False, "path": SESSION_PATH}
-    if data is None:
-        return {"present": True, "readable": False, "path": SESSION_PATH}
-    return {"present": True, "path": SESSION_PATH,
-            "stage_reached": data.get("stage_reached"), "task_id": data.get("task_id")}
+        legacy: Facts = {"present": False}
+    elif data is None:
+        legacy = {"present": True, "readable": False}
+    else:
+        legacy = {"present": True, "task_id": data.get("task_id"), **session_summary(data)}
+    in_progress = [t["task_id"] for t in tasks if t.get("stage_status") == "in_progress"]
+    return {"tasks": tasks, "in_progress": in_progress, "legacy": legacy}
 
 
 # ── Collection ───────────────────────────────────────────────────────────────
@@ -294,8 +323,9 @@ CHECKS: Dict[str, Tuple[Callable[[], Any], Callable[[], Any]]] = {
         "report": False, "graph_json": False, "active": "unknown"}),
     "karpathy": (check_karpathy, lambda: {
         "claude_md": False, "in_claude_md": False, "plugin_hits": [], "status": "unknown"}),
-    "head": (git_head, lambda: None),
-    "session": (check_session, lambda: {"present": True, "readable": False, "path": SESSION_PATH}),
+    "git": (git_state, lambda: {"work_tree": False, "head": None}),
+    "session": (check_sessions, lambda: {"tasks": [], "in_progress": [],
+                                         "legacy": {"present": False}, "scan_failed": True}),
 }
 
 
@@ -317,20 +347,28 @@ def collect(mode: str) -> Facts:
         outcomes = {name: fut.result() for name, fut in futures.items()}
     results = {name: value for name, (value, _) in outcomes.items()}
     errors = [err for _, err in outcomes.values() if err]
-    cache, cache_err = guarded("cache", lambda: check_cache(now, results["head"]),
-                               lambda: {"present": True, "readable": False})
+    cache, cache_err = guarded("cache", lambda: check_cache(now, results["git"]["head"]),
+                               lambda: {"present": True, "readable": False, "cache_reusable": False})
     return {
         "mode": mode,
         "timestamp": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "cwd": os.getcwd(),
-        **{k: v for k, v in results.items() if k != "head"},
+        **results,
         "cache": cache,
         "check_errors": errors + ([cache_err] if cache_err else []),
     }
 
 
 def gaps(facts: Facts) -> Tuple[List[str], List[str]]:
-    """(blocking, non_blocking). Blocking stays empty until AOO-022 (PR2)."""
+    """(blocking, non_blocking) at tooling scope.
+
+    Blocking here covers only what the script can decide on its own. Task-level
+    blocking rules (refs/provisioning-preflight.md § Blocking rules) are applied
+    by the agent when it writes preflight.md — see readiness_scope.
+    """
+    blocking: List[str] = []
+    if not facts["git"]["work_tree"]:
+        blocking.append("not_a_git_work_tree")
     warn: List[str] = []
     if facts["auth"]["file"] in ("missing", "unreadable"):
         warn.append(f"auth_file_{facts['auth']['file']}")
@@ -345,8 +383,15 @@ def gaps(facts: Facts) -> Tuple[List[str], List[str]]:
         warn.append("architecture_map_graph_missing")
     if facts["karpathy"]["status"] == "missing":
         warn.append("karpathy_missing")
+    session = facts["session"]
+    if len(session["in_progress"]) > 1:
+        warn.append("multiple_in_progress_sessions")
+    warn.extend(f"session_unreadable:{t['task_id']}" for t in session["tasks"]
+                if t.get("readable") is False)
+    if session["legacy"]["present"]:
+        warn.append("legacy_session_path")
     warn.extend(f"check_failed:{err.split(':')[0]}" for err in facts["check_errors"])
-    return [], warn
+    return blocking, warn
 
 
 # ── Rendering ────────────────────────────────────────────────────────────────
@@ -363,6 +408,7 @@ def to_json(facts: Facts) -> Facts:
         "timestamp": facts["timestamp"],
         "mode": facts["mode"],
         "ready_for_stage_0": not blocking,
+        "readiness_scope": "tooling",
         "blocking_gaps": blocking,
         "non_blocking_gaps": warn,
         "tools": {
@@ -384,7 +430,7 @@ def to_json(facts: Facts) -> Facts:
             "graphify_json_present": arch["graph_json"],
         },
         "cache": cache_out,
-        "session": {k: v for k, v in facts["session"].items() if k != "path"},
+        "session": facts["session"],
         "check_errors": facts["check_errors"],
     }
 
@@ -451,30 +497,60 @@ def md_karpathy(k: Facts) -> List[str]:
     return lines
 
 
-def md_memory(cache: Facts, session: Facts) -> List[str]:
+def md_cache(cache: Facts) -> List[str]:
     if not cache["present"]:
-        lines = ["- tooling-cache.json: missing (fresh check required)"]
-    elif cache.get("readable") is False:
-        lines = ["- tooling-cache.json: present", "- cache: unreadable"]
+        return ["- tooling-cache.json: missing (fresh check required)", "- cache_reusable: false"]
+    if cache.get("readable") is False:
+        return ["- tooling-cache.json: present", "- cache: unreadable", "- cache_reusable: false"]
+    lines = ["- tooling-cache.json: present",
+             f"- cached_at: {cache.get('checked_at') or '?'}",
+             f"- valid_until: {cache.get('valid_until') or '?'}",
+             f"- graph_commit: {cache.get('graph_commit') or '?'}"]
+    if cache.get("head_commit") and cache.get("graph_commit"):
+        verdict = (f"stale ({str(cache['graph_commit'])[:8]} != {cache['head_commit'][:8]})"
+                   if cache["graph_stale"] else "current")
+        lines.append(f"- graph_commit vs HEAD: {verdict}")
+    return lines + [f"- cache_status: {cache['cache_status']}",
+                    f"- cache_reusable: {str(cache['cache_reusable']).lower()}"]
+
+
+def md_task(task: Facts) -> str:
+    if task.get("readable") is False:
+        return f"  - {task['task_id']}: unreadable"
+    return f"  - {task['task_id']}: stage {task.get('stage_reached', '?')}, {task.get('stage_status') or '?'}"
+
+
+def md_sessions(session: Facts) -> List[str]:
+    tasks = session["tasks"]
+    if not tasks:
+        lines = ["- task sessions: none"]
     else:
-        lines = ["- tooling-cache.json: present",
-                 f"- cached_at: {cache.get('checked_at') or '?'}",
-                 f"- valid_until: {cache.get('valid_until') or '?'}",
-                 f"- graph_commit: {cache.get('graph_commit') or '?'}"]
-        if "head_commit" in cache:
-            if cache["graph_stale"]:
-                lines.append(f"- graph_commit vs HEAD: stale "
-                             f"({str(cache['graph_commit'])[:8]} != {cache['head_commit'][:8]})")
-            else:
-                lines.append("- graph_commit vs HEAD: current")
-        lines.append(f"- cache_status: {cache['cache_status']}")
-    if not session["present"]:
-        return lines + ["- session.json: missing"]
-    if session.get("readable") is False:
-        return lines + ["- session.json: present", "- session: unreadable"]
-    return lines + ["- session.json: present",
-                    f"- last_stage: {session.get('stage_reached', '?')}",
-                    f"- task_id: {session.get('task_id', '?')}"]
+        active = ", ".join(session["in_progress"]) or "none"
+        lines = [f"- task sessions: {len(tasks)} (in_progress: {active})"] + [md_task(t) for t in tasks]
+    if len(session["in_progress"]) > 1:
+        lines.append("- several tasks are in progress: ask the human which one to resume")
+    legacy = session["legacy"]
+    if legacy["present"]:
+        detail = ("unreadable" if legacy.get("readable") is False else
+                  f"task {legacy.get('task_id')}, stage {legacy.get('stage_reached')}, "
+                  f"{legacy.get('stage_status')}")
+        lines.append(f"- legacy memory/session.json: present ({detail}) — resume candidate; "
+                     "move to tasks/{task_id}/ after the human confirms the task id")
+    return lines
+
+
+def md_memory(cache: Facts, session: Facts) -> List[str]:
+    return md_cache(cache) + md_sessions(session)
+
+
+def md_summary(report: Facts) -> List[str]:
+    blocking = ", ".join(report["blocking_gaps"]) or "none"
+    warn = ", ".join(report["non_blocking_gaps"]) or "none"
+    return [f"- `ready_for_stage_0`: {str(report['ready_for_stage_0']).lower()}",
+            "- readiness_scope: tooling (combine with task-level blocking rules in "
+            "refs/provisioning-preflight.md before writing preflight.md)",
+            f"- Blocking gaps: {blocking}",
+            f"- Non-blocking gaps: {warn}"]
 
 
 def to_markdown(facts: Facts) -> str:
@@ -482,6 +558,7 @@ def to_markdown(facts: Facts) -> str:
         ("Mode", [facts["mode"]]),
         ("Timestamp", [facts["timestamp"]]),
         ("Working directory", [facts["cwd"]]),
+        ("Summary", md_summary(to_json(facts))),
         ("Auth", md_auth(facts["auth"])),
         ("Android CLI", md_android(facts["android"], facts["mode"])),
         ("Android skills", md_skills(facts["android"])),
@@ -506,21 +583,36 @@ def to_markdown(facts: Facts) -> str:
 
 # ── Entry point ──────────────────────────────────────────────────────────────
 
-def parse_args(argv: Sequence[str]) -> Tuple[str, bool]:
-    mode, as_json = "audit", False
+def parse_args(argv: Sequence[str]) -> Tuple[str, bool, bool]:
+    mode, as_json, cache_only = "audit", False, False
     for arg in argv:
         if arg == "--json":
             as_json = True
+        elif arg == "--cache-check":
+            cache_only = True
         else:
             mode = arg
-    return mode, as_json
+    return mode, as_json, cache_only
+
+
+def cache_check() -> Facts:
+    """Fast path for the Stage -1 cache decision: git + cache only (always JSON)."""
+    now = datetime.now(timezone.utc)
+    git, _ = guarded("git", git_state, lambda: {"work_tree": False, "head": None})
+    cache, _ = guarded("cache", lambda: check_cache(now, git["head"]),
+                       lambda: {"present": True, "readable": False, "cache_reusable": False})
+    return {"timestamp": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "cache": {k: v for k, v in cache.items() if k != "checked_at"}}
 
 
 def main(argv: Sequence[str]) -> int:
-    mode, as_json = parse_args(argv)
+    mode, as_json, cache_only = parse_args(argv)
     # Explicit output encoding: never crash on a non-UTF-8 locale.
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    if cache_only:
+        sys.stdout.write(json.dumps(cache_check(), indent=2) + "\n")
+        return 0
     facts = collect(mode)
     output = json.dumps(to_json(facts), indent=2) + "\n" if as_json else to_markdown(facts)
     sys.stdout.write(output)

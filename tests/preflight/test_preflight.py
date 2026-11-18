@@ -32,8 +32,20 @@ esac
 
 GIT_STUB = """\
 #!/bin/sh
-if [ "$1" = "rev-parse" ]; then echo "fixturehead"; exit 0; fi
+case "$1 $2" in
+  "rev-parse --is-inside-work-tree") echo "true"; exit 0 ;;
+  "rev-parse HEAD")                  echo "fixturehead"; exit 0 ;;
+esac
 exit 1
+"""
+
+# Inside a work tree, but HEAD cannot be resolved (e.g. repo without commits).
+GIT_NO_HEAD_STUB = """\
+#!/bin/sh
+case "$1 $2" in
+  "rev-parse --is-inside-work-tree") echo "true"; exit 0 ;;
+esac
+exit 128
 """
 
 GIT_FAIL_STUB = "#!/bin/sh\nexit 128\n"
@@ -182,18 +194,18 @@ class AuthTokenTests(Base):
     def test_non_utf8_auth_file_is_unreadable_and_other_checks_survive(self):
         fx = self.fixture()
         fx.write_bytes(".agent-auth.yaml", b"atlassian:\n  api_token: \"\xff\xfe\"\n")
-        fx.write(".project-orchestration/memory/session.json",
-                 json.dumps({"stage_reached": 3, "task_id": "T-9"}))
+        fx.write(".project-orchestration/tasks/T-9/session.json",
+                 json.dumps({"stage_reached": 3, "stage_status": "in_progress", "task_id": "T-9"}))
         data = fx.json()
         self.assertEqual(data["tools"]["auth_file"], "unreadable")
         self.assertEqual(data["tools"]["atlassian_token"], "unknown")
         self.assertIn("auth_file_unreadable", data["non_blocking_gaps"])
-        self.assertEqual(data["session"]["task_id"], "T-9")
+        self.assertEqual(data["session"]["in_progress"], ["T-9"])
         self.assertEqual(data["tools"]["android_cli"], "missing")
         md = fx.markdown()
         self.assertIn("- .agent-auth.yaml: unreadable", md)
         self.assertIn("- atlassian.api_token: unknown", md)
-        self.assertIn("- task_id: T-9", md)
+        self.assertIn("  - T-9: stage 3, in_progress", md)
         self.assertIn("## Android CLI", md)
 
 
@@ -258,39 +270,176 @@ class GraphifyTests(Base):
         self.assertEqual(fx.json()["architecture_map"]["active_tool"], "graphify")
 
 
-# ── Cache (current behaviour; AOO-018 hardening lands in PR2) ───────────────
+# ── Cache reuse (AOO-018) ────────────────────────────────────────────────────
 
 class CacheTests(Base):
+    """Cache is reusable only with a valid TTL AND a readable HEAD AND
+    graph_commit == HEAD. Every other case must say cache_reusable: false."""
+
     def write_cache(self, fx, **fields):
         fx.write(".project-orchestration/memory/tooling-cache.json", json.dumps(fields))
+
+    def assert_cache(self, fx, status, reusable):
+        cache = fx.json()["cache"]
+        self.assertEqual((cache["cache_status"], cache["cache_reusable"]), (status, reusable))
+        md = fx.markdown()
+        self.assertIn(f"- cache_status: {status}", md)
+        self.assertIn(f"- cache_reusable: {str(reusable).lower()}", md)
+
+    def test_fresh_and_matching_is_reusable(self):
+        fx = self.fixture()
+        self.write_cache(fx, valid_until="2099-01-01T00:00:00Z", graph_commit="fixturehead")
+        self.assert_cache(fx, "fresh", True)
 
     def test_expired(self):
         fx = self.fixture()
         self.write_cache(fx, valid_until="2000-01-01T00:00:00Z", graph_commit="fixturehead")
-        self.assertEqual(fx.json()["cache"]["cache_status"], "stale")
-        self.assertIn("- cache_status: stale", fx.markdown())
+        self.assert_cache(fx, "stale", False)
 
     def test_commit_mismatch(self):
         fx = self.fixture()
         self.write_cache(fx, valid_until="2099-01-01T00:00:00Z", graph_commit="other")
-        self.assertEqual(fx.json()["cache"]["cache_status"], "graph_stale")
-        self.assertIn("- cache_status: graph_stale", fx.markdown())
+        self.assert_cache(fx, "graph_stale", False)
 
-    def test_fresh_and_matching(self):
+    def test_missing_graph_commit(self):
         fx = self.fixture()
+        self.write_cache(fx, valid_until="2099-01-01T00:00:00Z")
+        self.assert_cache(fx, "no_commit", False)
+
+    def test_empty_graph_commit(self):
+        fx = self.fixture()
+        self.write_cache(fx, valid_until="2099-01-01T00:00:00Z", graph_commit="")
+        self.assert_cache(fx, "no_commit", False)
+
+    def test_head_unavailable(self):
+        fx = self.fixture(git=GIT_NO_HEAD_STUB)
         self.write_cache(fx, valid_until="2099-01-01T00:00:00Z", graph_commit="fixturehead")
-        self.assertEqual(fx.json()["cache"]["cache_status"], "fresh")
+        self.assert_cache(fx, "head_unavailable", False)
+
+    def test_git_missing(self):
+        fx = self.fixture(git=GIT_FAIL_STUB)
+        self.write_cache(fx, valid_until="2099-01-01T00:00:00Z", graph_commit="fixturehead")
+        self.assert_cache(fx, "head_unavailable", False)
+
+    def test_unparseable_ttl(self):
+        fx = self.fixture()
+        self.write_cache(fx, valid_until="next tuesday", graph_commit="fixturehead")
+        self.assert_cache(fx, "unparseable", False)
+
+    def test_missing_ttl(self):
+        fx = self.fixture()
+        self.write_cache(fx, graph_commit="fixturehead")
+        self.assert_cache(fx, "unknown", False)
 
     def test_unreadable(self):
         fx = self.fixture()
         fx.write(".project-orchestration/memory/tooling-cache.json", "{not json")
-        self.assertFalse(fx.json()["cache"]["readable"])
+        cache = fx.json()["cache"]
+        self.assertFalse(cache["readable"])
+        self.assertFalse(cache["cache_reusable"])
         self.assertIn("- cache: unreadable", fx.markdown())
 
     def test_missing(self):
         fx = self.fixture()
-        self.assertFalse(fx.json()["cache"]["present"])
+        cache = fx.json()["cache"]
+        self.assertFalse(cache["present"])
+        self.assertFalse(cache["cache_reusable"])
         self.assertIn("- tooling-cache.json: missing", fx.markdown())
+
+
+class CacheCheckModeTests(Base):
+    """--cache-check: cache verdict only, without probing Android tooling."""
+
+    def test_cache_check_only_reports_cache_and_git(self):
+        fx = self.fixture()
+        fx.stub("android", "#!/bin/sh\necho called >> \"$HOME/android-calls\"\n")
+        fx.write(".project-orchestration/memory/tooling-cache.json",
+                 json.dumps({"valid_until": "2099-01-01T00:00:00Z", "graph_commit": "fixturehead"}))
+        r = fx.run("--cache-check")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        data = json.loads(r.stdout)
+        self.assertEqual(set(data), {"timestamp", "cache"})
+        self.assertTrue(data["cache"]["cache_reusable"])
+        self.assertFalse(os.path.exists(os.path.join(fx.root, "android-calls")))
+
+    def test_cache_check_not_reusable(self):
+        fx = self.fixture()
+        r = fx.run("--cache-check")
+        self.assertFalse(json.loads(r.stdout)["cache"]["cache_reusable"])
+
+
+# ── Task sessions (AOO-019) ──────────────────────────────────────────────────
+
+class SessionTests(Base):
+    def write_session(self, fx, task_id, **fields):
+        fx.write(f".project-orchestration/tasks/{task_id}/session.json",
+                 json.dumps({"task_id": task_id, **fields}))
+
+    def test_single_task_at_canonical_path(self):
+        fx = self.fixture()
+        self.write_session(fx, "A-1", stage_reached=4, stage_status="in_progress")
+        session = fx.json()["session"]
+        self.assertEqual(session["tasks"], [
+            {"task_id": "A-1", "stage_reached": 4, "stage_status": "in_progress"}])
+        self.assertEqual(session["in_progress"], ["A-1"])
+        md = fx.markdown()
+        self.assertIn("- task sessions: 1 (in_progress: A-1)", md)
+        self.assertIn("  - A-1: stage 4, in_progress", md)
+
+    def test_multiple_in_progress_lists_all_and_never_picks(self):
+        fx = self.fixture()
+        self.write_session(fx, "A-1", stage_reached=2, stage_status="in_progress")
+        self.write_session(fx, "B-2", stage_reached=5, stage_status="in_progress")
+        self.write_session(fx, "C-3", stage_reached=7, stage_status="complete")
+        data = fx.json()
+        self.assertEqual(data["session"]["in_progress"], ["A-1", "B-2"])
+        self.assertNotIn("resume", data["session"])
+        self.assertIn("multiple_in_progress_sessions", data["non_blocking_gaps"])
+        self.assertIn("- task sessions: 3 (in_progress: A-1, B-2)", fx.markdown())
+
+    def test_legacy_session_is_reported_not_used(self):
+        fx = self.fixture()
+        fx.write(".project-orchestration/memory/session.json",
+                 json.dumps({"task_id": "OLD-1", "stage_reached": 3, "stage_status": "in_progress"}))
+        data = fx.json()
+        self.assertEqual(data["session"]["tasks"], [])
+        self.assertEqual(data["session"]["legacy"]["task_id"], "OLD-1")
+        self.assertIn("legacy_session_path", data["non_blocking_gaps"])
+        self.assertIn("- legacy memory/session.json: present (task OLD-1, stage 3, in_progress)",
+                      fx.markdown())
+
+    def test_unreadable_session_is_listed(self):
+        fx = self.fixture()
+        fx.write(".project-orchestration/tasks/X-9/session.json", "{broken")
+        data = fx.json()
+        self.assertEqual(data["session"]["tasks"], [{"task_id": "X-9", "readable": False}])
+        self.assertIn("session_unreadable:X-9", data["non_blocking_gaps"])
+
+
+# ── Readiness (AOO-022) ──────────────────────────────────────────────────────
+
+class ReadinessTests(Base):
+    def test_ready_in_git_work_tree(self):
+        fx = self.fixture()
+        data = fx.json()
+        self.assertTrue(data["ready_for_stage_0"])
+        self.assertEqual(data["readiness_scope"], "tooling")
+        self.assertIn("- `ready_for_stage_0`: true", fx.markdown())
+
+    def test_not_ready_outside_git_work_tree(self):
+        fx = self.fixture(git=GIT_FAIL_STUB)
+        data = fx.json()
+        self.assertFalse(data["ready_for_stage_0"])
+        self.assertIn("not_a_git_work_tree", data["blocking_gaps"])
+        md = fx.markdown()
+        self.assertIn("- `ready_for_stage_0`: false", md)
+        self.assertIn("- Blocking gaps: not_a_git_work_tree", md)
+
+    def test_non_blocking_gaps_do_not_block(self):
+        fx = self.fixture()  # no auth file, no android, no karpathy
+        data = fx.json()
+        self.assertTrue(data["ready_for_stage_0"])
+        self.assertIn("auth_file_missing", data["non_blocking_gaps"])
 
 
 # ── Output contract & parity (AOO-023) ───────────────────────────────────────
@@ -303,13 +452,13 @@ class OutputContractTests(Base):
         fx.write("CLAUDE.md", "karpathy rules\n")
         fx.write(".project-orchestration/memory/tooling-cache.json",
                  json.dumps({"valid_until": "2099-01-01T00:00:00Z", "graph_commit": "other"}))
-        fx.write(".project-orchestration/memory/session.json",
-                 json.dumps({"stage_reached": 2, "task_id": "T-1"}))
+        fx.write(".project-orchestration/tasks/T-1/session.json",
+                 json.dumps({"stage_reached": 2, "stage_status": "in_progress", "task_id": "T-1"}))
         return fx
 
     def test_json_keeps_backward_compatible_keys(self):
         data = self.full_fixture().json()
-        for key in ("timestamp", "mode", "ready_for_stage_0", "blocking_gaps",
+        for key in ("timestamp", "mode", "ready_for_stage_0", "readiness_scope", "blocking_gaps",
                     "non_blocking_gaps", "tools", "architecture_map", "cache"):
             self.assertIn(key, data)
         for key in ("auth_file", "atlassian_token", "figma_token", "github_token",
@@ -320,6 +469,7 @@ class OutputContractTests(Base):
     def test_markdown_keeps_sections(self):
         md = self.full_fixture().markdown()
         for section in ("# Tooling Preflight", "## Mode", "## Timestamp", "## Working directory",
+                        "## Summary",
                         "## Auth", "## Android CLI", "## Android skills", "## Understand-Anything",
                         "## Graphify", "## Karpathy", "## Memory cache", "## Decision reminder"):
             self.assertIn(section, md)
@@ -332,8 +482,11 @@ class OutputContractTests(Base):
         self.assertIn("- Karpathy: installed", md)
         self.assertEqual(data["cache"]["cache_status"], "graph_stale")
         self.assertIn("- cache_status: graph_stale", md)
-        self.assertEqual(data["session"]["task_id"], "T-1")
-        self.assertIn("- task_id: T-1", md)
+        self.assertEqual(data["session"]["in_progress"], ["T-1"])
+        self.assertIn("  - T-1: stage 2, in_progress", md)
+        self.assertEqual(data["cache"]["cache_reusable"], False)
+        self.assertIn("- cache_reusable: false", md)
+        self.assertIn(f"- `ready_for_stage_0`: {str(data['ready_for_stage_0']).lower()}", md)
         # active_tool depends on whether the host interpreter has graphifyy;
         # only parity between formats is asserted here.
         active = data["architecture_map"]["active_tool"]
@@ -358,8 +511,8 @@ class OutputContractTests(Base):
         self.assertIn("- .agent-auth.yaml: missing", md)
         self.assertFalse(data["cache"]["present"])
         self.assertIn("- tooling-cache.json: missing", md)
-        self.assertFalse(data["session"]["present"])
-        self.assertIn("- session.json: missing", md)
+        self.assertEqual(data["session"]["tasks"], [])
+        self.assertIn("- task sessions: none", md)
         self.assertEqual(data["tools"]["android_cli"], "missing")
         self.assertIn("- android CLI: missing", md)
 
@@ -367,14 +520,14 @@ class OutputContractTests(Base):
         fx = self.fixture()
         fx.write_bytes(".agent-auth.yaml", b"\xff\xfe")
         fx.write(".project-orchestration/memory/tooling-cache.json", "{bad")
-        fx.write(".project-orchestration/memory/session.json", "[1, 2]")
+        fx.write(".project-orchestration/tasks/T-2/session.json", "[1, 2]")
         data, md = fx.json(), fx.markdown()
         self.assertEqual(data["tools"]["auth_file"], "unreadable")
         self.assertIn("- .agent-auth.yaml: unreadable", md)
         self.assertFalse(data["cache"]["readable"])
         self.assertIn("- cache: unreadable", md)
-        self.assertFalse(data["session"]["readable"])
-        self.assertIn("- session: unreadable", md)
+        self.assertEqual(data["session"]["tasks"], [{"task_id": "T-2", "readable": False}])
+        self.assertIn("  - T-2: unreadable", md)
 
     def test_non_ascii_working_directory_with_c_locale(self):
         fx = self.fixture()

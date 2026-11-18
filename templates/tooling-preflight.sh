@@ -11,6 +11,7 @@ set -u
 #   bash templates/tooling-preflight.sh bootstrap        # bootstrap mode → markdown
 #   bash templates/tooling-preflight.sh --json           # audit mode → JSON
 #   bash templates/tooling-preflight.sh bootstrap --json # bootstrap mode → JSON
+#   bash templates/tooling-preflight.sh --cache-check    # cache verdict only → JSON (fast)
 #
 # Requires: python3 (stdlib only). Run from the project root.
 
