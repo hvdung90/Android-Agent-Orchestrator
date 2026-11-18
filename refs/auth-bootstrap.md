@@ -7,7 +7,7 @@ _Skill version: 6.1.3 — update this when SKILL.md bumps a minor or major versi
 `.agent-auth.yaml` is the **single source of truth** for all tokens/secrets.
 When the skill starts → read this file.
 When a tool is needed → check that tool's token at that moment.
-If it is missing → ask the user immediately, save it to the file, and continue.
+If it is missing → show instructions for the user to add it **directly to `.agent-auth.yaml`** (never accept a token pasted into the chat), re-read the file once they confirm, and continue.
 
 ---
 
@@ -41,7 +41,9 @@ check: .agent-auth.yaml exists?
 ## Step 2 — Check tokens when using a tool (Just-in-time)
 
 Before running any source reader, check the corresponding token.
-If it is missing → ask the user → save it → retry. Do not skip, and do not fabricate.
+If it is missing → show instructions for the user to fill it **directly in `.agent-auth.yaml`** (never ask them to paste a secret into chat) → wait for confirmation → re-read the file → retry. Do not skip, and do not fabricate.
+
+**Why not "paste here":** a token typed or pasted into the chat appears in the conversation transcript, is sent to the model provider, and may be captured in session summaries or logs. Writing it directly to `.agent-auth.yaml` keeps it out of the transcript entirely.
 
 ### Jira Reader
 
@@ -49,14 +51,22 @@ Required: `atlassian.domain`, `atlassian.email`, `atlassian.api_token`
 
 ```
 Check each field:
-  atlassian.domain   → empty? → ask: "Your Atlassian domain? (e.g. mycompany.atlassian.net)"
-  atlassian.email    → empty? → ask: "Atlassian login email?"
-  atlassian.api_token→ empty? → ask:
-    "An Atlassian API token is required to read Jira.
-     Get one at: https://id.atlassian.com/manage-profile/security/api-tokens
-     → Create API token → Copy → Paste it here:"
+  atlassian.domain → empty? → ask:
+    "Your Atlassian domain (e.g. mycompany.atlassian.net).
+     Open .agent-auth.yaml and fill in `atlassian.domain`, then reply 'done'."
 
-Receive token → save to .agent-auth.yaml → run Jira Reader
+  atlassian.email → empty? → ask:
+    "Your Atlassian login email.
+     Open .agent-auth.yaml and fill in `atlassian.email`, then reply 'done'."
+
+  atlassian.api_token → empty? → show (do NOT ask them to paste the value here):
+    "An Atlassian API token is required to read Jira.
+     1. Go to https://id.atlassian.com/manage-profile/security/api-tokens
+     2. Click 'Create API token', copy the value.
+     3. Open .agent-auth.yaml and paste it into `atlassian.api_token`.
+     4. Save the file, then reply 'done' (do not paste the token here)."
+
+User replies 'done' → re-read .agent-auth.yaml → verify field is now non-empty → run Jira Reader
 ```
 
 ### Confluence Reader
@@ -70,14 +80,14 @@ If Figma MCP tools are available in the agent's own tool list (checked at Stage 
 Only if Figma MCP tools are **not** available → fall back to REST API + PAT:
 
 ```
-figma.personal_access_token → empty? → ask:
-  "A Figma Personal Access Token is required to read designs via the REST API
-   (no Figma Dev Mode MCP server detected in this environment).
-   Get one at: Figma → Account Settings → Security → Personal access tokens → Generate new token
-   Required permission: File content (read-only)
-   Paste the token here:"
+figma.personal_access_token → empty? → show (do NOT ask them to paste the value here):
+  "A Figma Personal Access Token is required (no Figma MCP detected).
+   1. Go to Figma → Account Settings → Security → Personal access tokens.
+   2. Generate a new token with File content (read-only) permission, copy it.
+   3. Open .agent-auth.yaml and paste it into `figma.personal_access_token`.
+   4. Save the file, then reply 'done' (do not paste the token here)."
 
-Receive token → save to .agent-auth.yaml → run Figma Reader (access_mode: rest_api)
+User replies 'done' → re-read .agent-auth.yaml → verify field non-empty → run Figma Reader (access_mode: rest_api)
 ```
 
 ### GitHub (optional)
@@ -85,13 +95,14 @@ Receive token → save to .agent-auth.yaml → run Figma Reader (access_mode: re
 Required: `github.personal_access_token`
 
 ```
-github.personal_access_token → empty? → ask:
+github.personal_access_token → empty? → show (do NOT ask them to paste the value here):
   "A GitHub token is required to read private repos.
-   Get one at: GitHub → Settings → Developer settings → Personal access tokens → Fine-grained
-   Required permissions: Contents (read-only), Metadata (read-only)
-   Paste the token here:"
+   1. Go to GitHub → Settings → Developer settings → Personal access tokens → Fine-grained.
+   2. Create a token with Contents (read-only) + Metadata (read-only), copy it.
+   3. Open .agent-auth.yaml and paste it into `github.personal_access_token`.
+   4. Save the file, then reply 'done' (do not paste the token here)."
 
-Receive token → save to .agent-auth.yaml → run reader
+User replies 'done' → re-read .agent-auth.yaml → verify field non-empty → run reader
 ```
 
 ---
@@ -122,15 +133,15 @@ If missing → ask the user → save it to the correct block (Level 3 or Level 2
 
 ---
 
-## Step 4 — Save tokens to the file
+## Step 4 — Confirm tokens saved to the file
 
-When the user provides a token, the agent updates `.agent-auth.yaml`:
+The agent **never** writes a token value that the user typed or pasted into chat. Instead:
 
-- Find the correct field in the file
-- Write the value
-- Do not delete other fields
-- Do not log token values to the screen or to reports
-- Confirm to the user: "Saved. The token will be used for this session and future sessions."
+- When the user replies 'done': re-read `.agent-auth.yaml` and verify the relevant field is now non-empty.
+- Do not echo or log the token value to the screen, reports, or `session.json`.
+- Confirm to the user: "Token found in .agent-auth.yaml. Ready to continue."
+- If the field is still empty after 'done': repeat the instructions from Step 2 and ask the user to try again.
+- If the user pastes a token value directly into the chat: **warn them** that it has appeared in the transcript and they should consider rotating it, then proceed to instruct them to write it to the file instead.
 
 ---
 
@@ -152,8 +163,9 @@ Do not use interactive OAuth if the token already exists in the file.
 
 ## Safety rules
 
-- Never print tokens to the screen or reports at any time.
+- **Never accept a token pasted or typed into the chat.** Always instruct the user to write it directly to `.agent-auth.yaml`. If they paste one anyway, warn them and suggest rotating it.
+- Never print, echo, or log token values to the screen, reports, `session.json`, or any other output.
 - Do not commit `.agent-auth.yaml` (it is already in `.gitignore`).
 - Do not store tokens in any file other than `.agent-auth.yaml`.
-- Do not create tokens yourself. Only ask the user to provide them.
-- If the user refuses to provide a token → skip that tool, record it in the report, and continue with available data.
+- Do not create tokens yourself. Only guide the user to generate and store them.
+- If the user refuses to provide a token → skip that tool, record it in the preflight report, and continue with available data.
