@@ -1261,7 +1261,14 @@ In-progress task state — allows resume after an interruption.
   "follow_up_watchlist": [],
   "blocker": "null | <human-readable reason>",
   "partial_outputs": [],
-  "context": null   // fast mode only: holds sparse context-pack content (same fields as context-pack.json, sparse rules apply); null otherwise. Legacy sessions with workflow_mode "micro" are read as "fast".
+  "context": null,  // fast mode only: holds sparse context-pack content (same fields as context-pack.json, sparse rules apply); null otherwise. Legacy sessions with workflow_mode "micro" are read as "fast".
+  "telemetry": {    // running counters for § retro-log.jsonl; paths and counts only, never content
+    "policy_reads": [],       // {path, section|null} each time a skill-pack file or section is opened
+    "human_interrupts": [],   // {stage_id, kind} each time the agent stops for a human
+    "mode_upgrades": [],      // "fast->standard: <trigger>"
+    "first_patch_at": null,   // first product-code edit
+    "model_tiers": { "default": 0, "deep-reasoning": 0 }
+  }
 }
 ```
 
@@ -1298,6 +1305,42 @@ Append-only audit log of every skipped step. Written on auto-skips and confirm-s
 ```
 
 See `refs/compliance-policy.md` for full tier definitions and confirmation protocol.
+
+### `retro-log.jsonl` (telemetry)
+
+**Path:** `.project-orchestration/memory/retro-log.jsonl` — append-only, one JSON line per finished task. Written at Stage 7 close from `session.json.telemetry` (best-effort: a failed write is noted, never blocks the close). Stage 8 may add a reflection but does not own this record. Read by `scripts/pilot_report.py`, which rejects any line with fields not listed here.
+
+```json
+{
+  "schema": "aao-telemetry/1",
+  "task_id": "CA-42",
+  "skill_version": "6.1.3",                  // SKILL.md frontmatter version
+  "skill_commit": "653940f",                 // git rev of the skill pack if known, else null
+  "cohort": "baseline | candidate | null",   // set only during a pilot (docs/pilot/README.md)
+  "workflow_mode": "fast | standard | governed",
+  "mode_upgrades": ["fast->standard: Ads SDK / mediation"],
+  "ref_tier": "LIGHT | MEDIUM | HEAVY | FULL",
+  "approval_source": "human | jira:<KEY>@<updated-timestamp> | scope_confirmation | null",
+  "policy_reads": [{ "path": "workflows/fast.md", "section": null },
+                   { "path": "refs/compliance-policy.md", "section": "TDD exemption table" }],
+  "human_interrupts": [{ "stage_id": "2_requirements", "kind": "approval | scope_confirmation | exemption_confirm | escalation | clarification | blocker | other" }],
+  "started_at": "2026-11-18T09:00:00Z",      // Stage 0 session creation
+  "first_patch_at": "2026-11-18T09:40:00Z",  // first product-code edit, null if none
+  "closed_at": "2026-11-18T10:30:00Z",       // Stage 7 close
+  "tokens": { "input": 120000, "output": 9000, "cached": 80000, "source": "host_usage | manual | unavailable" },
+  "model_tiers": { "default": 10, "deep-reasoning": 0 },   // stages run on each tier
+  "evidence": { "pass": 4, "fail": 0, "not_run": 0, "blocked": 0 },
+  "outcome": "closed | abandoned",
+  "review_iterations": null,                 // filled in after PR review, if known
+  "escaped_defects": null                    // filled in later (e.g. bugs traced back within 30 days)
+}
+```
+
+Rules:
+- **Paths and counts only.** Never record the brief, code, diffs, file contents, names, emails or token values. `policy_reads.path` is relative to the skill pack; the report computes bytes itself, at `skill_commit` when it is a git revision.
+- Log a policy read every time a skill-pack file (or one section of it) is opened, including re-reads — re-reading is part of the cost being measured.
+- `tokens.source: unavailable` when the host shows no usage; never estimate.
+- `cohort` stays `null` outside a pilot.
 
 ### `graph-stamp.json`
 

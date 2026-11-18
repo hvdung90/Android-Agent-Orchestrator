@@ -132,6 +132,7 @@ output_produces:
   - if TEAM_DOCS_PATH active and coordination mode and starting a new task: team task markdown + board rows updated for human visibility  [C]
   - link list recorded (Jira, Figma, Confluence URLs if provided)
   - session.json task_brief: the user's task message as given (every mode; the only source in Mode C)
+  - session.json telemetry initialized (policy_reads, human_interrupts, mode_upgrades, first_patch_at, model_tiers); every later stage appends to it — paths and counts only
   - session.json brief_usable: true | false — true when the brief (plus links/docs) yields a goal and at least one testable acceptance criterion; false → interrupt with a blocker naming the missing parts
   - task_continuity: "new | continuation | unknown"
   - history_scan:
@@ -588,6 +589,7 @@ output_produces:
   - .project-orchestration/tasks/{task_id}/session.json: stage_status: complete
   - docs/ai/tasks/{task_id}/handoff.md: status set to complete; final summary written
   - .project-orchestration/status.json: entry updated (stage_reached: 7, stage_status: complete, pr_url if known)
+  - .project-orchestration/memory/retro-log.jsonl: one telemetry line from session.json.telemetry (best-effort; refs/contracts-and-artifacts.md § retro-log.jsonl)
   - if TEAM_DOCS_PATH active and coordination mode: current task's locks removed from <TEAM_DOCS_PATH>/active-tasks/<repo>/locks.json and team task archived  [C]
 
 state_on_complete:
