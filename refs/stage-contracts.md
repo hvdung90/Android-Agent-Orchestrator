@@ -43,6 +43,10 @@ A stage skipped by policy (e.g. 1.5 or 2.5 recorded as AUTO-SKIP / CONFIRM-SKIP 
 
 **Next stage** (resume and continuation): with `stage_status: in_progress`, resume `stage_id` itself at its `resume_entry_point`; with `stage_status: complete`, continue at the first stage after `stage_id` in this table that is not recorded as skipped in `skip-log.json`. Example: `1_discovery` complete + Clarification skipped → `2_requirements`.
 
+### Fast-mode inputs
+
+`fast` keeps requirements, context and discovery inline (`refs/contracts-and-artifacts.md § Artifact budget`). Wherever an `input_requires` below names `requirements/<task>.md`, `context-pack.json` or `discovery/<task>.md`, a `fast` task reads the inline equivalent in `session.json` (requirements summary, `context`, discovery findings). Where it names `implementation-plan.md`, a `fast` task has exactly one TDD task whose id is the `task_id`. `handoff.md` and `design-doc.md` are read only if they exist. Stage 1.5 inputs never apply to `fast` (Clarification is AUTO-SKIP there).
+
 ### Legacy sessions (no `stage_id`)
 
 Sessions written before `stage_id` existed are migrated **on resume only**, never during the scan:
@@ -53,6 +57,7 @@ Sessions written before `stage_id` existed are migrated **on resume only**, neve
   - else `skip-log.json` records the Clarification skip → `1_discovery`, `stage_status: complete` (1.5 counts as passed; § Stage order **Next stage** resolves to `2_requirements`);
   - else `stage_status: complete` → `1_discovery`;
   - else (`in_progress`, no brief) → still ambiguous: show the human both resume points (re-run the failed source reader, or re-run the blocked clarification worker) and let them choose.
+- A legacy `workflow_mode: micro` (or `preliminary_mode: micro`) is read as `fast` (ADR-0001).
 - Write the derived `stage_id` (and `stage_reached: 1.5` where it applies) only after the human confirms resuming that task.
 
 
@@ -137,7 +142,7 @@ output_produces:
       explicit_continuation: true | false
       decision: "skip | read_full | ask_human"
   - preliminary_ref_tier (LIGHT / MEDIUM / HEAVY / FULL) from preliminary_mode + source_mode, graph_impact assumed low until Stage 1 (SKILL.md § When to load refs)
-  - preliminary_mode (micro / fast / standard / governed) derived from task description and link presence
+  - preliminary_mode (fast / standard / governed) derived from task description and link presence
 
 state_on_complete:
   stage_id: "0_intake"
@@ -145,7 +150,7 @@ state_on_complete:
   stage_status: complete
   source_mode: "A | B | C"
   task_continuity: "new | continuation | unknown"
-  preliminary_mode: "micro | fast | standard | governed"
+  preliminary_mode: "fast | standard | governed"
   preliminary_ref_tier: "LIGHT | MEDIUM | HEAVY | FULL"
   blocker: null
   # status.json updated: entry added or refreshed for this task_id
@@ -182,12 +187,12 @@ guard_conditions:
   - if history_scan.decision = ask_human: block before Discovery until user confirms continuation vs independent task
 
 output_produces:
-  - docs/ai/tasks/{task_id}/discovery/<task>.md  (raw discovery notes; AUTO-SKIP when workflow_mode = micro — findings recorded inline in session.json instead)
-  - docs/ai/tasks/{task_id}/clarification/context-pack.json (partial — sources, graph_path, graph_impact, change_type, history_context if read; AUTO-SKIP when workflow_mode = micro — content inlined into session.json["context"] instead)
+  - docs/ai/tasks/{task_id}/discovery/<task>.md  (raw discovery notes; AUTO-SKIP when workflow_mode = fast — findings recorded inline in session.json instead)
+  - docs/ai/tasks/{task_id}/clarification/context-pack.json (partial — sources, graph_path, graph_impact, change_type, history_context if read; AUTO-SKIP when workflow_mode = fast — content inlined into session.json["context"] instead)
   - impact_assessment, regression_test_matrix, quality_gate_plan, follow_up_watchlist drafted in context-pack for code-touching tasks
   - module_impact_chain populated if graph_impact >= medium (Gradle Module Impact Analyzer)
   - .project-orchestration/tasks/{task_id}/skip-log.json appended if Gradle Module Impact Analyzer auto-skipped
-  - workflow_mode (micro / fast / standard / governed) finalized; complexity_score and risk_score computed after all sources read
+  - workflow_mode (fast / standard / governed) finalized after checking SKILL.md § Escalation triggers; complexity_score and risk_score computed after all sources read
   - ref_tier finalized (LIGHT / MEDIUM / HEAVY / FULL) from workflow_mode + source_mode + graph_impact per SKILL.md § When to load refs; if it is higher than preliminary_ref_tier, load the added refs before the next stage
   - mode_reasons list written to context-pack.json
   - session.json updated: workflow_mode, complexity_score, risk_score, mode_reasons set
@@ -196,7 +201,7 @@ state_on_complete:
   stage_id: "1_discovery"
   stage_reached: 1
   stage_status: complete
-  workflow_mode: "micro | fast | standard | governed"
+  workflow_mode: "fast | standard | governed"
   complexity_score: <1-10>
   risk_score: <1-10>
   ref_tier: "LIGHT | MEDIUM | HEAVY | FULL"
@@ -264,35 +269,40 @@ resume_entry_point: "re-run blocked analysis worker; other workers' outputs alre
 stage: "2_requirements"
 
 input_requires:
-  - docs/ai/tasks/{task_id}/clarification/context-pack.json (clarity_score sufficient, outcome: ready)
-  - clarification-brief.md
+  - docs/ai/tasks/{task_id}/clarification/context-pack.json (clarity_score sufficient, outcome: ready); fast: session.json["context"]
+  - clarification-brief.md only when Stage 1.5 ran (not when it was skipped, e.g. in fast)
 
 guard_conditions:
   - outcome must be "ready" (not "blocked" or "research-loop")
   - if outcome = blocked → escalate to user before proceeding
 
 output_produces:
-  - docs/ai/tasks/{task_id}/requirements/<task>.md (canonical requirements doc; when workflow_mode = micro, a ≤15-line inline summary written to session.json substitutes for this file — AUTO-SKIP the file, never the content)
-  - requirements artifact header, Affected Areas checklist, Decision Triggers section, Impact / Regression section (micro: same substance, inline)
-  - .project-orchestration/tasks/{task_id}/session.json: requirements_approved → false (pending)
+  - docs/ai/tasks/{task_id}/requirements/<task>.md (canonical requirements doc; when workflow_mode = fast, a ≤ 40-line inline summary written to session.json substitutes for this file — AUTO-SKIP the file, never the content)
+  - requirements artifact header, Affected Areas checklist, Decision Triggers section, Impact / Regression section (fast: same substance, inline)
+  - .project-orchestration/tasks/{task_id}/session.json: requirements_approved → false (pending), approval_source → null
 
 approval_gate:
-  - STOP after producing requirements doc (or inline summary, for micro)
-  - Do not proceed to Stage 3 until human sets approval — this gate is never skipped or lightened, only the underlying artifact's file-vs-inline form changes
-  - session.json: requirements_approved: true written only after explicit human approval
+  - STOP after producing requirements doc (or inline summary, for fast)
+  - Do not proceed to Stage 3 until approval is recorded — this gate is never skipped; only the artifact form and, in fast, the approval source change
+  - approval_source: human (standard / governed, and fast when no Jira-inherited condition holds)
+  - approval_source: jira:<KEY>@<updated-timestamp> — fast only, when every SKILL.md § FAST approval condition holds (Jira AC recorded with source + revision, all AC testable, no escalation trigger); the agent does not stop, it records the source
+  - approval_source: scope_confirmation — fast only, Mode B / C: one-line scope confirmation from the human
+  - any scope change after approval → requirements_approved: false, ask again
+  - session.json: requirements_approved: true written only together with a non-null approval_source
 
 state_on_complete:
   stage_id: "2_requirements"
   stage_reached: 2
   stage_status: complete
   requirements_approved: true
+  approval_source: "human | jira:<KEY>@<updated-timestamp> | scope_confirmation"
   blocker: null
 
 state_on_interrupt:
   stage_id: "2_requirements"
   stage_reached: 2
   stage_status: in_progress
-  blocker: "waiting for human approval of requirements/<task>.md"
+  blocker: "waiting for approval of requirements (file, or inline summary in fast)"
 
 resume_entry_point: "requirements doc already exists; re-present to user and await approval"
 ```
@@ -305,8 +315,8 @@ resume_entry_point: "requirements doc already exists; re-present to user and awa
 stage: "2.5_decision_gate"
 
 input_requires:
-  - docs/ai/tasks/{task_id}/requirements/<task>.md (requirements_approved: true)
-  - docs/ai/tasks/{task_id}/clarification/context-pack.json
+  - docs/ai/tasks/{task_id}/requirements/<task>.md (requirements_approved: true; fast: inline summary — § Fast-mode inputs)
+  - docs/ai/tasks/{task_id}/clarification/context-pack.json (fast: session.json["context"])
   - refs/contracts-and-artifacts.md: ADR trigger list + Decision Ownership matrix
   - docs/ai/decisions/README.md (read for duplicate-ADR check; auto-create if missing and a trigger fires)
 
@@ -372,8 +382,8 @@ guard_conditions:
 
 output_produces:
   - docs/ai/tasks/{task_id}/design/design-doc.md (design doc; MANDATORY when workflow_mode = governed OR graph_impact >= medium OR ADR-lite was triggered; otherwise AUTO-SKIP)
-  - docs/ai/tasks/{task_id}/planning/<task>.md (planning doc; AUTO-SKIP when workflow_mode ∈ {micro, fast})
-  - docs/ai/tasks/{task_id}/planning/implementation-plan.md (executable TDD plan; MANDATORY in every mode including micro — no placeholders; collapses to exactly 1 task entry when workflow_mode = micro; includes regression/security/performance checks)
+  - docs/ai/tasks/{task_id}/planning/<task>.md (planning doc; AUTO-SKIP when workflow_mode = fast)
+  - docs/ai/tasks/{task_id}/planning/implementation-plan.md (executable TDD plan; MANDATORY in standard / governed — no placeholders; includes regression/security/performance checks. AUTO-SKIP in fast: the whole change is one TDD task with id = task_id)
   - kotlin_android_versions and kotlin_android_rule_checklist written to context-pack / implementation-plan when Kotlin product code is touched
   - docs/ai/tasks/{task_id}/android-memo/<task>.md (Android skills memo, if Android-specific — auto-skip written to skip-log if omitted)
   - docs/ai/tasks/{task_id}/handoff.md (generated when code_owner is confirmed; MANDATORY)
@@ -411,7 +421,7 @@ stage: "4_implementation"
 input_requires:
   - docs/ai/tasks/{task_id}/design/design-doc.md (stage 3 complete, only when design-doc trigger was met)
   - docs/ai/tasks/{task_id}/planning/<task>.md (if not auto-skipped by mode)
-  - docs/ai/tasks/{task_id}/planning/implementation-plan.md (exists, no placeholders)
+  - docs/ai/tasks/{task_id}/planning/implementation-plan.md (exists, no placeholders; fast: none — one TDD task, id = task_id, § Fast-mode inputs)
   - session.json: code_owner set, requirements_approved: true
   - session.json: adr_status is accepted | deferred | not_required
   - context-pack.json: module_impact_chain (for build scope awareness)
@@ -617,41 +627,6 @@ Any interrupt → stage_status: in_progress, blocker: "<reason>" (stage_id stays
 
 ---
 
-## Updated `session.json` schema
+## `session.json` fields
 
-**Path:** `.project-orchestration/tasks/{task_id}/session.json`
-
-```json
-{
-  "task_id": "ANDROID-42 | task-slug",
-  "started_at": "2026-05-07T09:00:00Z",
-  "updated_at": "2026-05-07T11:30:00Z",
-  "stage_reached": -1,
-  "stage_status": "complete | in_progress | blocked",
-  "source_mode": "A | B | C",
-  "code_owner": "agent-name | null",
-  "assignee": "dev-name | agent-name | unassigned",
-  "handoff_to": "dev-name | null",
-  "branch": "feature/ANDROID-42-login | null",
-  "pr_url": "https://github.com/org/repo/pull/123 | null",
-  "requirements_approved": false,
-  "adr_required": false,
-  "adr_status": "proposed | accepted | deferred | superseded | not_required | null",
-  "decision_record": "docs/ai/decisions/ADR-NNNN-slug.md | null",
-  "workflow_mode": "micro | fast | standard | governed | null",
-  "preliminary_mode": "micro | fast | standard | governed | null",
-  "mode_override": "micro | fast | standard | governed | null",
-  "complexity_score": 0,
-  "risk_score": 0,
-  "change_type": "ui_change | database_change | network_change | dependency_change | architecture_change | logic_change | test_change | config_change | multi | null",
-  "module_impact_chain_scope": "single | local-chain | full-project | null",
-  "evidence_collected": [],
-  "impact_closure_status": "not_started | partial | complete | blocked | null",
-  "follow_up_watchlist": [],
-  "blocker": "null | <human-readable reason>",
-  "partial_outputs": [],
-  "context": null   // micro mode only: sparse context-pack content inlined here; null for non-micro
-}
-```
-
-`partial_outputs` lists artifact paths written before an interrupt — safe to re-read on resume. Agent must NOT re-run work that produced these outputs unless explicitly asked.
+The one schema is `refs/contracts-and-artifacts.md § session.json` (including `stage_id`, `task_brief`, `approval_source`, `preflight`, `ref_tier`). This file only defines which stage writes which fields (the `state_on_complete` / `state_on_interrupt` blocks above).

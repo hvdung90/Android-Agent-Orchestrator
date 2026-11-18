@@ -56,7 +56,7 @@ RETIRED_PATTERNS: Tuple[Tuple[str, "re.Pattern[str]"], ...] = (
 
 def scanned_files(root: str) -> List[str]:
     patterns = ("SKILL.md", "README.md", "QUICKSTART.md", "docs/FLOW.md",
-                "refs/*.md", "templates/*.md", "examples/*.md")
+                "refs/*.md", "templates/*.md", "examples/*.md", "workflows/*.md")
     files = {p for pat in patterns for p in glob.glob(os.path.join(root, pat))}
     return sorted(p for p in files if os.path.isfile(p))
 
@@ -333,6 +333,91 @@ def check_tdd_exemptions(root: str) -> Iterable[Finding]:
                       f"the table rows {sorted(r for _, r, _ in rows)}", "")
 
 
+MICRO_MODE = re.compile(r"\bmicro\b", re.I)
+FAST_DOC = "workflows/fast.md"
+FAST_DOC_MAX_BYTES = 12000
+DOC_PATH = re.compile(r"`((?:refs|templates|scripts|workflows|docs)/[^`\s]+?)`")
+REQUIRED_TRIGGERS = ("Ads SDK / mediation", "Paywall / subscription UI")
+
+
+def bullets_after(lines: List[str], heading: str) -> Tuple[int, List[str]]:
+    """(heading line no, bullet texts) of the first bullet list after `heading`."""
+    for i, line in enumerate(lines):
+        if line.strip() == heading:
+            items: List[str] = []
+            for nxt in lines[i + 1:]:
+                if nxt.startswith("- "):
+                    items.append(nxt[2:].strip())
+                elif nxt.strip() and items:
+                    break
+            return i + 1, items
+    return 0, []
+
+
+def check_fast_path(root: str) -> Iterable[Finding]:
+    """PR8a / ADR-0001: micro folded into fast; two-layer never-skipped list; one
+    escalation list mirrored in workflows/fast.md; Stage 2 approval source;
+    workflows/fast.md stays light and only points at files that exist."""
+    for path in scanned_files(root):
+        for no, line in enumerate(read_lines(path), 1):
+            if MICRO_MODE.search(line) and "legacy" not in line.lower():
+                yield Finding(rel(root, path), no, "fast-path: `micro` was folded into `fast` "
+                              "(ADR-0001); only legacy notes may mention it", line.strip())
+    skill = read_lines(os.path.join(root, "SKILL.md"))
+    text = "\n".join(skill)
+    for label in ("**Safety invariants**", "**Process gates**"):
+        if label not in text:
+            yield Finding("SKILL.md", 0, f"fast-path: never-skipped list needs the {label} layer", "")
+    for no, line in enumerate(skill, 1):
+        if "reduce artifact depth only" in line.lower():
+            yield Finding("SKILL.md", no, "fast-path: fast drops process gates; the "
+                          "'depth only' rule is retired", line.strip())
+    skill_no, skill_items = bullets_after(skill, "### Escalation triggers")
+    if not skill_items:
+        yield Finding("SKILL.md", 0, "fast-path: `### Escalation triggers` list missing", "")
+    for item in REQUIRED_TRIGGERS:
+        if item not in skill_items:
+            yield Finding("SKILL.md", skill_no, f"fast-path: escalation list must include '{item}'", "")
+    fast_path = os.path.join(root, FAST_DOC)
+    if not os.path.isfile(fast_path):
+        yield Finding(FAST_DOC, 0, "fast-path: workflows/fast.md missing", "")
+        return
+    fast = read_lines(fast_path)
+    fast_no, fast_items = bullets_after(fast, "## Escalation triggers")
+    if sorted(fast_items) != sorted(skill_items):
+        yield Finding(FAST_DOC, fast_no, "fast-path: escalation list must match "
+                      "SKILL.md § Escalation triggers exactly", "")
+    size = os.path.getsize(fast_path)
+    if size > FAST_DOC_MAX_BYTES:
+        yield Finding(FAST_DOC, 0, f"fast-path: {size} bytes > {FAST_DOC_MAX_BYTES}; FAST must stay light", "")
+    for no, line in enumerate(fast, 1):
+        for ref in DOC_PATH.findall(line):
+            if "{" in ref or "<" in ref:
+                continue
+            if not os.path.exists(os.path.join(root, ref)):
+                yield Finding(FAST_DOC, no, f"fast-path: points at missing file {ref}", "")
+    stage2 = section(read_lines(os.path.join(root, "refs/stage-contracts.md")),
+                     "## Stage 2 — Requirements", "## Stage 2.5")
+    if not any("approval_source" in l for _, l in stage2):
+        yield Finding("refs/stage-contracts.md", stage2[0][0] if stage2 else 0,
+                      "fast-path: Stage 2 must record approval_source", "")
+
+
+SESSION_SCHEMA_HEADING = re.compile(r"^#+ .*`session\.json` schema")
+
+
+def check_single_session_schema(root: str) -> Iterable[Finding]:
+    """The session.json schema lives only in refs/contracts-and-artifacts.md."""
+    for path in scanned_files(root):
+        rel_path = rel(root, path)
+        if rel_path == "refs/contracts-and-artifacts.md":
+            continue
+        for no, line in enumerate(read_lines(path), 1):
+            if SESSION_SCHEMA_HEADING.match(line):
+                yield Finding(rel_path, no, "session-schema: one schema only, in "
+                              "refs/contracts-and-artifacts.md § session.json", line.strip())
+
+
 def first_match(path: str, pattern: str) -> Tuple[Optional[str], int]:
     regex = re.compile(pattern)
     for no, line in enumerate(read_lines(path), 1):
@@ -365,7 +450,7 @@ CHECKS: Tuple[Callable[[str], Iterable[Finding]], ...] = (
     check_retired, check_stage_minus_one_session, check_stage_minus_one_state,
     check_stage_ids, check_ref_tier, check_readiness_scope, check_source_mode_inputs,
     check_skipped_stage, check_read_phase_git, check_team_docs_lifecycle,
-    check_tdd_exemptions, check_versions,
+    check_tdd_exemptions, check_fast_path, check_single_session_schema, check_versions,
 )
 
 
