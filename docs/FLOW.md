@@ -1,6 +1,6 @@
 # Android Agent Orchestrator — Complete Flow
 
-_Reflects skill v6.1.1. Update when SKILL.md changes._
+_Reflects skill v6.1.3. Update when SKILL.md changes._
 
 ---
 
@@ -68,7 +68,9 @@ All task types start with Stage -1.
     │  CACHE HIT   Run full preflight.sh (parallel)        │
     │  → use cached → write tooling-cache.json incl.       │
     │    tool/command Android command discovery            │
-    │    checks     → write/update session.json            │
+    │    checks     → write reports/preflight.md           │
+    │                  (ready_for_stage_0; no task session │
+    │                   yet — Stage 0 creates it)          │
     └───────────────────────────────────────────────────────┘
                             │
                             ▼
@@ -85,8 +87,9 @@ All task types start with Stage -1.
     └───────────────────────────────────────────────────────┘
                             │
     ┌───────────────────────┴───────────────────────────────┐
-    │  session.json: interrupted task present?              │
+    │  tasks/*/session.json: interrupted task present?      │
     │    Yes → offer user: "Resume <task_id> from Stage N?" │
+    │          (several → list all, human picks)            │
     │          surface handoff.md if present               │
     │    No  → continue                                     │
     └───────────────────────────────────────────────────────┘
@@ -507,6 +510,8 @@ All task types start with Stage -1.
   │  ① Write smallest failing test (RED)                         │
   │     Run → record RED to evidence/red-<task-id>.txt           │
   │     Gate E.5: RED evidence MUST exist before product code     │
+  │     (only exception: a row of compliance-policy               │
+  │      § TDD exemption table, recorded + replacement evidence)  │
   │                                                               │
   │  ② Write minimum code to pass (GREEN)                        │
   │     Run → record GREEN to evidence/green-<task-id>.txt       │
@@ -884,14 +889,15 @@ Docs finalization (Stage 7)
 ①  Stage -1 → Stage 0  :  Blocker in preflight is unresolved
 ②  Stage -1 → Stage 0  :  .agent-auth.yaml missing + external links present → WARN
                            (does not block, but source readers will skip)
-③  Stage 0  (Mode C)   :  Task unclear → require developer to provide a brief
+③  Stage 0  (any mode) :  Brief unusable (no goal or no testable AC) → ask for the missing parts
 ④  Stage 1.5 outcome   :  blocked → ask human, do not fabricate requirements
 ⑤  Stage 2 → 2.5       :  MANDATORY human approval requirements
 ⑥  Stage 2.5 → Stage 3 :  Decision trigger fired but ADR-lite not approved/deferred
 ⑦  Stage 3 → Stage 4   :  Missing design doc + single code owner
                            Missing branch name or assignee (must be set before coding)
                            implementation-plan.md missing or contains placeholders (Gate E)
-⑧  Stage 4 per-task    :  Product code written before RED evidence exists (Gate E.5)
+⑧  Stage 4 per-task    :  Product code written before RED evidence exists (Gate E.5),
+                           with no recorded exemption from compliance-policy § TDD exemption table
                            Spec-compliance review skipped or run after quality review
 ⑨  Stage 4 interrupt   :  handoff.md not updated before stopping (MANDATORY)
 ⑩  Stage 5 → Stage 6   :  Missing runtime evidence + graph update

@@ -211,9 +211,14 @@ Required sections:
 audit | bootstrap | update | refresh-graph | force-reinstall
 
 ## Summary
-- Ready for Stage 0:
+- `tooling_ready` (from `tooling-preflight.sh --json`): true | false
+- `ready_for_stage_0`: true | false — the only Stage 0 gate: `tooling_ready` AND task-level Blocking rules
 - Blocking gaps:
 - Non-blocking gaps:
+
+## Stage -1 state
+- stage_status / blocker / team_docs.conflict_check / team_docs.legacy_lock_index
+  (Stage -1 has no task session; Stage 0 copies these into the one it creates)
 
 ## Android CLI
 ## Android skills
@@ -282,11 +287,9 @@ After Stage -1 finishes (cache miss path only), write:
 - tool versions/states from preflight results
 - Android command discovery (`android_commands`, `android_studio_commands`, `adb`) from `refs/android-cli-compatibility.md`
 
-**`.project-orchestration/memory/session.json`** — only if no existing session or user chose not to resume:
-- `task_id`: from Intake (Stage 0) — write after source mode is determined
-- `stage_reached`: -1
-- `stage_status`: complete
-- `requirements_approved`: false
+**No task session is written by Stage -1.** `task_id` is assigned at Stage 0 (Intake), which creates `.project-orchestration/tasks/{task_id}/session.json` with `stage_reached: 0` (see `refs/stage-contracts.md § Stage 0`). The Stage -1 result lives in `reports/preflight.md` (`ready_for_stage_0`) and `tooling-cache.json` above.
+
+If a legacy `.project-orchestration/memory/session.json` exists (written by pre-6.1.x versions), do not overwrite or delete it: report it as a legacy resume candidate per `refs/stage-contracts.md § Resume rule`.
 
 ---
 

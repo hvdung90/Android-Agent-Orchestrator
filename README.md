@@ -1,6 +1,6 @@
 # Android Agent Orchestrator
 
-_Current skill version: 6.1.1_
+_Current skill version: 6.1.3_
 
 > **A meta-skill for Android projects.**  
 > Audit the tooling. Read the architecture map. Clarify the task. Approve requirements. Then code with one owner.
@@ -65,7 +65,7 @@ The agent **stops at Stage 2 and Stage 2.5** and will not write code without you
 
 Stage 7 always runs the task artifact integrity check. The heavier skill drift check runs only when orchestration files such as `SKILL.md`, `refs/**`, `templates/**`, `docs/FLOW.md`, or `CHANGELOG.md` changed.
 
-Android CLI commands are discovered at Stage -1 and cached in `tooling-cache.json`; unsupported commands must use the documented fallback matrix. When `TEAM_DOCS_PATH` is active, Stage -1 reads `active-tasks/locks.json` first and opens markdown boards only when needed.
+Android CLI commands are discovered at Stage -1 and cached in `tooling-cache.json`; unsupported commands must use the documented fallback matrix. When `TEAM_DOCS_PATH` is active, Stage -1 reads `active-tasks/<repo>/locks.json` first (coordination mode) and opens markdown boards only when needed.
 
 ---
 
@@ -84,7 +84,7 @@ One code owner at a time. All other agents are advisory only.
 
 ## TDD enforcement
 
-Every task in the implementation plan follows this loop — no exceptions:
+Every task in the implementation plan follows this loop. The only exceptions are the rows of `refs/compliance-policy.md § TDD exemption table` (e.g. a pure Gradle version bump or a colour/dimen-only resource change); an exempt task still records the replacement evidence that row requires:
 
 1. Write the failing test → run it → save `evidence/red-<task>.txt`
 2. Write minimum code to pass → run → save `evidence/green-<task>.txt`
@@ -96,7 +96,7 @@ Every task in the implementation plan follows this loop — no exceptions:
 
 For Kotlin product-code changes, the quality gate also requires the Kotlin / Android rule checklist and repo-native static analysis evidence (`lint`, `ktlint`, `detekt`, `spotless`, or the project's equivalent check tasks when configured).
 
-Product code cannot be written before RED evidence exists for that task.
+Product code cannot be written before RED evidence exists for that task, unless an exemption from that table is recorded in `skip-log.json`.
 
 ---
 
@@ -140,12 +140,17 @@ templates/
 ├── preflight-report.md           ← preflight output template
 ├── start-task-prompts.md         ← copy/paste prompts for starting tasks
 ├── tooling-preflight.sh          ← preflight entrypoint (thin wrapper, needs python3)
-└── tooling_preflight.py          ← preflight core: one implementation, Markdown or --json
+├── tooling_preflight.py          ← preflight core: one implementation, Markdown or --json
+└── team_docs_sync.py            ← team-docs git sync: read (no checkout changes) / begin / commit-push
 examples/
 └── preflight-report.example.md   ← filled example with auth section
+scripts/
+└── lint-contracts.py             ← contract drift lint (paths, field names, version headers)
 tests/
 ├── preflight/test_preflight.py  ← fixture-based regression tests (python3 -m unittest discover -s tests/preflight)
-└── auth/test_agent_auth.py      ← credential helper tests (python3 -m unittest discover -s tests/auth)
+├── auth/test_agent_auth.py      ← credential helper tests (python3 -m unittest discover -s tests/auth)
+├── contracts/test_lint_contracts.py ← linter regression tests (python3 -m unittest discover -s tests/contracts)
+└── team_docs/test_team_docs_sync.py ← real-git tests for the team-docs sync helper (python3 -m unittest discover -s tests/team_docs)
 docs/
 ├── FLOW.md                       ← complete flow diagram, all use cases
 └── ai/

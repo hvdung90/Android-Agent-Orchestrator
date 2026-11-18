@@ -6,12 +6,20 @@
 
 ## Summary
 
-- Ready for Stage 0: yes, with caveats
+- `tooling_ready`: true
+- `ready_for_stage_0`: true (with caveats below; no task-level blocking rule applies)
 - Blocking gaps: none for read-only analysis
 - Non-blocking gaps:
   - Understand-Anything not installed; falling back to Graphify (graph missing, will build if approved)
   - Karpathy plugin not detected (will apply principles manually)
   - `atlassian.api_token` empty (will request from user when Jira link provided)
+
+## Stage -1 state
+
+- `stage_status`: complete
+- `blocker`: null
+- `team_docs.conflict_check`: n/a (TEAM_DOCS_PATH not set)
+- `team_docs.legacy_lock_index`: n/a
 
 ## Auth
 
@@ -83,7 +91,7 @@
 
 ## Decisions
 
-- Proceed to Stage 0: yes for read-only task analysis
+- Stage 0 constraints: read-only task analysis
 - Required human decisions:
   - Approve Understand-Anything install/build (or Graphify as fallback) if an architecture graph is required for this task
   - Approve Karpathy plugin install or confirm manual application is acceptable

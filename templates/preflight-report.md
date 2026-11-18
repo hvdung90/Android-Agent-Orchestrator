@@ -6,9 +6,19 @@
 
 ## Summary
 
-- Ready for Stage 0:
+- `tooling_ready` (from `tooling-preflight.sh --json`): true | false
+- `ready_for_stage_0`: true | false — the only Stage 0 gate: `tooling_ready` AND task-level Blocking rules
 - Blocking gaps:
 - Non-blocking gaps:
+
+## Stage -1 state
+
+_No task exists yet, so this section — not a task `session.json` — holds Stage -1 state. Stage 0 copies it into the session it creates._
+
+- `stage_status`: complete | in_progress
+- `blocker`: null | <which preflight check failed or timed out>
+- `team_docs.conflict_check`: n/a | clean | conflict | stale-reclaim-pending
+- `team_docs.legacy_lock_index`: n/a | absent | present
 
 ## Auth
 
@@ -70,7 +80,7 @@
 
 ## Decisions
 
-- Proceed to Stage 0:
+- Stage 0 constraints (e.g. read-only analysis only):
 - Required human decisions:
 - Required installs/updates:
 - Required graph action:

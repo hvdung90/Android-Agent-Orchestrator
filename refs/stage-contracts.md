@@ -4,18 +4,57 @@ _Skill version: 6.1.3 — update this when SKILL.md bumps a minor or major versi
 
 Each stage defines a typed contract: what it requires as input, what it must produce as output, and what state it writes to `session.json` on completion or interrupt.
 
-**Resume rule:** At Stage -1, read `session.json`. If `stage_status = in_progress`, the previous run was interrupted at `stage_reached`. Run the **Integrity reconciliation** check below before offering to resume. Offer to resume from `resume_entry_point`. If user declines, overwrite session and start fresh.
+**Resume rule:** At Stage -1, scan `.project-orchestration/tasks/*/session.json`. Any session with `stage_status = in_progress` was interrupted at its `stage_reached`; if more than one exists, list them all and let the human pick — never choose one silently. A session at the legacy path `.project-orchestration/memory/session.json` (pre-6.1.x) is reported as a legacy resume candidate and moved to `tasks/{task_id}/session.json` only after the human confirms the task id. Run the **Integrity reconciliation** check below before offering to resume. Offer to resume from `resume_entry_point`. If user declines, overwrite session and start fresh.
 
 **Integrity reconciliation (mandatory before any resume offer — do not skip even when `stage_status = complete`):** `session.json` records what the agent *believes* happened; it is not proof the artifacts actually exist — a crash between writing `session.json` and writing the stage's output file, a manual deletion, or a failed git operation can all leave them out of sync. Trusting `stage_reached` blindly risks starting Stage 4 with no `handoff.md`, or closing Stage 6 against evidence that was never collected.
 
-1. Take the declared `stage_reached` (treat `2.5` as its own step between 2 and 3).
-2. Walk backward from `stage_reached` to `-1`, and for each stage in that range check its **MANDATORY** entries from this file's `output_produces` (skip AUTO-SKIP/CONFIRM-SKIP items already recorded in `skip-log.json` for that stage — those are legitimately absent; if `skip-log.json` does not exist, treat it as empty — lazy-create means a task with zero skips never writes the file).
-3. Find the **highest stage N where every MANDATORY output for stages `-1` through `N` exists on disk.**
-4. If `N == stage_reached` → integrity confirmed, proceed to offer resume normally.
-5. If `N < stage_reached` → do **not** trust the higher `stage_reached`. Write an integrity-mismatch note to `skip-log.json` (`tier: VIOLATION`, `reason: "artifact missing for declared stage <stage_reached>: <path>"`), roll `session.json.stage_reached` back to `N`, and offer resume from Stage `N`'s `resume_entry_point` instead. Tell the human what was found missing and why the resume point moved back.
+1. Take the declared `stage_id` and its position in § Stage order — `1.5_clarification` and `2.5_decision_gate` are steps of their own. A session without `stage_id` is a legacy session: derive it first (§ Legacy sessions).
+2. Walk backward in § Stage order from that stage to `-1_tooling_preflight`, and for each stage in that range check its **MANDATORY** entries from this file's `output_produces` (skip AUTO-SKIP/CONFIRM-SKIP items already recorded in `skip-log.json` for that stage — those are legitimately absent; if `skip-log.json` does not exist, treat it as empty — lazy-create means a task with zero skips never writes the file).
+3. Find the **highest stage N (by § Stage order) where every MANDATORY output for every stage from `-1_tooling_preflight` through `N` exists on disk.**
+4. If `N` is the declared stage → integrity confirmed, proceed to offer resume normally.
+5. If `N` is earlier than the declared stage → do **not** trust the declared stage. Tell the human what was found missing and offer resume from Stage `N`'s `resume_entry_point` instead. Steps 1–5 are **read-only**: only after the human chooses to resume *this* task, write the integrity-mismatch note to `skip-log.json` (`tier: VIOLATION`, `reason: "artifact missing for declared stage <stage_id>: <path>"`) and roll `session.json` `stage_id`/`stage_reached` back to `N`. Tasks the human does not pick are left untouched.
 6. Never silently proceed as if a stage is complete when its mandatory artifact is absent — this check exists specifically to catch that case before it corrupts a later gate (e.g. Stage 4 starting without `implementation-plan.md`, or Stage 6 closing without `execution.md` evidence).
 
-**Interrupt safety:** On any unrecoverable error or user interruption, write the current stage's interrupt state to `session.json` before stopping. Never leave `session.json` in an inconsistent state.
+**Interrupt safety:** On any unrecoverable error or user interruption, write the current stage's interrupt state to the task's `session.json` before stopping. Never leave `session.json` in an inconsistent state.
+
+**Stage -1 exception (no task yet):** Stage -1 runs before `task_id` exists, so its state — complete or interrupted, plus every Stage -1 finding later stages need (`ready_for_stage_0`, blockers, `team_docs.conflict_check`, `team_docs.legacy_lock_index`) — is written to `.project-orchestration/reports/preflight.md § Stage -1 state`. Stage 0 copies those fields into the `session.json` it creates (`preflight` block).
+
+**Resume scans are read-only:** looking for interrupted tasks never modifies their `session.json`. If the human resumes a task, Stage -1 results for this run stay in `preflight.md`; the resumed session only gains a `preflight` block (`ran_at`, `ready_for_stage_0`, `report: .project-orchestration/reports/preflight.md`). Its `stage_reached`, `stage_status`, `blocker`, and approvals are left exactly as they were until the resumed stage itself writes them.
+
+### Stage order
+
+`stage_id` is the canonical position of a task; `stage_reached` is kept as a readable number and must match this table. Every `state_on_complete` / `state_on_interrupt` below writes both.
+
+| order | `stage_id` | `stage_reached` |
+|---|---|---|
+| 0 | `-1_tooling_preflight` | -1 |
+| 1 | `0_intake` | 0 |
+| 2 | `1_discovery` | 1 |
+| 3 | `1.5_clarification` | 1.5 |
+| 4 | `2_requirements` | 2 |
+| 5 | `2.5_decision_gate` | 2.5 |
+| 6 | `3_design` | 3 |
+| 7 | `4_implementation` | 4 |
+| 8 | `5_verify` | 5 |
+| 9 | `6_qa_gate` | 6 |
+| 10 | `7_docs_decision_finalization` | 7 |
+
+A stage skipped by policy (e.g. 1.5 or 2.5 recorded as AUTO-SKIP / CONFIRM-SKIP in `skip-log.json`) counts as passed for reconciliation; it never becomes the task's `stage_id` — `stage_id` always names the last stage that actually ran.
+
+**Next stage** (resume and continuation): with `stage_status: in_progress`, resume `stage_id` itself at its `resume_entry_point`; with `stage_status: complete`, continue at the first stage after `stage_id` in this table that is not recorded as skipped in `skip-log.json`. Example: `1_discovery` complete + Clarification skipped → `2_requirements`.
+
+### Legacy sessions (no `stage_id`)
+
+Sessions written before `stage_id` existed are migrated **on resume only**, never during the scan:
+
+- `stage_reached` other than `1` → the matching `stage_id` from § Stage order.
+- `stage_reached: 1` is ambiguous (older contracts wrote `1` for both Discovery and Clarification):
+  - `docs/ai/tasks/{task_id}/clarification/clarification-brief.md` exists → `1.5_clarification` (same `stage_status`);
+  - else `skip-log.json` records the Clarification skip → `1_discovery`, `stage_status: complete` (1.5 counts as passed; § Stage order **Next stage** resolves to `2_requirements`);
+  - else `stage_status: complete` → `1_discovery`;
+  - else (`in_progress`, no brief) → still ambiguous: show the human both resume points (re-run the failed source reader, or re-run the blocked clarification worker) and let them choose.
+- Write the derived `stage_id` (and `stage_reached: 1.5` where it applies) only after the human confirms resuming that task.
+
 
 ---
 
@@ -37,18 +76,24 @@ output_produces:
   - .project-orchestration/reports/preflight.md                    ← GLOBAL
   - .project-orchestration/memory/tooling-cache.json               ← GLOBAL
   - if TEAM_DOCS_PATH active [both modes]: read <TEAM_DOCS_PATH>/active-tasks/shared/README.md (Cross-repo Impacts); ADRs/README.md scanned for relevant_adrs when workflow_mode ≥ standard
-  - if TEAM_DOCS_PATH active [C only]: conflict check read from <TEAM_DOCS_PATH>/active-tasks/<repo>/locks.json (or treated missing as empty)
+  - if TEAM_DOCS_PATH active [C only]: conflict check read from <TEAM_DOCS_PATH>/active-tasks/<repo>/locks.json on the fetched upstream ref (or treated missing as empty); fetch failure → conflict_check: unknown
+  - if TEAM_DOCS_PATH active: docs checkout left untouched (`team_docs_sync.py read`: fetch + read from upstream ref only; no_upstream or fetch_failed → lock data unknown)
   - .project-orchestration/status.json (initialized if missing)    ← GLOBAL
-  - .project-orchestration/tasks/{task_id}/session.json (stage_reached: -1)
+  # No task session.json is written here: task_id does not exist until Stage 0, which creates it.
+  # Stage -1 outcome is evidenced by reports/preflight.md (`ready_for_stage_0`) and tooling-cache.json.
   - context fields: tooling_readiness, auth_status, provisioning_mode, blockers, architecture_map_staleness
   # skip-log.json is NOT pre-created here — lazy: created only on first skip entry
 
-state_on_complete:
+state_on_complete:            # Stage 0 copies this into the session it creates (preflight block)
+  stage_id: "-1_tooling_preflight"
+  persisted_to: .project-orchestration/reports/preflight.md   # § Stage -1 state — no task_id yet
   stage_reached: -1
   stage_status: complete
   blocker: null
 
 state_on_interrupt:
+  stage_id: "-1_tooling_preflight"
+  persisted_to: .project-orchestration/reports/preflight.md   # § Stage -1 state — never a task session.json
   stage_reached: -1
   stage_status: in_progress
   blocker: "<which preflight check failed or timed out>"
@@ -68,7 +113,7 @@ input_requires:
   - user task description (Jira URL / Figma URL / plain text)
 
 guard_conditions:
-  - preflight.md must have proceed_to_stage_0: true
+  - preflight.md Summary must have ready_for_stage_0: true — the only Stage 0 gate, written by the agent as tooling_ready (from `tooling-preflight.sh --json`) AND the task-level blocking rules
   - if preflight has blocking gaps → show gaps, ask user to resolve before continuing
   - Task History Relevance Gate runs before source mode is finalized:
       default full-history behavior: skipped
@@ -77,9 +122,12 @@ guard_conditions:
 
 output_produces:
   - .project-orchestration/tasks/{task_id}/session.json (task_id, source_mode, started_at)
+  - session.json `preflight` block copied from reports/preflight.md § Stage -1 state: ran_at, ready_for_stage_0, blockers, team_docs.conflict_check, team_docs.legacy_lock_index
   - if TEAM_DOCS_PATH active and coordination mode and starting a new task: <TEAM_DOCS_PATH>/active-tasks/<repo>/locks.json appended with planning locks  [C]
   - if TEAM_DOCS_PATH active and coordination mode and starting a new task: team task markdown + board rows updated for human visibility  [C]
   - link list recorded (Jira, Figma, Confluence URLs if provided)
+  - session.json task_brief: the user's task message as given (every mode; the only source in Mode C)
+  - session.json brief_usable: true | false — true when the brief (plus links/docs) yields a goal and at least one testable acceptance criterion; false → interrupt with a blocker naming the missing parts
   - task_continuity: "new | continuation | unknown"
   - history_scan:
       performed: true | false
@@ -88,19 +136,22 @@ output_produces:
       overlap_score: "none | low | medium | high"
       explicit_continuation: true | false
       decision: "skip | read_full | ask_human"
-  - ref tier determined (LIGHT / MEDIUM / HEAVY / FULL)
+  - preliminary_ref_tier (LIGHT / MEDIUM / HEAVY / FULL) from preliminary_mode + source_mode, graph_impact assumed low until Stage 1 (SKILL.md § When to load refs)
   - preliminary_mode (micro / fast / standard / governed) derived from task description and link presence
 
 state_on_complete:
+  stage_id: "0_intake"
   stage_reached: 0
   stage_status: complete
   source_mode: "A | B | C"
   task_continuity: "new | continuation | unknown"
   preliminary_mode: "micro | fast | standard | governed"
+  preliminary_ref_tier: "LIGHT | MEDIUM | HEAVY | FULL"
   blocker: null
   # status.json updated: entry added or refreshed for this task_id
 
 state_on_interrupt:
+  stage_id: "0_intake"
   stage_reached: 0
   stage_status: in_progress
   blocker: "awaiting user to provide task description, source links, or task-history clarification"
@@ -118,7 +169,10 @@ stage: "1_discovery"
 input_requires:
   - session.json stage_reached >= 0
   - .project-orchestration/reports/preflight.md
-  - source links or docs/ai/inputs/ (per source_mode)
+  - source input per source_mode:
+      A = Jira / Figma / Confluence links recorded at Stage 0
+      B = docs/ai/inputs/
+      C = session.json task_brief (the user's message recorded at Stage 0; no links or local docs needed)
   - matched task history docs only when session.json history_scan.decision = read_full
 
 guard_conditions:
@@ -134,18 +188,22 @@ output_produces:
   - module_impact_chain populated if graph_impact >= medium (Gradle Module Impact Analyzer)
   - .project-orchestration/tasks/{task_id}/skip-log.json appended if Gradle Module Impact Analyzer auto-skipped
   - workflow_mode (micro / fast / standard / governed) finalized; complexity_score and risk_score computed after all sources read
+  - ref_tier finalized (LIGHT / MEDIUM / HEAVY / FULL) from workflow_mode + source_mode + graph_impact per SKILL.md § When to load refs; if it is higher than preliminary_ref_tier, load the added refs before the next stage
   - mode_reasons list written to context-pack.json
   - session.json updated: workflow_mode, complexity_score, risk_score, mode_reasons set
 
 state_on_complete:
+  stage_id: "1_discovery"
   stage_reached: 1
   stage_status: complete
   workflow_mode: "micro | fast | standard | governed"
   complexity_score: <1-10>
   risk_score: <1-10>
+  ref_tier: "LIGHT | MEDIUM | HEAVY | FULL"
   blocker: null
 
 state_on_interrupt:
+  stage_id: "1_discovery"
   stage_reached: 1
   stage_status: in_progress
   blocker: "<which source reader failed or which auth token was missing>"
@@ -181,13 +239,15 @@ output_produces:
   - NOTE: workflow_mode is NOT set here — it was finalized at end of Stage 1; Stage 1.5 reads it, never writes it
 
 state_on_complete:
-  stage_reached: 1
-  stage_status: complete        # note: stage_reached stays 1; 1.5 is a sub-stage
+  stage_id: "1.5_clarification"
+  stage_reached: 1.5
+  stage_status: complete
   clarity_score: <0-10>
   blocker: null                 # null = clarity sufficient to proceed
 
 state_on_interrupt:
-  stage_reached: 1
+  stage_id: "1.5_clarification"
+  stage_reached: 1.5
   stage_status: in_progress
   blocker: "clarification blocked: <missing info item or unresolved conflict description>"
   partial_outputs:
@@ -222,12 +282,14 @@ approval_gate:
   - session.json: requirements_approved: true written only after explicit human approval
 
 state_on_complete:
+  stage_id: "2_requirements"
   stage_reached: 2
   stage_status: complete
   requirements_approved: true
   blocker: null
 
 state_on_interrupt:
+  stage_id: "2_requirements"
   stage_reached: 2
   stage_status: in_progress
   blocker: "waiting for human approval of requirements/<task>.md"
@@ -273,6 +335,7 @@ approval_gate:
   - Do not proceed to Stage 3 until human approves or explicitly defers the ADR
 
 state_on_complete:
+  stage_id: "2.5_decision_gate"
   stage_reached: 2.5
   stage_status: complete
   adr_required: true | false
@@ -280,6 +343,7 @@ state_on_complete:
   blocker: null
 
 state_on_interrupt:
+  stage_id: "2.5_decision_gate"
   stage_reached: 2.5
   stage_status: in_progress
   blocker: "waiting for human approval/deferral of ADR-lite"
@@ -318,6 +382,7 @@ output_produces:
   - if TEAM_DOCS_PATH active and coordination mode: <TEAM_DOCS_PATH>/active-tasks/<repo>/locks.json reconciled to final file list, status: locked  [C]
 
 state_on_complete:
+  stage_id: "3_design"
   stage_reached: 3
   stage_status: complete
   code_owner: "<agent-name>"
@@ -326,6 +391,7 @@ state_on_complete:
   blocker: null
 
 state_on_interrupt:
+  stage_id: "3_design"
   stage_reached: 3
   stage_status: in_progress
   blocker: "<required design-doc incomplete or code_owner not yet selected>"
@@ -354,7 +420,7 @@ guard_conditions:
   - exactly one code owner — all other lanes advisory only
   - Karpathy guidelines applied to every code change
   - screenshot_before captured BEFORE first code change (if change_type includes ui_change)
-  - Gate E.5 enforced per task: RED evidence must exist before any product code for that task
+  - Gate E.5 enforced per task: RED evidence must exist before any product code for that task, unless a row of refs/compliance-policy.md § TDD exemption table applies (recorded in skip-log.json with its replacement evidence)
 
 output_produces:
   - product code changes (owned by code_owner)
@@ -368,12 +434,14 @@ output_produces:
   - .project-orchestration/status.json: entry updated (stage_reached: 4)
 
 state_on_complete:
+  stage_id: "4_implementation"
   stage_reached: 4
   stage_status: complete
-  tdd_evidence_complete: true   # all tasks have red + green evidence
+  tdd_evidence_complete: true   # every task has red + green evidence, or a recorded exemption + its replacement evidence
   blocker: null
 
 state_on_interrupt:
+  stage_id: "4_implementation"
   stage_reached: 4
   stage_status: in_progress
   blocker: "<build error | test failure | blocked on advisory clarification>"
@@ -415,11 +483,13 @@ output_produces:
   - .project-orchestration/status.json: entry updated (stage_reached: 5)
 
 state_on_complete:
+  stage_id: "5_verify"
   stage_reached: 5
   stage_status: complete
   blocker: null
 
 state_on_interrupt:
+  stage_id: "5_verify"
   stage_reached: 5
   stage_status: in_progress
   blocker: "<which required evidence item failed>"
@@ -459,11 +529,13 @@ approval_gate:
   - if required regression/security/performance evidence is missing → block and report to human
 
 state_on_complete:
+  stage_id: "6_qa_gate"
   stage_reached: 6
   stage_status: complete
   blocker: null
 
 state_on_interrupt:
+  stage_id: "6_qa_gate"
   stage_reached: 6
   stage_status: in_progress
   blocker: "<unresolved QA issue or missing acceptance coverage>"
@@ -509,11 +581,13 @@ output_produces:
   - if TEAM_DOCS_PATH active and coordination mode: current task's locks removed from <TEAM_DOCS_PATH>/active-tasks/<repo>/locks.json and team task archived  [C]
 
 state_on_complete:
+  stage_id: "7_docs_decision_finalization"
   stage_reached: 7
   stage_status: complete
   blocker: null
 
 state_on_interrupt:
+  stage_id: "7_docs_decision_finalization"
   stage_reached: 7
   stage_status: in_progress
   blocker: "<ADR final status missing | task changelog incomplete | impact closure incomplete | artifact integrity failed | applicable skill drift failed>"
@@ -526,18 +600,19 @@ resume_entry_point: "finish execution.md Task Changelog / Impact Closure / Artif
 ## Session state transitions (summary)
 
 ```
-Stage -1 complete → stage_reached: -1, stage_status: complete
-Stage 0  complete → stage_reached:  0, stage_status: complete, source_mode set
-Stage 1  complete → stage_reached:  1, stage_status: complete
-Stage 2  complete → stage_reached:  2, stage_status: complete, requirements_approved: true
-Stage 2.5 complete → stage_reached: 2.5, stage_status: complete, adr_status set
-Stage 3  complete → stage_reached:  3, stage_status: complete, code_owner set
-Stage 4  complete → stage_reached:  4, stage_status: complete
-Stage 5  complete → stage_reached:  5, stage_status: complete
-Stage 6  complete → stage_reached:  6, stage_status: complete
-Stage 7  complete → stage_reached:  7, stage_status: complete  ← task done
+Stage -1  complete → stage_id: -1_tooling_preflight          (in preflight.md; copied by Stage 0)
+Stage 0   complete → stage_id: 0_intake,  stage_reached: 0,   source_mode, preliminary_ref_tier set
+Stage 1   complete → stage_id: 1_discovery, stage_reached: 1, workflow_mode, ref_tier set
+Stage 1.5 complete → stage_id: 1.5_clarification, stage_reached: 1.5, clarity_score set
+Stage 2   complete → stage_id: 2_requirements, stage_reached: 2, requirements_approved: true
+Stage 2.5 complete → stage_id: 2.5_decision_gate, stage_reached: 2.5, adr_status set
+Stage 3   complete → stage_id: 3_design, stage_reached: 3, code_owner set
+Stage 4   complete → stage_id: 4_implementation, stage_reached: 4
+Stage 5   complete → stage_id: 5_verify, stage_reached: 5
+Stage 6   complete → stage_id: 6_qa_gate, stage_reached: 6
+Stage 7   complete → stage_id: 7_docs_decision_finalization, stage_reached: 7  ← task done
 
-Any interrupt → stage_status: in_progress, blocker: "<reason>"
+Any interrupt → stage_status: in_progress, blocker: "<reason>" (stage_id stays on the interrupted stage)
 ```
 
 ---

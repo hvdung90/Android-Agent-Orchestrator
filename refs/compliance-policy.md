@@ -39,8 +39,8 @@ Three tiers: **MANDATORY**, **AUTO-SKIP** (condition-gated, no human needed), **
 | Stage 2 requirements doc file (micro mode) | AUTO-SKIP when `workflow_mode = micro` | ≤15-line inline summary substitutes; human approval gate itself still MANDATORY; write to skip-log |
 | Stage 6 full QA report (fast/micro mode) | CONFIRM-SKIP when `workflow_mode` ∈ {fast, micro} | TDD evidence from Stage 4 substitutes; must ask human; Karpathy diff review + Gate G close remain MANDATORY |
 | Stage 4 screenshot_before | AUTO-SKIP when not UI | `change_type` does not include `ui_change` |
-| Stage 4 Gate E.5 RED evidence per task | **MANDATORY — never skippable** | — |
-| Stage 4 GREEN evidence per task | **MANDATORY — never skippable** | — |
+| Stage 4 Gate E.5 RED evidence per task | **MANDATORY** unless a § TDD exemption table row applies (with that row's tier) | § TDD exemption table |
+| Stage 4 GREEN evidence per task | **MANDATORY** unless a § TDD exemption table row applies (with that row's tier) | § TDD exemption table |
 | Stage 4 spec-compliance review per task | **MANDATORY — never skippable** | — |
 | Stage 4 quality review (Karpathy + Kotlin/Android convention) per task | **MANDATORY — never skippable** | — |
 | Stage 4 Kotlin / Android official-rule checklist review | **MANDATORY when Kotlin product code changed** | — |
@@ -79,7 +79,7 @@ These steps are mandatory by default but a human may override them. Agent must *
 | Workflow mode downgrade (governed → standard, standard → fast, fast → micro) | "Current task is scored as `<mode>`. Downgrade to `<lower mode>` removes [clarification / ADR gate / QA gate / discovery+requirements files]. Confirm? (y/n)" |
 | Stage 1.5 Clarification when any trigger fires | "Clarification trigger fired: `<reason>`. Skip clarification and proceed directly to requirements? (y/n)" |
 | Stage 2.5 ADR-lite when any decision trigger fires | "Decision trigger fired: `<reason>`. Skip ADR-lite and proceed to design? This removes the architecture decision record. (y/n)" |
-| Stage 4 Gate E.5 TDD for a specific task | "Task `<task-id>` is `<change_type>`. TDD is required. Skip RED-first for this task? Writing code without RED evidence. (y/n)" — see TDD exemption categories below. **Exception:** the `build-only` category (below) is AUTO-SKIP, not CONFIRM-SKIP — no ask needed when `change_type ∈ {dependency_change, config_change}` and scope contains no product code. |
+| Stage 4 Gate E.5 TDD for a specific task (CONFIRM-SKIP rows of § TDD exemption table only) | "Task `<task-id>` is `<change_type>`; its diff fits the `<reason>` exemption (`<scope_check>`). Replace RED/GREEN with `<replacement evidence>` for this task? (y/n)" — AUTO-SKIP rows are logged without asking; anything outside the table is denied, not asked. |
 | Stage 5 required evidence item — tool present but check failed or contradicted expectation | "Required evidence `<item>`'s tool is present but the check failed/contradicted expectation (`<reason>`). Skip and proceed without it? This will be recorded in skip-log.json. (y/n)" |
 | Stage 5 Kotlin static analysis failure or unavailable configured tool | "`<tool>` is required for Kotlin static analysis but failed/is unavailable (`<reason>`). Fix before close, or defer with follow-up `<tracking_ref>`? Confirm defer? (y/n)" |
 | Stage 5 required regression/security/performance evidence (tool unavailable or manual-only) | "Required impact evidence `<item>` cannot be collected (`<reason>`). Defer with follow-up `<tracking_ref>` or block the task? Confirm defer? (y/n)" |
@@ -87,36 +87,39 @@ These steps are mandatory by default but a human may override them. Agent must *
 | Stage 7 Artifact Integrity / applicable Skill Drift failure | "Stage 7 close check failed: `<reason>`. Close anyway? This will be recorded in skip-log.json. (y/n)" |
 | Any stage re-ordering or parallel shortcut not defined in SKILL.md | "This would run Stage `<X>` before Stage `<Y>` is complete. Confirm? (y/n)" |
 
-### TDD exemption categories
+### TDD exemption table
 
-These are the *only* cases where requesting a Gate E.5 CONFIRM-SKIP is reasonable. Outside these categories, the request should be denied.
+**This table is the only definition of when Gate E.5 RED/GREEN evidence may be replaced.** README, `SKILL.md`, `refs/contracts-and-artifacts.md § Gate E.5`, `refs/stage-contracts.md`, the stage compliance matrix above and `docs/FLOW.md` point here and must not restate or narrow it. Outside these rows the request is denied.
 
-| Case | Why TDD-first is impractical | Allowed alternative | Still required |
-|---|---|---|---|
-| **Pure UI pixel / layout tweak** | No stable way to write a failing test for 1dp margin change | `screenshot_before` captured before edit; Compose semantics or screenshot-after verifies output | Spec-compliance review ✅, quality review ✅ |
-| **Legacy code that is currently untestable** | No test harness exists; writing the test requires more refactoring than the feature | Write a characterization test (records current behavior) OR add a minimal test harness first; treat harness as its own task with full TDD loop | Characterization test committed before product code; skip-log records `reason: legacy-untestable` |
-| **Pure refactor — no behavior change** | Behavior is unchanged; new test would duplicate existing tests exactly | All existing tests pass before AND after refactor; diff reviewed for scope creep | Existing test suite green at start; green at end; no new behavior introduced |
-| **Spike / investigation branch** | No product code is written; spike is exploratory only | No product code allowed; output is notes, a spike branch, or a draft in `docs/ai/inputs/`; spike does not merge to main | Spike must be discarded or converted to a new task with full TDD when productionized |
-| **Build-only / dependency-only / config-only change** | `change_type ∈ {dependency_change, config_change}` and the diff touches only build files (`build.gradle*`, version catalogs, `gradle.properties`), dependency version pins, or manifest/build-variant config — no `.kt`/`.java` product code. No unit test can meaningfully fail for a version-string bump. | `build_success_all_modules` (dependency_change) or `build_success_release_variant` + `manifest_diff` (config_change) from the Evidence Gate Matrix substitutes for RED/GREEN — this is the same evidence Stage 5 already requires for these types | Full clean build across affected modules must pass; if the diff touches any product code alongside the build/config file, this exemption does not apply — normal TDD resumes |
+The tier column is binding: **AUTO-SKIP** applies without asking when the scope rule holds (still logged); **CONFIRM-SKIP** needs the human's yes for that specific task (ask row above). An exemption never means "no evidence": the replacement evidence must be collected and recorded like any other evidence — a task cannot self-declare PASS.
 
-**Auto-qualifies without asking** (unlike the other four categories, which require a CONFIRM-SKIP ask): when `change_type` is finalized as `dependency_change` or `config_change` **and** the diff scope contains no product-code files, this exemption applies automatically — the Evidence Gate Matrix for these types never required a test-pass item in the first place, so there is nothing to ask permission to skip. Still record it in `skip-log.json` as `AUTO-SKIP`, `reason: build-only`, so the audit trail shows why no RED/GREEN evidence exists for this task.
+| `reason` | Tier | Qualifies only when (scope rule, checked against the actual diff) | Replacement evidence (recorded under `evidence/`) | Still required |
+|---|---|---|---|---|
+| `build-only` | AUTO-SKIP | `change_type ∈ {dependency_change, config_change}` and the diff touches **only** Gradle build files (`build.gradle*`, `settings.gradle*`, version catalogs, `gradle.properties`, wrapper). No `.kt`/`.java`, no resources, no `AndroidManifest.xml`. | `build_success_all_modules` (dependency_change) or `build_success_release_variant` (config_change) — the same items the Evidence Gate Matrix already requires | Clean build of every affected module |
+| `manifest-config` | CONFIRM-SKIP | As `build-only`, but the diff also touches `AndroidManifest.xml` or build-variant config. Manifest edits can change behavior (permissions, `exported`, intent filters), so a human confirms. | `build_success_release_variant` + `manifest_diff`, plus an instrumented/Robolectric check when a permission, component or intent filter changed | Spec-compliance review, quality review |
+| `resource-presentation` | AUTO-SKIP | Diff touches **only** presentation resources: values in `res/values*/{colors,dimens,styles,themes}.xml`, text-only edits in `res/values*/strings.xml`, files under `res/drawable*/`, `res/mipmap*/`, `res/font/`. No resource is renamed or removed; no string gains/loses/reorders format placeholders (`%s`, `%1$d`, …) or plural quantities; no `.kt`/`.java`, layout, navigation, `res/xml`, menu or manifest file. | `build_success` + `lint_report` for the affected module; `screenshot_after` of an affected screen when a device/emulator or snapshot test (Paparazzi/Roborazzi) is available, else the degraded-evidence note | Spec-compliance review, quality review |
+| `ui-pixel-tweak` | CONFIRM-SKIP | Layout XML attribute edits or Compose modifier/value edits (padding, size, color, typography, alignment) that add or remove **no** view, id, state, callback, binding expression or logic. | `screenshot_before` + `screenshot_after`, or a Paparazzi/Roborazzi snapshot diff; existing UI/Robolectric tests for that screen pass | Spec-compliance review, quality review |
+| `pure-refactor` | CONFIRM-SKIP | Behavior unchanged; a new test would only duplicate existing ones. | Existing test suite green before **and** after; diff reviewed for scope creep | No new behavior introduced |
+| `legacy-untestable` | CONFIRM-SKIP | No test harness exists and adding one costs more than the change. | Characterization test committed before product code, **or** a minimal harness added as its own task with full TDD | Characterization test / harness evidence |
+| `spike` | CONFIRM-SKIP | Exploratory work; no product code merges. | Notes, spike branch or draft in `docs/ai/inputs/` | Spike discarded, or converted to a new task with full TDD |
 
-**Exemption is NOT valid for:**
-- Features that are "hard to test" but testable with effort (use Android Advisor for test strategy).
-- New screens or flows (always UI-testable with Compose semantics or Robolectric).
-- Any task where acceptance criteria can be expressed as a unit or integration test.
-- Time pressure — "we're in a hurry" is not an exemption category.
+**Never an exemption** (normal RED/GREEN applies):
+- Anything outside the scope rule of its row — one product-code file in the diff ends every resource/build exemption for that task.
+- `res/navigation/`, `res/xml/` (preferences, network security config, file providers), menus, data-binding or view-binding expressions, `onClick`/listener attributes, new or removed views/ids: these change behavior.
+- Features that are "hard to test" but testable with effort (use Android Advisor for test strategy); new screens or flows (Compose semantics or Robolectric); any task whose acceptance criteria can be written as a unit or integration test.
+- Time pressure.
 
 **Exemption record (always written to `skip-log.json`):**
 ```json
 {
   "stage": "4",
   "step": "gate_e5_tdd",
-  "tier": "CONFIRM-SKIP",
-  "reason": "legacy-untestable | pure-refactor | ui-pixel-tweak | spike | build-only",
+  "tier": "AUTO-SKIP | CONFIRM-SKIP",
+  "reason": "build-only | manifest-config | resource-presentation | ui-pixel-tweak | pure-refactor | legacy-untestable | spike",
   "task_id": "<task-id>",
-  "confirmed_by": "human",
-  "alternative": "<what was done instead>",
+  "confirmed_by": "policy | human",
+  "scope_check": "<files in the diff, and why they satisfy the row's scope rule>",
+  "alternative": "<replacement evidence paths>",
   "consequence": "RED evidence not collected for this task"
 }
 ```

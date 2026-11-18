@@ -203,13 +203,23 @@ Parse rules: human-readable mirror of locks.json. Read only when human-facing bo
 
 Steps marked `[C]` run in `coordination` mode only. Steps marked `[both]` run in both modes.
 
-1. `[both]` `git pull --rebase` on docs repo before reading any file.
+1. `[both]` **Sync without touching the docs checkout** — one command for every file this stage reads:
+   ```bash
+   python3 templates/team_docs_sync.py read <TEAM_DOCS_PATH> active-tasks/shared/README.md active-tasks/<repo>/locks.json ADRs/README.md
+   ```
+   It runs `git fetch`, resolves the checked-out branch's upstream (never assumes `origin/main`) and reads each path with `git show <upstream>:<path>`; worktree, index and HEAD stay exactly as they were, so a dirty or diverged checkout is fine. A path missing on the ref comes back `present: false` (treat as a missing file).
+   - `sync: fresh` → `lock_freshness: fresh`; use the returned contents.
+   - `sync: no_upstream` or `sync: fetch_failed` → contents come from the local checkout and `lock_freshness: unknown`: nothing proves they match the team's current state. `[both]` reads continue with a warning. For the `[C]` lock check the result is `team_docs.conflict_check: unknown`, and Stage 0 must not write planning locks until the human confirms proceeding without fresh lock data.
+   - `local_ahead > 0` → unpushed local commits may hold this developer's own locks; mention them in the conflict table.
+   - Record `team_docs.sync` and `team_docs.local_ahead` in `reports/preflight.md § Stage -1 state`.
+   - Never run `pull`, `rebase`, `merge`, `checkout`, `reset` or `stash` in this phase; those belong to § Writes.
 2. `[both]` Read `<TEAM_DOCS_PATH>/active-tasks/shared/README.md` — scan Cross-repo Impacts for decisions affecting the current repo.
 3. `[C]` Read `<TEAM_DOCS_PATH>/active-tasks/<repo>/locks.json` if present; if missing, treat as `{ "version": 1, "locks": [] }`.
+   - **Legacy global index (pre-6.1.3):** if `<TEAM_DOCS_PATH>/active-tasks/locks.json` also exists, do **not** merge it in or use it as a silent fallback. Record `team_docs.legacy_lock_index: present` in `reports/preflight.md § Stage -1 state` (Stage 0 copies it into the task session), list any entries whose `repo` matches the current repo, and ask the human to move them into `active-tasks/<repo>/locks.json` (then delete the legacy file once no repo still references it). Until migrated, treat matching legacy entries as conflicts, not as clean.
 4. `[C]` Match planned scope against `locks[]`:
    - If overlap AND matching lock's `locked_at` is **not stale** (see § Stale lock reclaim policy) → HARD STOP, print conflict table with owner @github-handle and `locked_at` timestamp.
    - If overlap AND matching lock's `locked_at` **is stale** → do not hard-stop; follow § Stale lock reclaim policy (CONFIRM-SKIP, human must approve reclaim).
-   - If clean → log `team_docs.conflict_check: clean` in `session.json`.
+   - Record the result (`team_docs.conflict_check: clean | conflict | stale-reclaim-pending`) in `reports/preflight.md § Stage -1 state`; Stage 0 copies it into the task session. Stage -1 never writes a task `session.json`.
 5. `[both]` Read `<TEAM_DOCS_PATH>/ADRs/README.md` when `workflow_mode ≥ standard`. Scan the index for ADRs whose repo prefix matches the current repo OR whose title keywords overlap with the task brief. Load the full ADR file only for matches. Record loaded ADRs in `context-pack.json → relevant_adrs[]`. Skip for `micro`/`fast` modes. This is the primary mechanism for surfacing historical decisions and rationale before planning — do not wait for an ADR conflict to discover that a past decision exists.
 6. `[both]` Load `<TEAM_DOCS_PATH>/standards/` when the task has cross-repo impact, `team_coordination` is enabled in project policy, or a matching lock/task file must be inspected. Apply loaded standards as active constraints for the task.
 7. `[C]` Read per-repo board (`active-tasks/<repo>/README.md`) only for writes, conflict details after a lock match, or explicit human-facing team status work.
@@ -226,15 +236,15 @@ Locks are written once at Stage 0 and never touched again until Stage 3 (upgrade
 1. When Stage -1's conflict check finds an overlapping lock whose `locked_at` is stale, do not hard-stop. Instead ask:
    > "Lock on `<file>` by @`<owner>` (Task `<task-id>`) is `<N>` days old — stale threshold is `<threshold>`. It may be abandoned, or the owner may just not have reached Stage 7 yet. Reclaim this lock and proceed? (y/n)"
 2. If the human confirms reclaim:
-   - Remove the stale lock object from `active-tasks/locks.json` and let the current task's Stage 0 write its own lock.
+   - Remove the stale lock object from `active-tasks/<repo>/locks.json` and let the current task's Stage 0 write its own lock.
    - Append an audit line to the current task file `## Notes/Gotchas`: `Reclaimed stale lock on <file> from <old-task-id> (@<old-owner>, locked since <old-locked_at>).`
-   - `git push`.
+   - `python3 templates/team_docs_sync.py commit-push <TEAM_DOCS_PATH> -m "team-docs: reclaim stale lock <file>" -- active-tasks/<repo>/locks.json <task file>` (after `begin`).
 3. If the human declines → treat as a normal HARD STOP; do not proceed with the overlapping file.
 4. **Never reclaim silently.** A false "abandoned" read (owner is mid-task but simply hasn't touched that file in days) is a real conflict risk — staleness is a prompt to ask, not a license to proceed.
 
 **Tiebreak for genuine concurrent races** (both locks fresh — this is the residual window described in the anti-race protocol above, where two devs start within seconds of each other and both pass Stage -1 before either's Stage 0 write lands):
 - **Earliest `locked_at` wins.** The task with the later `locked_at` timestamp must yield: replan scope to avoid the contested file(s), or pause and contact the earlier owner directly.
-- **Post-push re-verification (closes the residual window):** immediately after Stage 0's `git push` succeeds, re-`git pull --rebase` and re-read `active-tasks/locks.json`. If an object for the same file now has an earlier `locked_at` than the current task's own lock → the current task lost the tiebreak; remove its own pending lock, `git push`, and follow the tiebreak rule above.
+- **Post-push re-verification (closes the residual window):** immediately after Stage 0's `commit-push` succeeds, re-read `active-tasks/<repo>/locks.json` with `python3 templates/team_docs_sync.py read`. If an object for the same file now has an earlier `locked_at` than the current task's own lock → the current task lost the tiebreak; remove its own pending lock (`begin` → edit → `commit-push`), and follow the tiebreak rule above.
 
 ---
 
@@ -242,30 +252,43 @@ Locks are written once at Stage 0 and never touched again until Stage 3 (upgrade
 
 Steps marked `[C]` run in `coordination` mode only. Steps marked `[both]` run in both modes.
 
+**Write lifecycle (every write step below):** `begin` → write this step's files → `commit-push` with exactly those paths.
+
+```bash
+python3 templates/team_docs_sync.py begin <TEAM_DOCS_PATH>
+# … write this step's files …
+python3 templates/team_docs_sync.py commit-push <TEAM_DOCS_PATH> -m "team-docs: <task-id> <stage> <what>" -- <every path this step wrote>
+```
+
+- `begin` requires a clean checkout before the task writes anything — changes already there are not this task's to commit (exit 3: ask the human; never stash, commit or discard them) — then `git pull --rebase`.
+- `commit-push` stages **only** the listed paths (`git add -- <paths>`, never `git add .` / `-A`), and stops (exit 3) if any other path changed meanwhile; then commit, check the checkout is clean, push. A rejected push gets one `pull --rebase` + retry; a second rejection is exit 5.
+- Rebase conflict (exit 4) → the helper has already run `git rebase --abort`; report the conflicting paths and ask the human. Never resolve `locks.json` conflicts automatically.
+- List deleted and moved paths too (Stage 7 archive moves a file: list both the old and the new path).
+
 ### Stage 0 (task creation)
 
 `[C]` All steps in this section are coordination-mode only. In `knowledge` mode, Stage 0 makes no writes to the docs repo.
 
-- `git pull --rebase` on docs repo before writing.
+- `python3 templates/team_docs_sync.py begin <TEAM_DOCS_PATH>`.
 - **Bootstrap per-repo board if missing:** if `active-tasks/<repo>/README.md` does not exist → copy `active-tasks/REPO_BOARD_TEMPLATE.md`, replace `<REPO_SLUG>` placeholder with actual slug, create the file. This happens once per repo, not per task.
 - If `active-tasks/TASK_TEMPLATE.md` exists → copy to `active-tasks/<repo>/<task-id>-<slug>.md`.
 - If template NOT found → use embedded fallback below. Log warning: `TASK_TEMPLATE.md not found — used embedded fallback. Consider adding template to docs repo.`
 - Fill: Task ID, Repo, Branch, Owner (ask user if not derivable from `git config user.name`), Started (ISO datetime), Mode.
 - Append row to `active-tasks/<repo>/README.md § Overview`.
 - **Write pending lock objects** to `active-tasks/<repo>/locks.json` for all files likely to be touched. Status = `planning`. This is mandatory — do not defer to Stage 3.
-- **`git push` docs repo after all writes complete.** Do NOT wait for other concurrent tasks on the same repo to finish — each task manages only its own rows/files. Other tasks will pick up changes via `git pull --rebase` before their next write.
-- **Post-push re-verify (mandatory, closes the residual race window):** `git pull --rebase`, re-read `active-tasks/<repo>/locks.json`. If any object for a file this task just locked has an earlier `locked_at` than this task's own → apply § Stale lock reclaim policy's tiebreak rule (earliest `locked_at` wins; this task yields).
+- **`commit-push` with the paths this step wrote** (task file, `active-tasks/<repo>/README.md`, `active-tasks/<repo>/locks.json`, and the board template copy if it was bootstrapped). Do NOT wait for other concurrent tasks on the same repo to finish — each task manages only its own rows/files.
+- **Post-push re-verify (mandatory, closes the residual race window):** `python3 templates/team_docs_sync.py read <TEAM_DOCS_PATH> active-tasks/<repo>/locks.json`. If any object for a file this task just locked has an earlier `locked_at` than this task's own → apply § Stale lock reclaim policy's tiebreak rule (earliest `locked_at` wins; this task yields).
 
 ### Stage 2.5 (decision affecting other repos)
 
 When a decision matches the "affects other repos" heuristic (see SKILL.md § Stage 2.5):
 
 `[both]` — knowledge mode still deposits decisions as cross-repo knowledge:
-- `git pull --rebase` on docs repo before writing.
+- `python3 templates/team_docs_sync.py begin <TEAM_DOCS_PATH>`.
 - Create ADR in `<TEAM_DOCS_PATH>/ADRs/<repo>-<nnnn>-<slug>.md` (see `docs/ai/decisions/` schema for format).
 - Update `<TEAM_DOCS_PATH>/ADRs/README.md` index with the new row.
 - Append row to `active-tasks/shared/README.md § Cross-repo Impacts`.
-- **`git push` docs repo.**
+- **`commit-push`** with the ADR file, `ADRs/README.md` and `active-tasks/shared/README.md`.
 
 `[C]` — coordination mode additionally writes to the task file:
 - Append to team task file `## Decisions`:
@@ -279,23 +302,23 @@ When a decision matches the "affects other repos" heuristic (see SKILL.md § Sta
 
 `[C]` All steps in this section are coordination-mode only. In `knowledge` mode, Stage 3 makes no writes to the docs repo.
 
-- `git pull --rebase` on docs repo before writing.
+- `python3 templates/team_docs_sync.py begin <TEAM_DOCS_PATH>`.
 - Upgrade pending lock objects from `planning` → `locked` in `active-tasks/<repo>/locks.json` with the final file list from `implementation-plan.md`.
 - Add any new files not in the pending list; remove entries for files that won't be touched.
 - Update team task file `## Scope > Files sẽ touch (LOCKED)` from `implementation-plan.md`.
-- **`git push` docs repo after all writes complete.**
+- **`commit-push`** with `active-tasks/<repo>/locks.json` and the task file.
 
 ### Stage 7 (archive)
 
 `[C]` All steps in this section are coordination-mode only. In `knowledge` mode, Stage 7 makes no writes to the docs repo (nothing was created to clean up).
 
-- `git pull --rebase` on docs repo before writing.
+- `python3 templates/team_docs_sync.py begin <TEAM_DOCS_PATH>`.
 - Update team task file status → `✅ done`.
 - Create `archive/YYYY-MM/` directory if it doesn't exist.
 - Move file: `active-tasks/<repo>/<task-id>-<slug>.md` → `archive/YYYY-MM/<repo>-<task-id>-<slug>.md`.
 - Remove row from `active-tasks/<repo>/README.md § Overview`.
 - Remove lock objects owned by this task from `active-tasks/<repo>/locks.json`.
-- **`git push` docs repo after all writes complete.**
+- **`commit-push`** with the old and new task-file paths, `active-tasks/<repo>/README.md` and `active-tasks/<repo>/locks.json`.
 
 ---
 
@@ -352,6 +375,6 @@ Used when `TASK_TEMPLATE.md` is not found in the docs repo.
 ## What NOT to do
 
 - Do NOT write `session.json`, `context-pack.json`, or other operational artifacts into `TEAM_DOCS_PATH`. Those stay in `.project-orchestration/`.
-- Do NOT rewrite historical entries in `active-tasks/README.md`. Append-only for Cross-repo Impacts; overwrite-in-place only for the Overview count table.
+- Do NOT rewrite historical entries in `active-tasks/shared/README.md`. Append-only for Cross-repo Impacts; overwrite-in-place only for the Overview count table.
 - Do NOT create files in `TEAM_DOCS_PATH/orchestration/` (that path does not exist — team docs is human-readable coordination, not agent state).
 - Do NOT commit docs repo changes with `--no-verify` or force-push. Treat docs repo the same as any production branch.
