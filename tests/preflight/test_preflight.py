@@ -50,6 +50,16 @@ exit 128
 
 GIT_FAIL_STUB = "#!/bin/sh\nexit 128\n"
 
+# Bare repository: HEAD resolves, but there is no work tree.
+GIT_BARE_STUB = """\
+#!/bin/sh
+case "$1 $2" in
+  "rev-parse --is-inside-work-tree") echo "false"; exit 0 ;;
+  "rev-parse HEAD")                  echo "fixturehead"; exit 0 ;;
+esac
+exit 1
+"""
+
 
 class Fixture:
     """A temp project + stub bin directory."""
@@ -347,6 +357,63 @@ class CacheTests(Base):
         self.assertIn("- tooling-cache.json: missing", fx.markdown())
 
 
+class FinalReadinessAuthorityTests(Base):
+    """The script never emits the final gate: only preflight.md carries
+    ready_for_stage_0 (= tooling_ready AND task-level rules, written by the agent)."""
+
+    def test_script_does_not_emit_final_gate(self):
+        fx = self.fixture()
+        data = fx.json()
+        self.assertNotIn("ready_for_stage_0", data)
+        md = fx.markdown()
+        self.assertNotRegex(md, r"`ready_for_stage_0`: (true|false)")
+        self.assertIn("decided by the agent in preflight.md", md)
+
+    def test_docs_name_preflight_md_as_the_only_gate(self):
+        with open(os.path.join(REPO, "refs", "contracts-and-artifacts.md"), encoding="utf-8") as f:
+            text = f.read()
+        self.assertNotIn("Prefer `preflight.json` over `preflight.md` for any boolean gate", text)
+        self.assertIn("only Stage 0 gate", text)
+
+
+class BareRepoCacheTests(Base):
+    """A bare repo has a HEAD but no work tree: cache must not be reusable,
+    in the fast path and in the full run alike."""
+
+    def write_matching_cache(self, fx):
+        fx.write(".project-orchestration/memory/tooling-cache.json",
+                 json.dumps({"valid_until": "2099-01-01T00:00:00Z", "graph_commit": "fixturehead"}))
+
+    def test_cache_check_refuses_reuse_without_work_tree(self):
+        fx = self.fixture(git=GIT_BARE_STUB)
+        self.write_matching_cache(fx)
+        cache = json.loads(fx.run("--cache-check").stdout)["cache"]
+        self.assertEqual((cache["cache_status"], cache["cache_reusable"]), ("not_a_git_work_tree", False))
+        full = fx.json()
+        self.assertFalse(full["cache"]["cache_reusable"])
+        self.assertIn("not_a_git_work_tree", full["blocking_gaps"])
+
+    @unittest.skipUnless(shutil.which("git"), "real git required")
+    def test_real_bare_repository(self):
+        fx = self.fixture(git=None)          # use the host git
+        git = shutil.which("git")
+        src = os.path.join(fx.root, "src")
+        env = {**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@example.invalid",
+               "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@example.invalid"}
+        for cmd in (["init", "-q", src], ["-C", src, "commit", "-q", "--allow-empty", "-m", "c"]):
+            subprocess.run([git, *cmd], check=True, env=env, capture_output=True)
+        shutil.rmtree(fx.proj)
+        subprocess.run([git, "clone", "-q", "--bare", src, fx.proj], check=True, capture_output=True)
+        head = subprocess.run([git, "-C", fx.proj, "rev-parse", "HEAD"], check=True,
+                              capture_output=True, text=True).stdout.strip()
+        fx.write(".project-orchestration/memory/tooling-cache.json",
+                 json.dumps({"valid_until": "2099-01-01T00:00:00Z", "graph_commit": head}))
+        fx.path = fx.bin + ":" + os.path.dirname(git) + ":/usr/bin:/bin"
+        cache = json.loads(fx.run("--cache-check").stdout)["cache"]
+        self.assertFalse(cache["cache_reusable"])
+        self.assertEqual(cache["cache_status"], "not_a_git_work_tree")
+
+
 class CacheCheckModeTests(Base):
     """--cache-check: cache verdict only, without probing Android tooling."""
 
@@ -422,23 +489,22 @@ class ReadinessTests(Base):
     def test_ready_in_git_work_tree(self):
         fx = self.fixture()
         data = fx.json()
-        self.assertTrue(data["ready_for_stage_0"])
-        self.assertEqual(data["readiness_scope"], "tooling")
-        self.assertIn("- `ready_for_stage_0`: true", fx.markdown())
+        self.assertTrue(data["tooling_ready"])
+        self.assertIn("- tooling_ready: true", fx.markdown())
 
     def test_not_ready_outside_git_work_tree(self):
         fx = self.fixture(git=GIT_FAIL_STUB)
         data = fx.json()
-        self.assertFalse(data["ready_for_stage_0"])
+        self.assertFalse(data["tooling_ready"])
         self.assertIn("not_a_git_work_tree", data["blocking_gaps"])
         md = fx.markdown()
-        self.assertIn("- `ready_for_stage_0`: false", md)
+        self.assertIn("- tooling_ready: false", md)
         self.assertIn("- Blocking gaps: not_a_git_work_tree", md)
 
     def test_non_blocking_gaps_do_not_block(self):
         fx = self.fixture()  # no auth file, no android, no karpathy
         data = fx.json()
-        self.assertTrue(data["ready_for_stage_0"])
+        self.assertTrue(data["tooling_ready"])
         self.assertIn("auth_file_missing", data["non_blocking_gaps"])
 
 
@@ -458,7 +524,7 @@ class OutputContractTests(Base):
 
     def test_json_keeps_backward_compatible_keys(self):
         data = self.full_fixture().json()
-        for key in ("timestamp", "mode", "ready_for_stage_0", "readiness_scope", "blocking_gaps",
+        for key in ("timestamp", "mode", "tooling_ready", "blocking_gaps",
                     "non_blocking_gaps", "tools", "architecture_map", "cache"):
             self.assertIn(key, data)
         for key in ("auth_file", "atlassian_token", "figma_token", "github_token",
@@ -486,7 +552,7 @@ class OutputContractTests(Base):
         self.assertIn("  - T-1: stage 2, in_progress", md)
         self.assertEqual(data["cache"]["cache_reusable"], False)
         self.assertIn("- cache_reusable: false", md)
-        self.assertIn(f"- `ready_for_stage_0`: {str(data['ready_for_stage_0']).lower()}", md)
+        self.assertIn(f"- tooling_ready: {str(data['tooling_ready']).lower()}", md)
         # active_tool depends on whether the host interpreter has graphifyy;
         # only parity between formats is asserted here.
         active = data["architecture_map"]["active_tool"]

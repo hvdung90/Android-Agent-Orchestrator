@@ -252,18 +252,22 @@ def cache_freshness(valid_until: Optional[str], now: datetime) -> str:
         return "unparseable"
 
 
-def cache_status(freshness: str, graph_commit: Any, head: Optional[str]) -> str:
-    """Only 'fresh' means reusable: valid TTL AND readable HEAD AND commit == HEAD."""
+def cache_status(freshness: str, graph_commit: Any, git: Facts) -> str:
+    """Only 'fresh' means reusable: valid TTL AND readable HEAD AND a work tree
+    (the same precondition the full run blocks on) AND commit == HEAD."""
+    head = git["head"]
     if freshness != "fresh":
         return freshness
     if head is None:
         return "head_unavailable"
+    if not git["work_tree"]:
+        return "not_a_git_work_tree"
     if not graph_commit:
         return "no_commit"
     return "fresh" if graph_commit == head else "graph_stale"
 
 
-def check_cache(now: datetime, head: Optional[str]) -> Facts:
+def check_cache(now: datetime, git: Facts) -> Facts:
     present, data = read_json(CACHE_PATH)
     if not present:
         return {"present": False, "cache_reusable": False}
@@ -271,7 +275,8 @@ def check_cache(now: datetime, head: Optional[str]) -> Facts:
         return {"present": True, "readable": False, "cache_reusable": False}
     valid_until = data.get("valid_until")
     graph_commit = data.get("graph_commit")
-    status = cache_status(cache_freshness(valid_until, now), graph_commit, head)
+    status = cache_status(cache_freshness(valid_until, now), graph_commit, git)
+    head = git["head"]
     facts: Facts = {"present": True, "checked_at": data.get("checked_at"),
                     "valid_until": valid_until, "graph_commit": graph_commit}
     if head is not None:
@@ -347,7 +352,7 @@ def collect(mode: str) -> Facts:
         outcomes = {name: fut.result() for name, fut in futures.items()}
     results = {name: value for name, (value, _) in outcomes.items()}
     errors = [err for _, err in outcomes.values() if err]
-    cache, cache_err = guarded("cache", lambda: check_cache(now, results["git"]["head"]),
+    cache, cache_err = guarded("cache", lambda: check_cache(now, results["git"]),
                                lambda: {"present": True, "readable": False, "cache_reusable": False})
     return {
         "mode": mode,
@@ -364,7 +369,7 @@ def gaps(facts: Facts) -> Tuple[List[str], List[str]]:
 
     Blocking here covers only what the script can decide on its own. Task-level
     blocking rules (refs/provisioning-preflight.md § Blocking rules) are applied
-    by the agent when it writes preflight.md — see readiness_scope.
+    by the agent when it writes the final ready_for_stage_0 into preflight.md.
     """
     blocking: List[str] = []
     if not facts["git"]["work_tree"]:
@@ -407,8 +412,7 @@ def to_json(facts: Facts) -> Facts:
     return {
         "timestamp": facts["timestamp"],
         "mode": facts["mode"],
-        "ready_for_stage_0": not blocking,
-        "readiness_scope": "tooling",
+        "tooling_ready": not blocking,
         "blocking_gaps": blocking,
         "non_blocking_gaps": warn,
         "tools": {
@@ -546,9 +550,9 @@ def md_memory(cache: Facts, session: Facts) -> List[str]:
 def md_summary(report: Facts) -> List[str]:
     blocking = ", ".join(report["blocking_gaps"]) or "none"
     warn = ", ".join(report["non_blocking_gaps"]) or "none"
-    return [f"- `ready_for_stage_0`: {str(report['ready_for_stage_0']).lower()}",
-            "- readiness_scope: tooling (combine with task-level blocking rules in "
-            "refs/provisioning-preflight.md before writing preflight.md)",
+    return [f"- tooling_ready: {str(report['tooling_ready']).lower()}",
+            "- final `ready_for_stage_0`: decided by the agent in preflight.md "
+            "(tooling_ready AND refs/provisioning-preflight.md § Blocking rules)",
             f"- Blocking gaps: {blocking}",
             f"- Non-blocking gaps: {warn}"]
 
@@ -599,7 +603,7 @@ def cache_check() -> Facts:
     """Fast path for the Stage -1 cache decision: git + cache only (always JSON)."""
     now = datetime.now(timezone.utc)
     git, _ = guarded("git", git_state, lambda: {"work_tree": False, "head": None})
-    cache, _ = guarded("cache", lambda: check_cache(now, git["head"]),
+    cache, _ = guarded("cache", lambda: check_cache(now, git),
                        lambda: {"present": True, "readable": False, "cache_reusable": False})
     return {"timestamp": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
             "cache": {k: v for k, v in cache.items() if k != "checked_at"}}
