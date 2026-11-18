@@ -220,9 +220,13 @@ No product-code changes. Finalize ADR status, Task Changelog, Impact Closure, Ko
 
 If team docs is active, remove task locks from `locks.json` and archive the task file via `refs/team-docs.md`.
 
+### Telemetry
+
+Every task keeps running counters in `session.json.telemetry` — paths and counts only, never content: each skill-pack file or section opened (`policy_reads`, re-reads included), each stop for a human (`human_interrupts`), mode upgrades, the first product-code edit, stages per model tier. At Stage 7 close, append one line to `.project-orchestration/memory/retro-log.jsonl` (`refs/contracts-and-artifacts.md § retro-log.jsonl`); a failed write is noted and never blocks the close. `scripts/pilot_report.py` turns these lines into the ADR-0001 pilot comparison (`docs/pilot/README.md`).
+
 ### Stage 8 — Retro (optional, non-blocking)
 
-Optional, non-blocking, never reopens a complete Stage 7 task. Append best-effort telemetry to `.project-orchestration/memory/retro-log.jsonl` using `refs/contracts-and-artifacts.md`.
+Optional, non-blocking, never reopens a complete Stage 7 task. Reflection only: the telemetry record is written at Stage 7 (§ Telemetry).
 
 ---
 
@@ -293,7 +297,7 @@ The parent orchestrator must wait:
 ├── memory/
 │   ├── tooling-cache.json                    ← GLOBAL: Stage -1 cache
 │   ├── graph-stamp.json                      ← GLOBAL: graph staleness (repo-level, one per repo — not per task)
-│   └── retro-log.jsonl                       ← GLOBAL: append-only, one line per completed task (Stage 8, best-effort)
+│   └── retro-log.jsonl                       ← GLOBAL: append-only telemetry, one line per finished task (Stage 7, best-effort)
 ├── reports/
 │   └── preflight.md                          ← GLOBAL: Stage -1 result
 └── tasks/

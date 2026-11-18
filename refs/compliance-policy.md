@@ -65,6 +65,7 @@ Three tiers: **MANDATORY**, **AUTO-SKIP** (condition-gated, no human needed), **
 | Stage 7 Impact Closure | **MANDATORY for code-touching tasks** | — |
 | Stage 7 `task-summary.md` | **MANDATORY for code-touching tasks** | — |
 | Stage 7 Artifact Integrity Check | **MANDATORY** | — |
+| Stage 7 telemetry line (`retro-log.jsonl`) | best-effort — **never blocks close**; a failed write is noted in `task-summary.md` | paths and counts only (`refs/contracts-and-artifacts.md § retro-log.jsonl`) |
 | Stage 7 Skill Drift Check | AUTO-SKIP when task did not touch skill's own files | task did not modify `SKILL.md`/`refs/**`/`templates/**`/`docs/FLOW.md`/`CHANGELOG.md` |
 | Write session.json state transitions | **MANDATORY — never skippable** | — |
 | Write skip-log.json on any skip | **MANDATORY — never skippable** | — |

@@ -13,6 +13,7 @@ FAST is for an isolated change with clear acceptance criteria: a UI or resource 
 - RED before product code, then GREEN — unless the diff fits a row of `refs/compliance-policy.md § TDD exemption table`.
 - Karpathy diff review before close.
 - `session.json` state written at every stage (`stage_id` + `stage_reached`), and the team-docs lock check when `TEAM_DOCS_PATH` is set.
+- Telemetry counters in `session.json.telemetry`: every skill-pack file or section you open (`policy_reads`, this file included), every stop for a human, the first product-code edit. Paths and counts only.
 
 ## Escalation triggers
 
@@ -88,7 +89,7 @@ Karpathy review of the diff: simplest change that meets the AC, nothing outside 
 
 ### 7 · Close
 
-Write `docs/ai/tasks/{task_id}/task-summary.md`: what changed, AC → evidence, one line each for changelog, impact closure and Kotlin rule closure, follow-ups. Run the Artifact Integrity Check (`refs/contracts-and-artifacts.md § Artifact Integrity Check`). Release team-docs locks with `begin` → edit → `commit-push`. Set `stage_id: "7_docs_decision_finalization"`, `stage_status: complete`.
+Write `docs/ai/tasks/{task_id}/task-summary.md`: what changed, AC → evidence, one line each for changelog, impact closure and Kotlin rule closure, follow-ups. Run the Artifact Integrity Check (`refs/contracts-and-artifacts.md § Artifact Integrity Check`). Release team-docs locks with `begin` → edit → `commit-push`. Append one telemetry line to `.project-orchestration/memory/retro-log.jsonl` (`refs/contracts-and-artifacts.md § retro-log.jsonl`; best-effort, never blocks). Set `stage_id: "7_docs_decision_finalization"`, `stage_status: complete`.
 
 ## What FAST does not produce
 

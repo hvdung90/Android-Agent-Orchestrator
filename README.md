@@ -147,15 +147,18 @@ workflows/
 examples/
 └── preflight-report.example.md   ← filled example with auth section
 scripts/
-└── lint-contracts.py             ← contract drift lint (paths, field names, version headers)
+├── lint-contracts.py             ← contract drift lint (paths, field names, version headers)
+└── pilot_report.py               ← telemetry validation + baseline/candidate pilot comparison
 tests/
 ├── preflight/test_preflight.py  ← fixture-based regression tests (python3 -m unittest discover -s tests/preflight)
 ├── auth/test_agent_auth.py      ← credential helper tests (python3 -m unittest discover -s tests/auth)
 ├── contracts/test_lint_contracts.py ← linter regression tests (python3 -m unittest discover -s tests/contracts)
-└── team_docs/test_team_docs_sync.py ← real-git tests for the team-docs sync helper (python3 -m unittest discover -s tests/team_docs)
+├── team_docs/test_team_docs_sync.py ← real-git tests for the team-docs sync helper (python3 -m unittest discover -s tests/team_docs)
+└── pilot/test_pilot_report.py    ← pilot report tests (python3 -m unittest discover -s tests/pilot)
 docs/
 ├── FLOW.md                       ← complete flow diagram, all use cases
 ├── decisions/                    ← decisions about this skill pack itself (ADR-0001: adaptive workflow)
+├── pilot/README.md               ← how to run and report the ADR-0001 pilot
 └── ai/
     ├── decisions/                ← GLOBAL: project-wide ADR ledger (immutable once Accepted)
     │   ├── 0000-template.md      ← ADR-lite template
