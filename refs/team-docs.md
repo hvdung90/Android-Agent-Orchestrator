@@ -203,7 +203,15 @@ Parse rules: human-readable mirror of locks.json. Read only when human-facing bo
 
 Steps marked `[C]` run in `coordination` mode only. Steps marked `[both]` run in both modes.
 
-1. `[both]` `git pull --rebase` on docs repo before reading any file.
+1. `[both]` **Sync without touching the docs checkout.** Reads must work on a dirty or diverged `TEAM_DOCS_PATH` and must leave its worktree, index and branch exactly as they were:
+   - `git -C <TEAM_DOCS_PATH> fetch --quiet` — updates remote-tracking refs only.
+   - Resolve the upstream of the checked-out branch: `git -C <TEAM_DOCS_PATH> rev-parse --abbrev-ref --symbolic-full-name @{upstream}` (do not assume `origin/main`).
+   - Read every file below from that ref: `git -C <TEAM_DOCS_PATH> show "<upstream>:<path>"`. A path missing on the ref is treated exactly like a missing file.
+   - No upstream configured → read the checked-out files and record `team_docs.sync: no_upstream`.
+   - Fetch fails (offline, auth) → read the local copy and record `team_docs.sync: fetch_failed`. `[both]` reads continue with a warning. For the `[C]` lock check the result is `team_docs.conflict_check: unknown`: Stage 0 must not write planning locks until the human confirms proceeding without fresh lock data.
+   - Local commits not yet pushed (`git rev-list --count <upstream>..HEAD` > 0) → record `team_docs.local_ahead: <n>`; they may hold this developer's own locks — mention them in the conflict table.
+   - Record `team_docs.sync: fresh | no_upstream | fetch_failed` in `reports/preflight.md § Stage -1 state`.
+   - Never run `pull`, `rebase`, `merge`, `checkout`, `reset` or `stash` in this phase; those belong to § Writes.
 2. `[both]` Read `<TEAM_DOCS_PATH>/active-tasks/shared/README.md` — scan Cross-repo Impacts for decisions affecting the current repo.
 3. `[C]` Read `<TEAM_DOCS_PATH>/active-tasks/<repo>/locks.json` if present; if missing, treat as `{ "version": 1, "locks": [] }`.
    - **Legacy global index (pre-6.1.3):** if `<TEAM_DOCS_PATH>/active-tasks/locks.json` also exists, do **not** merge it in or use it as a silent fallback. Record `team_docs.legacy_lock_index: present` in `reports/preflight.md § Stage -1 state` (Stage 0 copies it into the task session), list any entries whose `repo` matches the current repo, and ask the human to move them into `active-tasks/<repo>/locks.json` (then delete the legacy file once no repo still references it). Until migrated, treat matching legacy entries as conflicts, not as clean.
@@ -242,6 +250,11 @@ Locks are written once at Stage 0 and never touched again until Stage 3 (upgrade
 ## Writes
 
 Steps marked `[C]` run in `coordination` mode only. Steps marked `[both]` run in both modes.
+
+**Write-phase sync (applies to every `git pull --rebase` / `git push` below):**
+- Precondition: `git -C <TEAM_DOCS_PATH> status --porcelain` is empty. If it is not, stop and ask the human — never stash, commit, or discard their changes.
+- `git pull --rebase` hits a conflict → `git rebase --abort`, report the conflicting paths, and ask the human. Never resolve `locks.json` conflicts automatically.
+- `git push` rejected (someone pushed first) → `git pull --rebase` once more under the same rules, re-check the planned write still applies, push again; a second rejection → ask the human.
 
 ### Stage 0 (task creation)
 

@@ -250,5 +250,37 @@ class ToolingReadinessNameTests(LintFixture):
         self.append("refs/sub-agents.md", "ready_for_stage_0: true | false")
         self.assert_flagged("readiness-field", "refs/sub-agents.md:")
 
+
+class TeamDocsReadPhaseTests(LintFixture):
+    """AOO-013: Stage -1 team-docs reads must not mutate the docs checkout."""
+
+    def inject_read_step(self, text):
+        self.replace("refs/team-docs.md", "7. `[C]` Read per-repo board", text + "\n7. `[C]` Read per-repo board")
+
+    def test_pull_rebase_in_read_phase_is_flagged(self):
+        self.inject_read_step("8. `[both]` `git pull --rebase` on docs repo before reading any file.")
+        self.assert_flagged("read-phase-git", "refs/team-docs.md:")
+
+    def test_other_mutating_commands_are_flagged(self):
+        for cmd in ("git -C $T checkout main", "git stash", "git -C $T reset --hard @{u}",
+                    "git merge origin/main"):
+            with self.subTest(cmd=cmd):
+                self.setUp()
+                self.inject_read_step(f"8. `[both]` run `{cmd}` first.")
+                self.assert_flagged("read-phase-git", "refs/team-docs.md:")
+
+    def test_prohibition_wording_is_allowed(self):
+        self.inject_read_step("   - Never run `git pull`, `rebase`, `checkout` here.")
+        self.assert_clean()
+
+    def test_fetch_and_show_are_allowed(self):
+        self.inject_read_step('8. `[both]` `git -C $T fetch --quiet` then `git -C $T show "$up:path"`.')
+        self.assert_clean()
+
+    def test_write_phase_may_rebase(self):
+        content = self.read("refs/team-docs.md")
+        self.assertIn("pull --rebase", content[content.index("## Writes"):])
+        self.assert_clean()
+
 if __name__ == "__main__":
     unittest.main()

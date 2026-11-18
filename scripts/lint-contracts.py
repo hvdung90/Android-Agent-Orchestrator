@@ -13,7 +13,9 @@ that has already happened at least once (see docs review AOO-004/016/019/020):
   5. stage ids            — every state block sets stage_id/stage_reached of its
                             stage; § Stage order lists all stages (AOO-008)
   6. ref tier             — Stage 0 preliminary only, Stage 1 finalizes (AOO-015)
-  7. version headers      — SKILL frontmatter == SKILL heading == README ==
+  7. read-phase git       — no pull/rebase/merge/checkout/reset/stash in the
+                            Stage -1 team-docs reads (AOO-013)
+  8. version headers      — SKILL frontmatter == SKILL heading == README ==
                             FLOW == every refs/*.md header == latest CHANGELOG
 
 A line may mention a retired path only when it also contains the word
@@ -245,6 +247,20 @@ def check_skipped_stage(root: str) -> Iterable[Finding]:
         yield Finding(rel_path, 0, "skipped-stage: § Stage order must define **Next stage**", "")
 
 
+READ_PHASE_MUTATION = re.compile(r"\bgit\b[^`\n]*\b(pull|rebase|merge|checkout|reset|stash)\b")
+
+
+def check_read_phase_git(root: str) -> Iterable[Finding]:
+    """AOO-013: Stage -1 team-docs reads must not mutate the docs checkout.
+    Lines that state the prohibition (contain 'never') are allowed."""
+    rel_path = "refs/team-docs.md"
+    for no, line in section(read_lines(os.path.join(root, rel_path)), "## Reads (Stage -1", "## "):
+        if READ_PHASE_MUTATION.search(line) and "never" not in line.lower():
+            yield Finding(rel_path, no, "read-phase-git: Stage -1 reads use `git fetch` + "
+                          "`git show <upstream>:<path>`; pull/rebase/merge/checkout/reset/stash "
+                          "belong to § Writes", line.strip())
+
+
 def first_match(path: str, pattern: str) -> Tuple[Optional[str], int]:
     regex = re.compile(pattern)
     for no, line in enumerate(read_lines(path), 1):
@@ -276,7 +292,7 @@ def check_versions(root: str) -> Iterable[Finding]:
 CHECKS: Tuple[Callable[[str], Iterable[Finding]], ...] = (
     check_retired, check_stage_minus_one_session, check_stage_minus_one_state,
     check_stage_ids, check_ref_tier, check_readiness_scope, check_source_mode_inputs,
-    check_skipped_stage, check_versions,
+    check_skipped_stage, check_read_phase_git, check_versions,
 )
 
 
