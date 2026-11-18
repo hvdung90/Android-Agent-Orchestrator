@@ -20,24 +20,25 @@ Three tiers: **MANDATORY**, **AUTO-SKIP** (condition-gated, no human needed), **
 | Stage 1/1.5 Impact + Regression Plan | **MANDATORY for code-touching tasks** | — |
 | Stage 1.5 Clarification | AUTO-SKIP when all exit conditions met | all 6 trigger conditions false AND docs detailed |
 | Stage 2 Requirements write | **MANDATORY** | — |
-| Stage 2 Human approval gate | **MANDATORY — never skippable** | — |
+| Stage 2 approval gate | **MANDATORY — never skippable** | — (the *source* varies: `approval_source: human` in standard/governed; in fast `jira:<KEY>@<revision>` or `scope_confirmation` per `SKILL.md § FAST approval`) |
 | Stage 2.5 Decision Gate | **MANDATORY** | — |
 | Stage 2.5 duplicate-ADR check | **MANDATORY** — always runs before creating a new ADR | — |
 | Stage 2.5 ADR-lite creation | AUTO-SKIP when no ADR trigger fires, or when an existing Accepted ADR already covers it | all ADR trigger conditions false, or covering ADR found |
 | Stage 2.5 ADR-lite approval/deferral | **MANDATORY when ADR exists** | — |
 | Stage 3 `design/design-doc.md` | **MANDATORY when trigger met** | required if `workflow_mode=governed OR graph_impact≥medium OR ADR-lite was triggered`; otherwise AUTO-SKIP with trigger reason |
-| Stage 3 `implementation-plan.md` generation | **MANDATORY** — no placeholders (exact test command/method/path always required; exact code body required only in `governed` mode) | — |
-| Stage 3 `handoff.md` generation | **MANDATORY when code_owner is confirmed** | — |
+| Stage 3 `implementation-plan.md` generation | **MANDATORY in standard/governed** — no placeholders (exact test command/method/path always required; exact code body required only in `governed` mode) | AUTO-SKIP when `workflow_mode = fast`: the change is one TDD task (task id = `task_id`); mode-defined form, no skip-log entry |
+| Stage 3 `handoff.md` generation | **MANDATORY when code_owner is confirmed** (standard/governed) | AUTO-SKIP when `workflow_mode = fast` unless the code owner changes (the Stage 4 interrupt row below still applies) |
 | Stage 3 Android memo | AUTO-SKIP when non-Android change | `change_type` ∉ {ui_change, database_change, network_change, architecture_change} AND no Android API mentioned |
 | Stage 3 Android Advisor convention consult | AUTO-SKIP when `kotlin_convention_scope` is empty | no mapped Affected Area touched AND no Kotlin file in scope |
-| Stage 1.5 Clarification (fast/micro mode) | AUTO-SKIP when `workflow_mode` ∈ {fast, micro} | scores finalized after Stage 1; write to skip-log |
-| Stage 2.5 ADR trigger check (fast/micro mode) | **MANDATORY** | trigger evaluation always runs regardless of mode |
-| Stage 2.5 ADR creation + approval (fast/micro mode) | AUTO-SKIP only if no ADR trigger fires | if any trigger fires → mode upgrades to governed; write to skip-log |
-| Stage 3 design doc (no trigger) | AUTO-SKIP when `workflow_mode` ∈ {fast, micro}, or when standard mode has `graph_impact=low` and no ADR trigger | implementation-plan.md still MANDATORY (1 task entry for micro); write to skip-log |
-| Stage 1 discovery note file (micro mode) | AUTO-SKIP when `workflow_mode = micro` | findings recorded inline in session.json instead; write to skip-log |
-| Stage 1 context-pack.json file (micro mode) | AUTO-SKIP when `workflow_mode = micro` | content inlined into session.json["context"]; no skip-log entry needed (mode-defined form) |
-| Stage 2 requirements doc file (micro mode) | AUTO-SKIP when `workflow_mode = micro` | ≤15-line inline summary substitutes; human approval gate itself still MANDATORY; write to skip-log |
-| Stage 6 full QA report (fast/micro mode) | CONFIRM-SKIP when `workflow_mode` ∈ {fast, micro} | TDD evidence from Stage 4 substitutes; must ask human; Karpathy diff review + Gate G close remain MANDATORY |
+| Stage 1.5 Clarification (fast mode) | AUTO-SKIP when `workflow_mode = fast` | scores finalized after Stage 1; write to skip-log |
+| Stage 2.5 ADR trigger check (fast mode) | **MANDATORY** | trigger evaluation always runs regardless of mode |
+| Stage 2.5 ADR creation + approval (fast mode) | AUTO-SKIP only if no ADR trigger fires | if any trigger fires → mode upgrades to governed; write to skip-log |
+| Stage 3 design doc (no trigger) | AUTO-SKIP when `workflow_mode = fast`, or when standard mode has `graph_impact=low` and no ADR trigger | write to skip-log |
+| Stage 1 discovery note file (fast mode) | AUTO-SKIP when `workflow_mode = fast` | findings recorded inline in session.json; mode-defined form, no skip-log entry |
+| Stage 1 context-pack.json file (fast mode) | AUTO-SKIP when `workflow_mode = fast` | content inlined into session.json["context"]; mode-defined form, no skip-log entry |
+| Stage 2 requirements doc file (fast mode) | AUTO-SKIP when `workflow_mode = fast` | ≤ 40-line inline summary in session.json substitutes; the approval gate itself is still MANDATORY |
+| Stage 6 full QA report (fast mode) | AUTO-SKIP when `workflow_mode = fast` | Stage 4 TDD evidence + Evidence Gate Matrix items substitute; Karpathy diff review + Gate G close remain MANDATORY |
+| Stage 7 Task Changelog / Impact Closure / Kotlin Rule Closure as separate sections (fast mode) | AUTO-SKIP when `workflow_mode = fast` | recorded as one line each in `task-summary.md`; Artifact Integrity Check still MANDATORY |
 | Stage 4 screenshot_before | AUTO-SKIP when not UI | `change_type` does not include `ui_change` |
 | Stage 4 Gate E.5 RED evidence per task | **MANDATORY** unless a § TDD exemption table row applies (with that row's tier) | § TDD exemption table |
 | Stage 4 GREEN evidence per task | **MANDATORY** unless a § TDD exemption table row applies (with that row's tier) | § TDD exemption table |
@@ -76,7 +77,7 @@ These steps are mandatory by default but a human may override them. Agent must *
 
 | Step | Ask before skipping |
 |---|---|
-| Workflow mode downgrade (governed → standard, standard → fast, fast → micro) | "Current task is scored as `<mode>`. Downgrade to `<lower mode>` removes [clarification / ADR gate / QA gate / discovery+requirements files]. Confirm? (y/n)" |
+| Workflow mode downgrade (governed → standard, standard → fast) — never into `fast` while an escalation trigger fires (`SKILL.md § Escalation triggers`) | "Current task is scored as `<mode>`. Downgrade to `<lower mode>` removes [clarification / ADR gate / QA gate / requirements, design and plan files]. Confirm? (y/n)" |
 | Stage 1.5 Clarification when any trigger fires | "Clarification trigger fired: `<reason>`. Skip clarification and proceed directly to requirements? (y/n)" |
 | Stage 2.5 ADR-lite when any decision trigger fires | "Decision trigger fired: `<reason>`. Skip ADR-lite and proceed to design? This removes the architecture decision record. (y/n)" |
 | Stage 4 Gate E.5 TDD for a specific task (CONFIRM-SKIP rows of § TDD exemption table only) | "Task `<task-id>` is `<change_type>`; its diff fits the `<reason>` exemption (`<scope_check>`). Replace RED/GREEN with `<replacement evidence>` for this task? (y/n)" — AUTO-SKIP rows are logged without asking; anything outside the table is denied, not asked. |

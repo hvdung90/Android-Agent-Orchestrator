@@ -142,6 +142,8 @@ templates/
 ├── tooling-preflight.sh          ← preflight entrypoint (thin wrapper, needs python3)
 ├── tooling_preflight.py          ← preflight core: one implementation, Markdown or --json
 └── team_docs_sync.py            ← team-docs git sync: read (no checkout changes) / begin / commit-push
+workflows/
+└── fast.md                       ← self-contained FAST path (LIGHT tier): what to do, when to escalate
 examples/
 └── preflight-report.example.md   ← filled example with auth section
 scripts/
@@ -153,6 +155,7 @@ tests/
 └── team_docs/test_team_docs_sync.py ← real-git tests for the team-docs sync helper (python3 -m unittest discover -s tests/team_docs)
 docs/
 ├── FLOW.md                       ← complete flow diagram, all use cases
+├── decisions/                    ← decisions about this skill pack itself (ADR-0001: adaptive workflow)
 └── ai/
     ├── decisions/                ← GLOBAL: project-wide ADR ledger (immutable once Accepted)
     │   ├── 0000-template.md      ← ADR-lite template

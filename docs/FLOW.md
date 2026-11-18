@@ -1076,34 +1076,34 @@ Mode mapping:
         │
         ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                   FAST mode stage flow                      │
+│          FAST mode stage flow  (follow workflows/fast.md)   │
 │                                                             │
-│  -1 → 0 → 1 → 2(mini) → 2.5-lite → 3-lite →               │
-│  4(TDD) → 5(lite) → 6(lite) → 7(lite)                      │
+│  -1 → 0 → 1(inline) → 2(approval) → 2.5(trigger check) →    │
+│  3(owner + branch) → 4(TDD) → 5 → 6(diff review) → 7(summary)│
 │                                                             │
-│  Every stage runs. Only depth and selected steps differ:    │
+│  Process gates dropped (ADR-0001):                          │
+│    requirements / discovery / context-pack files (inline in │
+│    session.json), Stage 1.5, design doc,                    │
+│    implementation-plan.md (one TDD task, id = task_id),     │
+│    full Stage 6 QA report, separate Stage 7 sections        │
+│    (one line each in task-summary.md), handoff.md unless    │
+│    the owner changes or Stage 4 is interrupted              │
 │                                                             │
-│  AUTO-SKIP within stages (written to skip-log.json):        │
-│    Stage 1.5  — complexity/risk confirmed low at Stage 1    │
-│    Stage 2.5  ADR creation — AUTO-SKIP only when no trigger │
-│      fires (ADR trigger check MANDATORY; trigger → governed) │
-│    Stage 3  design doc + Android memo — plan ≤ 5 tasks only │
+│  Stage 2 approval — never dropped, source may differ:       │
+│    jira:<KEY>@<rev>  AC recorded + testable + no trigger    │
+│    scope_confirmation  Mode B / C, one line from the human  │
+│    human               otherwise                            │
 │                                                             │
-│  CONFIRM-SKIP (ask human first):                            │
-│    Stage 6  full QA report — Karpathy diff review +         │
-│      Gate G close remain MANDATORY regardless               │
+│  Safety invariants — never dropped in any mode:             │
+│    no secret in context, one code owner, evidence before    │
+│    PASS, ADR trigger check, TDD Gate E.5 (or exemption      │
+│    table row), Karpathy diff review, session.json writes,   │
+│    team-docs lock check when active                         │
 │                                                             │
-│  LITE (always runs, minimal output):                        │
-│    Stage 2  — requirements ≤ 40 lines, ACs + facts only     │
-│    Stage 5  — evidence gate; graph update skipped if low    │
-│    Stage 7  — Task Changelog + Artifact Integrity            │
-│      (MANDATORY); Skill Drift only when skill files changed; │
-│      no ADR status update when no ADR exists                │
-│                                                             │
-│  NEVER SKIPPED regardless of mode:                          │
-│    Auth init, requirements approval, ADR trigger check,     │
-│    TDD Gate E.5, Karpathy diff review, Gate G close,        │
-│    session.json + skip-log.json writes, status.json updates │
+│  Escalate to standard: any SKILL.md § Escalation trigger    │
+│    (billing, auth, security/privacy, DB, public API,        │
+│    release config, manifest, multi-module, unclear AC,      │
+│    ads SDK / mediation, paywall / subscription UI)          │
 └─────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────┐
@@ -1132,6 +1132,8 @@ Mode can only be **upgraded** (fast → standard → governed) during a task. Do
 ```
 Auto-upgrade triggers (logged to session.json + skip-log.json):
   - Acceptance criteria count > 5 while in fast mode → standard
+  - Any SKILL.md § Escalation trigger in the task or diff → standard
+  - More than 2 files, or impact beyond the changed feature, in fast → standard
   - ADR trigger fires during Stage 2.5 check → governed
   - Graph shows god nodes in change path → governed
   - Source reading reveals multi-module impact → governed

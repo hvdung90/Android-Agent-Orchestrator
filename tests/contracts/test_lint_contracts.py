@@ -18,7 +18,7 @@ sys.path.insert(0, os.path.join(REPO, "scripts"))
 lint = __import__("lint-contracts")  # hyphenated module name
 
 COPIED = ("SKILL.md", "README.md", "QUICKSTART.md", "CHANGELOG.md",
-          "docs", "refs", "templates", "examples")
+          "docs", "refs", "templates", "examples", "workflows")
 
 
 class LintFixture(unittest.TestCase):
@@ -342,6 +342,60 @@ class TddExemptionTests(LintFixture):
         block = content[start:start + 6000].replace("| AUTO-SKIP |", "| MAYBE |", 1)
         self.write("refs/compliance-policy.md", content[:start] + block + content[start + 6000:])
         self.assert_flagged("tdd-exemption", "refs/compliance-policy.md:")
+
+
+class FastPathTests(LintFixture):
+    """PR8a (ADR-0001): micro folded into FAST, two-layer never-skipped list,
+    one escalation trigger list, FAST approval source, light workflows/fast.md."""
+
+    def test_micro_mode_is_flagged(self):
+        self.append("refs/compliance-policy.md", "| Stage 1 note (micro mode) | AUTO-SKIP when micro |")
+        self.assert_flagged("fast-path", "refs/compliance-policy.md:")
+
+    def test_legacy_micro_mention_is_allowed(self):
+        self.append("refs/stage-contracts.md", "- legacy `workflow_mode: micro` is read as `fast`.")
+        self.assert_clean()
+
+    def test_never_skipped_must_have_two_layers(self):
+        self.replace("SKILL.md", "**Process gates**", "**Other gates**")
+        self.assert_flagged("fast-path", "SKILL.md:")
+
+    def test_old_depth_only_sentence_is_flagged(self):
+        self.append("SKILL.md", "Micro/fast reduce artifact depth only.")
+        self.assert_flagged("fast-path", "SKILL.md:")
+
+    def test_escalation_lists_must_match(self):
+        self.replace("workflows/fast.md", "- Paywall / subscription UI", "- Paywall screens")
+        self.assert_flagged("fast-path", "workflows/fast.md:")
+
+    def test_escalation_list_needs_vulcanlabs_triggers(self):
+        for rel in ("SKILL.md", "workflows/fast.md"):
+            self.replace(rel, "- Ads SDK / mediation\n", "")
+        self.assert_flagged("fast-path", "SKILL.md:")
+
+    def test_stage_2_records_approval_source(self):
+        content = self.read("refs/stage-contracts.md")
+        start = content.index("## Stage 2 — Requirements")
+        end = content.index("## Stage 2.5")
+        block = content[start:end].replace("approval_source", "approval_kind")
+        self.write("refs/stage-contracts.md", content[:start] + block + content[end:])
+        self.assert_flagged("fast-path", "refs/stage-contracts.md:")
+
+    def test_fast_workflow_must_stay_light(self):
+        self.append("workflows/fast.md", "x" * 13000)
+        self.assert_flagged("fast-path", "workflows/fast.md:")
+
+    def test_fast_workflow_links_must_exist(self):
+        self.append("workflows/fast.md", "See `refs/does-not-exist.md`.")
+        self.assert_flagged("fast-path", "workflows/fast.md:")
+
+
+class SingleSessionSchemaTests(LintFixture):
+    """The session.json schema lives only in contracts-and-artifacts."""
+
+    def test_second_session_schema_is_flagged(self):
+        self.append("refs/stage-contracts.md", "## Updated `session.json` schema\n\n```json\n{}\n```")
+        self.assert_flagged("session-schema", "refs/stage-contracts.md:")
 
 if __name__ == "__main__":
     unittest.main()

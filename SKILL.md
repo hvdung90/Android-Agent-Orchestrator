@@ -63,21 +63,47 @@ Mode is derived at Stage 0 and finalized at the end of Stage 1. Human override i
 
 | Mode | Use when | Stage sequence | Artifact depth |
 |---|---|---|---|
-| **micro** | Single file, additive-only, no shared state, trivially testable | -1 → 0 → 1(inline) → 2(inline) → 2.5-lite → 3-micro → 4 → 5(micro) → 6(lite) → 7(lite) | Inline requirements/context; no discovery/requirements/design files; `implementation-plan.md` still mandatory with exactly 1 task |
-| **fast** | Single-file bug fix, isolated logic fix, ≤ 2 files, no architecture impact | -1 → 0 → 1 → 2(mini) → 2.5-lite → 3-lite → 4 → 5(lite) → 6(lite) → 7(lite) | Requirements ≤ 40 lines, 3-lite: plan + code_owner + branch only, lite verify |
+| **fast** | Isolated change with clear AC: UI/resource tweak, single-file bug fix, isolated logic fix, ≤ 2 files, no architecture impact, no escalation trigger | -1 → 0 → 1(inline) → 2(approval only) → 2.5(trigger check) → 3(owner + branch) → 4 → 5 → 6(diff review) → 7(summary) | Follow `workflows/fast.md`. Requirements, context and discovery inline in `session.json`; no requirements/design/plan files; the whole change is one TDD task |
 | **standard** | Normal Android feature, multi-file, single module, clear requirements | -1 → 0 → 1 → [1.5] → 2 → [2.5] → 3 → 4 → 5 → 6 → 7 | Requirements ≤ 120 lines, design ≤ 180 lines |
 | **governed** | Large feature, migration, multi-module, Jira + Figma, any ADR trigger | Full -1 → 7 | No restrictions |
 
-_Stage suffix legend: `(inline)` = artifact inlined into `session.json` instead of a separate file; `(micro)`/`(lite)`/`(mini)` = reduced artifact depth. Full definitions: `refs/contracts-and-artifacts.md § Artifact budget`._
+_`micro` was folded into `fast` (ADR-0001). A legacy session with `workflow_mode: micro` is read as `fast` on resume._
 
-Never skipped in any mode: auth init, team docs lock check when active, human requirements approval, ADR trigger check, Gate E.5 RED evidence (only the rows of `refs/compliance-policy.md § TDD exemption table` may replace it), Evidence Gate Matrix, Karpathy diff review, `session.json`, `status.json`, and applicable finalization checks. Micro/fast reduce artifact depth only.
+_Stage suffix legend: `(inline)` = content written to `session.json` instead of a separate file. Full definitions: `refs/contracts-and-artifacts.md § Artifact budget`._
+
+**What is never skipped — two layers (ADR-0001):**
+
+- **Safety invariants** — every mode, no exception: no secret in context or output (`refs/auth-bootstrap.md`); one code owner; no PASS without evidence (Evidence Gate Matrix items for the `change_type`); ADR trigger check; Gate E.5 RED/GREEN, replaceable only by a row of `refs/compliance-policy.md § TDD exemption table`; Karpathy diff review; `session.json` state transitions; team-docs lock check when active.
+- **Process gates** — required in `standard` / `governed`; `fast` drops them: separate requirements file, Stage 1.5 clarification, design doc, `implementation-plan.md`, full Stage 6 QA report, Stage 7 artifacts beyond `task-summary.md`, and `handoff.md` unless the code owner changes. Stage 2 approval is never dropped, but in `fast` it may come from Jira (§ FAST approval).
+
+### FAST approval
+
+A `fast` task needs no separate human requirements approval when **all** hold: the Jira issue's acceptance criteria are recorded with source and revision (`approval_source: jira:<KEY>@<updated-timestamp>`), every AC is testable, and no escalation trigger fires. Briefs without Jira (Mode B / C) get a one-line scope confirmation instead (`approval_source: scope_confirmation`). Any scope change after approval re-opens it. `standard` / `governed` always use `approval_source: human`.
+
+### Escalation triggers
+
+A `fast` task escalates to at least `standard` as soon as the task or its diff touches any of these (an ADR trigger still means `governed`):
+
+- Billing / in-app purchase
+- Auth / OAuth / account
+- Security / privacy / user data
+- Database schema or migration
+- Public API / shared module contract
+- Release config (signing, build variants, ProGuard/R8, versioning)
+- Manifest permissions, exported components, intent filters
+- More than one module
+- Unclear or untestable acceptance criteria
+- Ads SDK / mediation
+- Paywall / subscription UI
+
+Record the trigger in `session.json.mode_reasons` and in `skip-log.json` as a mode upgrade. Remote Config keys and analytics events alone do not escalate.
 
 **Override rules (priority order):**
 1. Any ADR trigger fires → minimum `governed`
 2. Jira ticket + Figma link both present → minimum `standard`
-3. Human explicitly requests a mode → use that mode; log `mode_override` in `session.json`
-4. Task brief is incomplete or ambiguous → minimum `standard`
-5. Scope is ambiguous between `micro` and `fast` → minimum `fast` (never auto-select `micro` on an ambiguous read)
+3. Any § Escalation trigger fires → minimum `standard`
+4. Human explicitly requests a mode → use that mode; log `mode_override` in `session.json` (a human may not request `fast` while an escalation trigger fires)
+5. Task brief is incomplete or ambiguous → minimum `standard`
 6. Otherwise → use computed mode from scores
 
 Scoring, skip rules, and artifact budgets live in `refs/contracts-and-artifacts.md` and `refs/compliance-policy.md`.
@@ -91,9 +117,9 @@ Load refs on demand; do not load all refs upfront. Rows are checked top to botto
 | Tier | Condition (first match wins) | Load |
 |---|---|---|
 | **FULL** | `workflow_mode = governed` · migration · AGP · unfamiliar codebase · god nodes in path | + `refs/playbooks.md` + all refs |
+| **LIGHT** | `workflow_mode = fast` AND `graph_impact = low` | `workflows/fast.md` only; load a ref only where that file points to it |
 | **HEAVY** | `source_mode = A` (Jira/Figma/Confluence links present) | + `refs/sub-agents.md` |
-| **LIGHT** | `workflow_mode` ∈ {micro, fast} AND `source_mode = C` (brief in the message only) AND `graph_impact = low` | mandatory stage refs only; no optional/deep refs |
-| **MEDIUM** | everything else — e.g. `standard` with B or C, `fast`/`micro` with B, any mode with `graph_impact ≥ medium` | + `refs/clarification-workflow.md` |
+| **MEDIUM** | everything else — e.g. `standard` with B or C, `fast` with `graph_impact ≥ medium` | + `refs/clarification-workflow.md` |
 
 **When it is decided.** Stage 0 records `preliminary_ref_tier` from `preliminary_mode` + `source_mode`, treating `graph_impact` as `low` (it is not known yet). Stage 1 records the final `ref_tier` from `workflow_mode` + `source_mode` + `graph_impact`. If the final tier is higher, load the added refs before the next stage; if it is lower, simply stop loading the optional refs.
 
@@ -164,7 +190,7 @@ Run only when clarification triggers fire; otherwise skip per policy. Load `refs
 
 ### Stage 2 — Requirements
 
-Write canonical requirements and stop for human approval. Load `refs/contracts-and-artifacts.md` for schema and Gate D.
+Write canonical requirements and stop for human approval (`fast`: inline requirements in `session.json` and the approval source from § FAST approval; never skip the approval itself). Load `refs/contracts-and-artifacts.md` for schema and Gate D.
 
 ### Stage 2.5 — Decision Gate / ADR-lite
 
@@ -172,7 +198,7 @@ ADR trigger check is mandatory in every mode. Load `refs/contracts-and-artifacts
 
 ### Stage 3 — Design split + Executable Plan
 
-No product-code changes. Produce `design/design-doc.md` only when its trigger is met, plus required planning artifacts, command/version snapshot, Kotlin/Android rule checklist when applicable, `implementation-plan.md`, `handoff.md`, code owner, branch, and `commit_policy`. Load `refs/stage-contracts.md § Stage 3`, `refs/contracts-and-artifacts.md § design-doc / implementation-plan`, `refs/android-cli-compatibility.md`, and `refs/playbooks.md`.
+No product-code changes. Produce `design/design-doc.md` only when its trigger is met, plus required planning artifacts, command/version snapshot, Kotlin/Android rule checklist when applicable, `implementation-plan.md`, `handoff.md`, code owner, branch, and `commit_policy`. In `fast`, Stage 3 only sets code owner, branch and `commit_policy` (no plan, design or handoff file; the whole change is one TDD task whose id is the `task_id`). Load `refs/stage-contracts.md § Stage 3`, `refs/contracts-and-artifacts.md § design-doc / implementation-plan`, `refs/android-cli-compatibility.md`, and `refs/playbooks.md`.
 
 If team docs is active and `TEAM_DOCS_MODE: coordination`, reconcile `locks.json` to the final file list. In `knowledge` mode, skip this step.
 
@@ -219,7 +245,6 @@ Model tier per stage. Override the session default only when cognitive load warr
 | 7 Finalize | ADR status, task summary, archive | **Haiku 4.5** | — |
 | 8 Retro | reflection, telemetry append | **Haiku 4.5** | — |
 
-**micro mode:** tất cả stages → Haiku 4.5 (task bounded, không cần reasoning nặng).
 
 Model IDs: `claude-haiku-4-5-20251001` · `claude-sonnet-4-6` · `claude-opus-5`
 
@@ -250,9 +275,9 @@ Load `refs/provisioning-preflight.md` for provisioning decisions. Load `refs/and
 The parent orchestrator must wait:
 1. Before Stage 0: wait for Stage -1 result (including team docs conflict check when active).
 2. Before Requirements: wait for required Clarification outputs if any trigger fires.
-3. Before Design: wait for human approval of requirements.
+3. Before Design: wait for approval of requirements (`fast`: per § FAST approval — Jira-inherited or one-line scope confirmation).
 4. Before Design: wait for approved or explicitly deferred ADR-lite when Stage 2.5 requires one.
-5. Before Implementation: wait for approved requirements, decision gate result, design doc, executable `implementation-plan.md`, Android memo if Android-specific, and chosen single code owner with branch set.
+5. Before Implementation: wait for approved requirements, decision gate result, design doc and executable `implementation-plan.md` when the mode requires them (`fast` requires neither), Android memo if Android-specific, and chosen single code owner with branch set.
 6. **Gate E.5 — Test-first ready (before each task in Stage 4):** wait for failing test written + RED evidence recorded, or a recorded exemption from `refs/compliance-policy.md § TDD exemption table`. Per-task, not per-stage.
 7. Before Close: wait for runtime evidence, graph update if needed, spec-compliance ✅, Karpathy diff review ✅, acceptance coverage check, and Stage 7 finalization.
 
@@ -331,7 +356,7 @@ graphify-out/
 3. **Cache + resume check** — read `tooling-cache.json`; if valid, use cached tool/command state. Scan in-progress sessions and run `refs/stage-contracts.md § Integrity reconciliation` before trusting `stage_reached`.
 4. **Tooling Preflight** — on cache miss, run `templates/tooling-preflight.sh` JSON + markdown, then write cache including Android command discovery.
 5. **Intake + discovery** — derive source mode, task continuity, change type, impact, and finalized workflow mode.
-6. **Clarify + approve** — clarify when triggers fire; write requirements; stop for human approval.
+6. **Clarify + approve** — clarify when triggers fire; write requirements; stop for approval (`fast`: § FAST approval).
 7. **Decision gate** — run ADR trigger check; create/approve/defer ADR when required.
 8. **Plan + lock** — write executable plan, Android memo when applicable, handoff, code owner/branch, and team locks.
 9. **Implement + verify** — per-task TDD loop, Evidence Gate Matrix, Android fallback rules, graph update, Karpathy/code-quality review.
