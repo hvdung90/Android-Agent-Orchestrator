@@ -13,6 +13,13 @@
   - Karpathy plugin not detected (will apply principles manually)
   - `atlassian.api_token` empty (will request from user when Jira link provided)
 
+## Stage -1 state
+
+- `stage_status`: complete
+- `blocker`: null
+- `team_docs.conflict_check`: n/a (TEAM_DOCS_PATH not set)
+- `team_docs.legacy_lock_index`: n/a
+
 ## Auth
 
 - `.agent-auth.yaml`: present

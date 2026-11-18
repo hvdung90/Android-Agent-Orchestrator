@@ -1,0 +1,158 @@
+"""Regression tests for scripts/lint-contracts.py.
+
+Each test copies the skill pack's linted files into a temp dir, injects one
+known regression (or one allowed exception), and checks the linter's verdict.
+
+Run:  python3 -m unittest discover -s tests/contracts -v
+"""
+import io
+import os
+import shutil
+import sys
+import tempfile
+import unittest
+from contextlib import redirect_stdout
+
+REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+sys.path.insert(0, os.path.join(REPO, "scripts"))
+lint = __import__("lint-contracts")  # hyphenated module name
+
+COPIED = ("SKILL.md", "README.md", "QUICKSTART.md", "CHANGELOG.md",
+          "docs", "refs", "templates", "examples")
+
+
+class LintFixture(unittest.TestCase):
+    def setUp(self):
+        self.root = tempfile.mkdtemp(prefix="aao-lint-")
+        self.addCleanup(shutil.rmtree, self.root, True)
+        for name in COPIED:
+            src = os.path.join(REPO, name)
+            dst = os.path.join(self.root, name)
+            if os.path.isdir(src):
+                shutil.copytree(src, dst)
+            elif os.path.isfile(src):
+                shutil.copy2(src, dst)
+
+    def path(self, rel):
+        return os.path.join(self.root, rel)
+
+    def read(self, rel):
+        with open(self.path(rel), encoding="utf-8") as f:
+            return f.read()
+
+    def write(self, rel, content):
+        os.makedirs(os.path.dirname(self.path(rel)), exist_ok=True)
+        with open(self.path(rel), "w", encoding="utf-8") as f:
+            f.write(content)
+
+    def append(self, rel, line):
+        self.write(rel, self.read(rel) + "\n" + line + "\n")
+
+    def replace(self, rel, old, new):
+        content = self.read(rel)
+        self.assertIn(old, content, f"fixture anchor missing in {rel}")
+        self.write(rel, content.replace(old, new, 1))
+
+    def run_lint(self):
+        out = io.StringIO()
+        with redirect_stdout(out):
+            code = lint.main(["lint-contracts", self.root])
+        return code, out.getvalue()
+
+    def assert_clean(self):
+        code, out = self.run_lint()
+        self.assertEqual(code, 0, out)
+
+    def assert_flagged(self, rule_prefix, where):
+        code, out = self.run_lint()
+        self.assertEqual(code, 1, out)
+        hits = [l for l in out.splitlines() if l.startswith(where) and rule_prefix in l]
+        self.assertTrue(hits, f"expected {rule_prefix!r} at {where!r}, got:\n{out}")
+
+
+class Baseline(LintFixture):
+    def test_current_repo_is_clean(self):
+        self.assert_clean()
+
+
+class RetiredPathTests(LintFixture):
+    def test_global_lock_path(self):
+        self.append("SKILL.md", "Read `active-tasks/locks.json` at Stage -1.")
+        self.assert_flagged("lock-path", "SKILL.md:")
+
+    def test_global_board_path(self):
+        self.append("refs/team-docs.md", "Append to `active-tasks/README.md`.")
+        self.assert_flagged("board-path", "refs/team-docs.md:")
+
+    def test_old_readiness_field(self):
+        self.append("refs/sub-agents.md", "proceed_to_stage_0: true")
+        self.assert_flagged("readiness-field", "refs/sub-agents.md:")
+
+    def test_old_session_path(self):
+        self.append("templates/preflight-report.md", "- read memory/session.json")
+        self.assert_flagged("session-path", "templates/preflight-report.md:")
+
+    def test_legacy_mention_is_allowed(self):
+        self.append("refs/team-docs.md",
+                    "If the legacy `active-tasks/locks.json` exists, migrate it.")
+        self.append("refs/provisioning-preflight.md",
+                    "A legacy `memory/session.json` is a resume candidate.")
+        self.assert_clean()
+
+    def test_history_files_are_not_scanned(self):
+        self.append("CHANGELOG.md", "- old: read `active-tasks/locks.json`, proceed_to_stage_0")
+        self.write("docs/Some-Review-2026.md",
+                   "Old text: `active-tasks/README.md`, memory/session.json\n")
+        self.assert_clean()
+
+
+class VersionTests(LintFixture):
+    def test_ref_header_mismatch(self):
+        self.replace("refs/playbooks.md", "_Skill version: 6.1.3", "_Skill version: 6.1.1")
+        self.assert_flagged("version:", "refs/playbooks.md:")
+
+    def test_readme_header_mismatch(self):
+        self.replace("README.md", "_Current skill version: 6.1.3_", "_Current skill version: 6.1.0_")
+        self.assert_flagged("version:", "README.md:")
+
+    def test_historical_versions_in_changelog_are_fine(self):
+        self.assertIn("## v6.1.1", self.read("CHANGELOG.md"))
+        self.assert_clean()
+
+    def test_unreleased_section_does_not_count_as_version(self):
+        content = self.read("CHANGELOG.md")
+        if "## Unreleased" not in content:
+            self.write("CHANGELOG.md",
+                       content.replace("# Changelog\n", "# Changelog\n\n## Unreleased\n\n- x\n", 1))
+        self.assert_clean()
+
+    def test_changelog_ahead_of_skill_is_flagged(self):
+        self.replace("CHANGELOG.md", "## v6.1.3", "## v6.2.0\n\n- x\n\n## v6.1.3")
+        self.assert_flagged("version:", "CHANGELOG.md:")
+
+
+class StageMinusOneStateTests(LintFixture):
+    """Stage -1 has no task_id: its state lives in reports/preflight.md."""
+
+    def test_task_session_output_in_stage_minus_one_contract(self):
+        self.replace("refs/stage-contracts.md", "  - .project-orchestration/status.json",
+                     "  - .project-orchestration/tasks/{task_id}/session.json (stage_reached: -1)\n"
+                     "  - .project-orchestration/status.json")
+        self.assert_flagged("stage-1-session", "refs/stage-contracts.md:")
+
+    def test_team_docs_stage_minus_one_writes_session(self):
+        self.replace("refs/team-docs.md", "7. `[C]` Read per-repo board",
+                     "   - log `team_docs.x` in `session.json`.\n7. `[C]` Read per-repo board")
+        self.assert_flagged("stage-1-session", "refs/team-docs.md:")
+
+    def test_stage_minus_one_state_must_name_preflight_report(self):
+        content = self.read("refs/stage-contracts.md")
+        start, end = content.index("## Stage -1"), content.index("## Stage 0")
+        block = content[start:end].replace(
+            "persisted_to: .project-orchestration/reports/preflight.md", "persisted_to: somewhere")
+        self.write("refs/stage-contracts.md", content[:start] + block + content[end:])
+        self.assert_flagged("stage-1-state", "refs/stage-contracts.md:")
+
+
+if __name__ == "__main__":
+    unittest.main()

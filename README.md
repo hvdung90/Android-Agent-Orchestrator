@@ -143,6 +143,8 @@ examples/
 └── preflight-report.example.md   ← filled example with auth section
 scripts/
 └── lint-contracts.py             ← contract drift lint (paths, field names, version headers)
+tests/
+└── contracts/test_lint_contracts.py ← linter regression tests (python3 -m unittest discover -s tests/contracts)
 docs/
 ├── FLOW.md                       ← complete flow diagram, all use cases
 └── ai/

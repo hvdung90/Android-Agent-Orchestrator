@@ -10,6 +10,15 @@
 - Blocking gaps:
 - Non-blocking gaps:
 
+## Stage -1 state
+
+_No task exists yet, so this section — not a task `session.json` — holds Stage -1 state. Stage 0 copies it into the session it creates._
+
+- `stage_status`: complete | in_progress
+- `blocker`: null | <which preflight check failed or timed out>
+- `team_docs.conflict_check`: n/a | clean | conflict | stale-reclaim-pending
+- `team_docs.legacy_lock_index`: n/a | absent | present
+
 ## Auth
 
 - `.agent-auth.yaml`: present | created-empty | missing

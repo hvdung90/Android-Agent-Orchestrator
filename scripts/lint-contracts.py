@@ -8,7 +8,8 @@ that has already happened at least once (see docs review AOO-004/016/019/020):
   2. cross-repo board     — only `active-tasks/shared/README.md`
   3. readiness field      — only `ready_for_stage_0` (never `proceed_to_stage_0`)
   4. task session path    — only `tasks/{task_id}/session.json`; Stage -1 must
-                            not produce a task session (task_id is born in Stage 0)
+                            not write a task session (task_id is born in Stage 0):
+                            its state persists to reports/preflight.md
   5. version headers      — SKILL frontmatter == SKILL heading == README ==
                             FLOW == every refs/*.md header == latest CHANGELOG
 
@@ -82,14 +83,40 @@ def section(lines: List[str], start: str, end: str) -> List[Tuple[int, str]]:
     return out
 
 
+STAGE_MINUS_ONE_SECTIONS: Tuple[Tuple[str, str, str], ...] = (
+    # (file, section start, next section start)
+    ("refs/stage-contracts.md", "## Stage -1", "## Stage 0"),
+    ("refs/team-docs.md", "## Reads (Stage -1", "## "),
+)
+SESSION_HANDOFF_WORDS = ("stage 0", "never", "legacy")
+PREFLIGHT_STATE = "persisted_to: .project-orchestration/reports/preflight.md"
+
+
 def check_stage_minus_one_session(root: str) -> Iterable[Finding]:
-    path = os.path.join(root, "refs", "stage-contracts.md")
-    stage = section(read_lines(path), "## Stage -1", "## Stage 0")
-    for no, line in stage:
-        if "tasks/{task_id}/session.json" in line and "legacy" not in line.lower():
-            yield Finding(rel(root, path), no,
-                          "stage-1-session: Stage -1 has no task_id; Stage 0 creates the session",
-                          line.strip())
+    """Stage -1 has no task_id. Inside Stage -1 sections a line may mention
+    session.json only to hand off to Stage 0, forbid the write, or describe
+    legacy migration."""
+    for rel_path, start, end in STAGE_MINUS_ONE_SECTIONS:
+        path = os.path.join(root, rel_path)
+        for no, line in section(read_lines(path), start, end):
+            low = line.lower()
+            if "session.json" in low and not any(w in low for w in SESSION_HANDOFF_WORDS):
+                yield Finding(rel_path, no,
+                              "stage-1-session: Stage -1 has no task session; record in "
+                              "reports/preflight.md § Stage -1 state (Stage 0 copies it)",
+                              line.strip())
+
+
+def check_stage_minus_one_state(root: str) -> Iterable[Finding]:
+    """Both Stage -1 states must say they persist to reports/preflight.md."""
+    rel_path = "refs/stage-contracts.md"
+    lines = section(read_lines(os.path.join(root, rel_path)), "## Stage -1", "## Stage 0")
+    hits = [no for no, line in lines if PREFLIGHT_STATE in line]
+    if len(hits) < 2:
+        anchor = lines[0][0] if lines else 0
+        yield Finding(rel_path, anchor,
+                      "stage-1-state: state_on_complete and state_on_interrupt must both have "
+                      f"`{PREFLIGHT_STATE}`", "")
 
 
 def first_match(path: str, pattern: str) -> Tuple[Optional[str], int]:
@@ -121,7 +148,7 @@ def check_versions(root: str) -> Iterable[Finding]:
 
 
 CHECKS: Tuple[Callable[[str], Iterable[Finding]], ...] = (
-    check_retired, check_stage_minus_one_session, check_versions,
+    check_retired, check_stage_minus_one_session, check_stage_minus_one_state, check_versions,
 )
 
 

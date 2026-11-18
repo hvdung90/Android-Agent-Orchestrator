@@ -18,3 +18,5 @@ jobs:
           python-version: "3.9"
       - name: Lint skill contracts
         run: python3 scripts/lint-contracts.py
+      - name: Test the linter
+        run: python3 -m unittest discover -s tests/contracts -v

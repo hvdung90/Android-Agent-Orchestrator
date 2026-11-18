@@ -15,7 +15,11 @@ Each stage defines a typed contract: what it requires as input, what it must pro
 5. If `N < stage_reached` → do **not** trust the higher `stage_reached`. Write an integrity-mismatch note to `skip-log.json` (`tier: VIOLATION`, `reason: "artifact missing for declared stage <stage_reached>: <path>"`), roll `session.json.stage_reached` back to `N`, and offer resume from Stage `N`'s `resume_entry_point` instead. Tell the human what was found missing and why the resume point moved back.
 6. Never silently proceed as if a stage is complete when its mandatory artifact is absent — this check exists specifically to catch that case before it corrupts a later gate (e.g. Stage 4 starting without `implementation-plan.md`, or Stage 6 closing without `execution.md` evidence).
 
-**Interrupt safety:** On any unrecoverable error or user interruption, write the current stage's interrupt state to `session.json` before stopping. Never leave `session.json` in an inconsistent state.
+**Interrupt safety:** On any unrecoverable error or user interruption, write the current stage's interrupt state to the task's `session.json` before stopping. Never leave `session.json` in an inconsistent state.
+
+**Stage -1 exception (no task yet):** Stage -1 runs before `task_id` exists, so its state — complete or interrupted, plus every Stage -1 finding later stages need (`ready_for_stage_0`, blockers, `team_docs.conflict_check`, `team_docs.legacy_lock_index`) — is written to `.project-orchestration/reports/preflight.md § Stage -1 state`. Stage 0 copies those fields into the `session.json` it creates (`preflight` block).
+
+**Resume scans are read-only:** looking for interrupted tasks never modifies their `session.json`. If the human resumes a task, Stage -1 results for this run stay in `preflight.md`; the resumed session only gains a `preflight` block (`ran_at`, `ready_for_stage_0`, `report: .project-orchestration/reports/preflight.md`). Its `stage_reached`, `stage_status`, `blocker`, and approvals are left exactly as they were until the resumed stage itself writes them.
 
 ---
 
@@ -43,12 +47,14 @@ output_produces:
   - context fields: tooling_readiness, auth_status, provisioning_mode, blockers, architecture_map_staleness
   # skip-log.json is NOT pre-created here — lazy: created only on first skip entry
 
-state_on_complete:            # carried into the session Stage 0 creates; not persisted on its own
+state_on_complete:            # Stage 0 copies this into the session it creates (preflight block)
+  persisted_to: .project-orchestration/reports/preflight.md   # § Stage -1 state — no task_id yet
   stage_reached: -1
   stage_status: complete
   blocker: null
 
 state_on_interrupt:
+  persisted_to: .project-orchestration/reports/preflight.md   # § Stage -1 state — never a task session.json
   stage_reached: -1
   stage_status: in_progress
   blocker: "<which preflight check failed or timed out>"
@@ -77,6 +83,7 @@ guard_conditions:
 
 output_produces:
   - .project-orchestration/tasks/{task_id}/session.json (task_id, source_mode, started_at)
+  - session.json `preflight` block copied from reports/preflight.md § Stage -1 state: ran_at, ready_for_stage_0, blockers, team_docs.conflict_check, team_docs.legacy_lock_index
   - if TEAM_DOCS_PATH active and coordination mode and starting a new task: <TEAM_DOCS_PATH>/active-tasks/<repo>/locks.json appended with planning locks  [C]
   - if TEAM_DOCS_PATH active and coordination mode and starting a new task: team task markdown + board rows updated for human visibility  [C]
   - link list recorded (Jira, Figma, Confluence URLs if provided)

@@ -211,6 +211,10 @@ audit | bootstrap | update | refresh-graph | force-reinstall
 - Blocking gaps:
 - Non-blocking gaps:
 
+## Stage -1 state
+- stage_status / blocker / team_docs.conflict_check / team_docs.legacy_lock_index
+  (Stage -1 has no task session; Stage 0 copies these into the one it creates)
+
 ## Android CLI
 ## Android skills
 ## Understand-Anything
