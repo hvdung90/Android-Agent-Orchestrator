@@ -397,5 +397,35 @@ class SingleSessionSchemaTests(LintFixture):
         self.append("refs/stage-contracts.md", "## Updated `session.json` schema\n\n```json\n{}\n```")
         self.assert_flagged("session-schema", "refs/stage-contracts.md:")
 
+
+class ModelRoutingTests(LintFixture):
+    """PR8b (ADR-0001 decision 5): Claude Code only, no pinned model IDs or
+    versioned model names, one default tier with a GOVERNED-only step-up."""
+
+    def test_pinned_model_id_is_flagged(self):
+        self.append("SKILL.md", "Model IDs: `claude-sonnet-4-6`")
+        self.assert_flagged("model-routing", "SKILL.md:")
+
+    def test_versioned_model_name_is_flagged(self):
+        self.append("refs/sub-agents.md", "Run this worker on **Haiku 4.5**.")
+        self.assert_flagged("model-routing", "refs/sub-agents.md:")
+
+    def test_multi_host_claim_is_flagged(self):
+        self.append("README.md", "An instruction pack for Claude Code, Cursor, Codex and other tools.")
+        self.assert_flagged("model-routing", "README.md:")
+
+    def test_unsupported_host_note_is_allowed(self):
+        self.append("README.md", "Cursor and Codex are not supported (ADR-0001).")
+        self.assert_clean()
+
+    def test_step_up_outside_governed_is_flagged(self):
+        self.replace("SKILL.md", "| 4 Implementation | code, Android TDD | `default` |",
+                     "| 4 Implementation | code, Android TDD | `deep-reasoning` |")
+        self.assert_flagged("model-routing", "SKILL.md:")
+
+    def test_routing_section_required(self):
+        self.replace("SKILL.md", "## Model routing", "## Models")
+        self.assert_flagged("model-routing", "SKILL.md:")
+
 if __name__ == "__main__":
     unittest.main()
