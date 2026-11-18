@@ -4,8 +4,11 @@
 # THIS FILE:  templates/agent-auth.example.yaml  (committed, no secrets)
 # REAL FILE:  .agent-auth.yaml                   (gitignored, auto-created when the skill first runs)
 #
-# Do not copy this file manually. The skill will create .agent-auth.yaml if it is missing.
-# Tokens are requested when the corresponding tool needs them.
+# Do not copy this file manually: `python3 templates/agent_auth.py init` creates
+# .agent-auth.yaml with owner-only permissions (0600) if it is missing.
+# Tokens are requested when the corresponding tool needs them. Fill them in
+# YOURSELF in this file — never paste a token into the chat. The agent never
+# reads this file; it uses `agent_auth.py status` / `exec`.
 #
 # Ref: refs/auth-bootstrap.md
 # ─────────────────────────────────────────────────────────────────────────────
@@ -22,7 +25,8 @@ workspace:
 # ══════════════════════════════════════════════════════════════
 
 # ── Atlassian — Jira + Confluence share one token ──────────
-# MCP: mcp__claude_ai_Atlassian__*
+# Used for the REST fallback only. The Atlassian connector
+# (mcp__claude_ai_Atlassian__*) uses its own OAuth session instead.
 atlassian:
   domain: ""          # e.g. mycompany.atlassian.net  (without https://)
   email: ""           # Atlassian login email
@@ -37,7 +41,8 @@ figma:
   # → Generate new token → Permissions: File content (read-only) → Copy
 
 # ── GitHub (optional) ──────────────────────────────────────────
-# MCP: mcp__plugin_everything-claude-code_github__*
+# Only needed when neither `gh` login nor a user-configured GitHub MCP server
+# is available.
 github:
   personal_access_token: ""
   # GitHub → Settings → Developer settings → Personal access tokens → Fine-grained
@@ -59,9 +64,9 @@ projects: []
 #     atlassian:
 #       domain: "client-alpha.atlassian.net"
 #       email: "contractor@client-alpha.com"
-#       api_token: ""               # leave empty → agent asks when needed
+#       api_token: ""               # leave empty → you are asked to fill it when needed
 #     figma:
-#       personal_access_token: ""   # leave empty → agent asks when needed
+#       personal_access_token: ""   # leave empty → you are asked to fill it when needed
 #
 #   - name: "internal-platform"
 #     jira_project_key: "PLAT"

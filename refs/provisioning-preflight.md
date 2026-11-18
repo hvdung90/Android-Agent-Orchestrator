@@ -12,14 +12,18 @@ It prevents agents from assuming tool availability, inventing commands, reading 
 
 ## Cache check (run before anything else)
 
-Read `.project-orchestration/memory/tooling-cache.json`:
+Run `bash templates/tooling-preflight.sh --cache-check` (git + cache only, no tool probes) and use its `cache.cache_reusable`. Do not re-derive the decision by reading `tooling-cache.json` by hand.
 
-| Condition | Action |
-|---|---|
-| File missing | Run full preflight via `bash templates/tooling-preflight.sh` |
-| `valid_until` expired | Run full preflight; overwrite cache |
-| `graph_commit` ≠ `git rev-parse HEAD` | Run full preflight; overwrite cache |
-| `valid_until` in future AND `graph_commit` matches | **Skip tool checks**; load cached values; write brief preflight.md noting "cache hit"; go to Stage 0 |
+| `cache.cache_status` | `cache_reusable` | Action |
+|---|---|---|
+| `fresh` (TTL valid AND HEAD readable AND inside a git work tree AND `graph_commit` == HEAD) | `true` | **Skip tool checks**; load cached values; write brief preflight.md noting "cache hit"; go to Stage 0 |
+| file missing / `readable: false` | `false` | Run full preflight; write cache |
+| `stale` (TTL expired) | `false` | Run full preflight; overwrite cache |
+| `graph_stale` (`graph_commit` ≠ HEAD) | `false` | Run full preflight; overwrite cache |
+| `no_commit` (`graph_commit` missing or empty) | `false` | Run full preflight; overwrite cache — no evidence the cache matches this commit |
+| `head_unavailable` (no git, or HEAD unresolvable) | `false` | Run full preflight; do not write a cache without `graph_commit` |
+| `not_a_git_work_tree` (e.g. a bare repo: HEAD readable, no work tree) | `false` | Run full preflight — it blocks with the same gap, so the fast path cannot bypass it |
+| `unparseable` / `unknown` (bad or missing `valid_until`) | `false` | Run full preflight; overwrite cache |
 
 Cache TTL default: **24 hours**. Invalidated immediately after any install/update action.
 
@@ -229,6 +233,8 @@ Block Stage 0 when:
 - Android CLI is required for immediate runtime evidence and is missing,
 - user asked to verify device/runtime but no evidence can be produced.
 
+**Who decides.** `tooling-preflight.sh --json` reports `tooling_ready`: its `blocking_gaps` cover only what the script can decide alone (today: `not_a_git_work_tree`, from Stage -1 `input_requires`). The task-level rules above need the task, so the agent applies them and writes the final `ready_for_stage_0` into `preflight.md § Summary` as **`tooling_ready` AND task-level rules**. That line is the only Stage 0 gate. Never write `true` when `tooling_ready` is `false`, and never treat `tooling_ready: true` as "this task may proceed".
+
 Do not block Stage 0 when:
 - optional architecture-map tool (Understand-Anything or Graphify) is missing but docs/capture-knowledge can be used,
 - Karpathy plugin is missing but principles can be applied manually,
@@ -243,11 +249,12 @@ Do not block Stage 0 when:
 At Stage -1, run Step 1 (auth init):
 
 ```bash
-test -f .agent-auth.yaml && echo "present" || echo "missing"
+python3 templates/agent_auth.py init          # creates 0600 file from template if missing; never overwrites
+python3 templates/agent_auth.py status --json # states only — never values
 ```
 
-- Present → load, note which tokens have values vs empty.
-- Missing → auto-create from template (all tokens empty); notify user.
+- Never open `.agent-auth.yaml` directly; `agent_auth.py` is the only reader (see `refs/auth-bootstrap.md § Principles`).
+- Created → notify the user; tokens are requested only when a tool needs them.
 
 Token checks for each tool happen **just-in-time** when that tool is called. Do not check everything up front at Stage -1.
 
@@ -255,11 +262,11 @@ Record in preflight report:
 
 ```markdown
 ## Auth
-- .agent-auth.yaml: present | created-empty | missing
-- atlassian.api_token: set | empty
-- figma.personal_access_token: set | empty
-- github.personal_access_token: set | empty
-- project overrides: <count> defined
+- .agent-auth.yaml: present | created-empty | missing | unreadable
+- .agent-auth.yaml permissions: ok | too_open
+- atlassian.api_token: set | empty | missing_key
+- figma.personal_access_token: set | empty | missing_key
+- github.personal_access_token: set | empty | missing_key
 ```
 
 ---
@@ -290,5 +297,5 @@ After Stage -1 finishes (cache miss path only), write:
 - Never delete `graphify-out/` or `.understand-anything/` unless user asked for reset.
 - Never hand-edit `graphify-out/**` or `.understand-anything/**`.
 - Never assume a Claude Code skill is available unless it appears in the agent's own skill list.
-- Never log or print token values from `.agent-auth.yaml`.
+- Never log or print token values from `.agent-auth.yaml`, and never open the file directly — use `templates/agent_auth.py`.
 - Never commit `.agent-auth.yaml` (verify `.gitignore` covers it).
