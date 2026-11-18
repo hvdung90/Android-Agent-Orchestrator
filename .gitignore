@@ -10,3 +10,6 @@
 graphify-out/
 .specify/
 .skills/
+
+# Python bytecode
+__pycache__/

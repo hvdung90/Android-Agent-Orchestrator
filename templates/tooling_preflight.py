@@ -58,9 +58,10 @@ TOKEN_KEYS: Tuple[Tuple[str, str, str], ...] = (
 def run_command(argv: Sequence[str]) -> Tuple[int, str]:
     """Run argv without a shell. Returns (exit code, stdout+stderr); -1 on failure."""
     try:
-        proc = subprocess.run(list(argv), capture_output=True, text=True, timeout=CMD_TIMEOUT_S)
+        proc = subprocess.run(list(argv), capture_output=True, text=True, encoding="utf-8",
+                              errors="replace", timeout=CMD_TIMEOUT_S)
         return proc.returncode, (proc.stdout or "") + "\n" + (proc.stderr or "")
-    except (OSError, subprocess.SubprocessError):
+    except (OSError, ValueError, subprocess.SubprocessError):
         return -1, ""
 
 
@@ -137,14 +138,19 @@ def token_status(value: Optional[str]) -> str:
     return "set" if value else "empty"
 
 
+def unknown_auth(file_state: str) -> Facts:
+    return {"file": file_state, "tokens": {k: "unknown" for k, _, _ in TOKEN_KEYS}}
+
+
 def check_auth() -> Facts:
     if not os.path.isfile(AUTH_FILE):
-        return {"file": "missing", "tokens": {k: "unknown" for k, _, _ in TOKEN_KEYS}}
+        return unknown_auth("missing")
     try:
         with open(AUTH_FILE, encoding="utf-8") as f:
             content = f.read()
-    except OSError:
-        return {"file": "present", "tokens": {k: "unknown" for k, _, _ in TOKEN_KEYS}}
+    except (OSError, UnicodeDecodeError):
+        # Never surface the raw bytes or the decode error (it can quote content).
+        return unknown_auth("unreadable")
     tokens = {k: token_status(yaml_section_key(content, sec, key)) for k, sec, key in TOKEN_KEYS}
     return {"file": "present", "tokens": tokens}
 
@@ -272,33 +278,62 @@ def check_session() -> Facts:
 
 # ── Collection ───────────────────────────────────────────────────────────────
 
+def fallback_android() -> Facts:
+    return {"cli": None, "adb": None, "info": [], "skills": [],
+            "commands": {k: "unknown" for k, _, _ in ANDROID_COMMANDS},
+            "studio_commands": {k: "unknown" for k, _, _ in STUDIO_COMMANDS}}
+
+
+# name → (check, fallback used when the check raises). A failing check must
+# never take the other checks' results down with it.
+CHECKS: Dict[str, Tuple[Callable[[], Any], Callable[[], Any]]] = {
+    "auth": (check_auth, lambda: unknown_auth("unknown")),
+    "android": (check_android, fallback_android),
+    "arch": (check_architecture_map, lambda: {
+        "ua_plugin": [], "ua_graph": False, "graphify_cli": None, "graphify_pkg": None,
+        "report": False, "graph_json": False, "active": "unknown"}),
+    "karpathy": (check_karpathy, lambda: {
+        "claude_md": False, "in_claude_md": False, "plugin_hits": [], "status": "unknown"}),
+    "head": (git_head, lambda: None),
+    "session": (check_session, lambda: {"present": True, "readable": False, "path": SESSION_PATH}),
+}
+
+
+def guarded(name: str, check: Callable[[], Any], fallback: Callable[[], Any]
+            ) -> Tuple[Any, Optional[str]]:
+    """Run one check; on any exception return (fallback, error class name).
+    Only the exception type is reported — messages may quote file contents."""
+    try:
+        return check(), None
+    except Exception as exc:  # noqa: BLE001 — isolation boundary by design
+        return fallback(), f"{name}: {type(exc).__name__}"
+
+
 def collect(mode: str) -> Facts:
     now = datetime.now(timezone.utc)
-    jobs: Dict[str, Callable[[], Any]] = {
-        "auth": check_auth,
-        "android": check_android,
-        "arch": check_architecture_map,
-        "karpathy": check_karpathy,
-        "head": git_head,
-        "session": check_session,
-    }
-    with ThreadPoolExecutor(max_workers=len(jobs)) as pool:
-        futures = {name: pool.submit(fn) for name, fn in jobs.items()}
-        results = {name: fut.result() for name, fut in futures.items()}
+    with ThreadPoolExecutor(max_workers=len(CHECKS)) as pool:
+        futures = {name: pool.submit(guarded, name, check, fallback)
+                   for name, (check, fallback) in CHECKS.items()}
+        outcomes = {name: fut.result() for name, fut in futures.items()}
+    results = {name: value for name, (value, _) in outcomes.items()}
+    errors = [err for _, err in outcomes.values() if err]
+    cache, cache_err = guarded("cache", lambda: check_cache(now, results["head"]),
+                               lambda: {"present": True, "readable": False})
     return {
         "mode": mode,
         "timestamp": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "cwd": os.getcwd(),
         **{k: v for k, v in results.items() if k != "head"},
-        "cache": check_cache(now, results["head"]),
+        "cache": cache,
+        "check_errors": errors + ([cache_err] if cache_err else []),
     }
 
 
 def gaps(facts: Facts) -> Tuple[List[str], List[str]]:
     """(blocking, non_blocking). Blocking stays empty until AOO-022 (PR2)."""
     warn: List[str] = []
-    if facts["auth"]["file"] == "missing":
-        warn.append("auth_file_missing")
+    if facts["auth"]["file"] in ("missing", "unreadable"):
+        warn.append(f"auth_file_{facts['auth']['file']}")
     if not facts["android"]["cli"]:
         warn.append("android_cli_missing")
     arch = facts["arch"]
@@ -310,6 +345,7 @@ def gaps(facts: Facts) -> Tuple[List[str], List[str]]:
         warn.append("architecture_map_graph_missing")
     if facts["karpathy"]["status"] == "missing":
         warn.append("karpathy_missing")
+    warn.extend(f"check_failed:{err.split(':')[0]}" for err in facts["check_errors"])
     return [], warn
 
 
@@ -349,14 +385,16 @@ def to_json(facts: Facts) -> Facts:
         },
         "cache": cache_out,
         "session": {k: v for k, v in facts["session"].items() if k != "path"},
+        "check_errors": facts["check_errors"],
     }
 
 
 def md_auth(auth: Facts) -> List[str]:
-    if auth["file"] == "missing":
-        lines = ["- .agent-auth.yaml: missing (will be auto-created on first run)"]
-    else:
-        lines = ["- .agent-auth.yaml: present"]
+    file_line = {
+        "missing": "- .agent-auth.yaml: missing (will be auto-created on first run)",
+        "unreadable": "- .agent-auth.yaml: unreadable (not valid UTF-8 or no read permission)",
+    }.get(auth["file"], f"- .agent-auth.yaml: {auth['file']}")
+    lines = [file_line]
     labels = {k: f"{sec}.{key}" for k, sec, key in TOKEN_KEYS}
     return lines + [f"- {labels[k]}: {v}" for k, v in auth["tokens"].items()]
 
@@ -451,6 +489,8 @@ def to_markdown(facts: Facts) -> str:
         ("Graphify", md_graphify(facts["arch"])),
         ("Karpathy", md_karpathy(facts["karpathy"])),
         ("Memory cache", md_memory(facts["cache"], facts["session"])),
+        *([("Check errors", [f"- {e}" for e in facts["check_errors"]])]
+          if facts["check_errors"] else []),
         ("Decision reminder", [
             "- Default mode is audit.",
             "- Do not install/update/rebuild unless user requested bootstrap, update, "
@@ -478,6 +518,9 @@ def parse_args(argv: Sequence[str]) -> Tuple[str, bool]:
 
 def main(argv: Sequence[str]) -> int:
     mode, as_json = parse_args(argv)
+    # Explicit output encoding: never crash on a non-UTF-8 locale.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     facts = collect(mode)
     output = json.dumps(to_json(facts), indent=2) + "\n" if as_json else to_markdown(facts)
     sys.stdout.write(output)

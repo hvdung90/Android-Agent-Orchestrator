@@ -69,6 +69,12 @@ class Fixture:
         with open(p, "w") as f:
             f.write(content)
 
+    def write_bytes(self, rel, content):
+        p = os.path.join(self.proj, rel)
+        os.makedirs(os.path.dirname(p), exist_ok=True)
+        with open(p, "wb") as f:
+            f.write(content)
+
     def copy_template_auth(self, transform=None):
         with open(TEMPLATE_AUTH) as f:
             content = f.read()
@@ -78,7 +84,8 @@ class Fixture:
         env = {"PATH": self.path, "HOME": self.root, "LANG": "C.UTF-8"}
         env.update(self.extra_env)
         return subprocess.run([BASH, SCRIPT, *args], cwd=self.proj, env=env,
-                              capture_output=True, text=True, timeout=60)
+                              capture_output=True, text=True, encoding="utf-8",
+                              errors="replace", timeout=60)
 
     def json(self, *args):
         r = self.run("--json", *args)
@@ -158,8 +165,36 @@ class AuthTokenTests(Base):
     def test_token_values_never_printed(self):
         fx = self.fixture()
         fx.copy_template_auth(lambda c: c.replace('api_token: ""', 'api_token: "SECRET-XYZ"', 1))
-        self.assertNotIn("SECRET-XYZ", fx.run("--json").stdout)
-        self.assertNotIn("SECRET-XYZ", fx.run().stdout)
+        for args in (("--json",), ()):
+            r = fx.run(*args)
+            self.assertNotIn("SECRET-XYZ", r.stdout)
+            self.assertNotIn("SECRET-XYZ", r.stderr)
+
+    def test_secret_not_leaked_when_auth_file_is_not_utf8(self):
+        """Decode failure must not dump the file (or a traceback quoting it)."""
+        fx = self.fixture()
+        fx.write_bytes(".agent-auth.yaml", b'atlassian:\n  api_token: "SECRET-XYZ\xff\xfe"\n')
+        for args in (("--json",), ()):
+            r = fx.run(*args)
+            self.assertNotIn("SECRET-XYZ", r.stdout + r.stderr)
+            self.assertNotIn("Traceback", r.stderr)
+
+    def test_non_utf8_auth_file_is_unreadable_and_other_checks_survive(self):
+        fx = self.fixture()
+        fx.write_bytes(".agent-auth.yaml", b"atlassian:\n  api_token: \"\xff\xfe\"\n")
+        fx.write(".project-orchestration/memory/session.json",
+                 json.dumps({"stage_reached": 3, "task_id": "T-9"}))
+        data = fx.json()
+        self.assertEqual(data["tools"]["auth_file"], "unreadable")
+        self.assertEqual(data["tools"]["atlassian_token"], "unknown")
+        self.assertIn("auth_file_unreadable", data["non_blocking_gaps"])
+        self.assertEqual(data["session"]["task_id"], "T-9")
+        self.assertEqual(data["tools"]["android_cli"], "missing")
+        md = fx.markdown()
+        self.assertIn("- .agent-auth.yaml: unreadable", md)
+        self.assertIn("- atlassian.api_token: unknown", md)
+        self.assertIn("- task_id: T-9", md)
+        self.assertIn("## Android CLI", md)
 
 
 # ── Android CLI discovery ────────────────────────────────────────────────────
@@ -171,6 +206,15 @@ class AndroidCliTests(Base):
         self.assertEqual(t["android_cli"], "missing")
         self.assertEqual(t["android_commands"]["docs_search"], "missing")
         self.assertIn("- android CLI: missing", fx.markdown())
+
+    def test_non_utf8_command_output_does_not_crash(self):
+        fx = self.fixture()
+        fx.stub("android", ANDROID_STUB.replace(
+            'echo "commands: docs search fetch screen capture layout run"',
+            "printf 'commands: docs search fetch screen capture layout run \\377\\376\\n'"))
+        data = fx.json()
+        self.assertEqual(data["tools"]["android_commands"]["docs_search"], "supported")
+        self.assertIn("  - android docs search: supported", fx.markdown())
 
     def test_cli_present_discovers_commands(self):
         fx = self.fixture()
@@ -295,8 +339,53 @@ class OutputContractTests(Base):
         active = data["architecture_map"]["active_tool"]
         self.assertIn(f"- active architecture-map tool: {active}", md)
         for token_key, label in (("atlassian_token", "atlassian.api_token"),
+                                 ("figma_token", "figma.personal_access_token"),
                                  ("github_token", "github.personal_access_token")):
             self.assertIn(f"- {label}: {data['tools'][token_key]}", md)
+        names = {"docs_search": "android docs search", "layout": "android layout",
+                 "run": "android run"}
+        for key, name in names.items():
+            self.assertIn(f"  - {name}: {data['tools']['android_commands'][key]}", md)
+        studio = {"analyze_file": "android studio analyze-file",
+                  "find_usages": "android studio find-usages"}
+        for key, name in studio.items():
+            self.assertIn(f"  - {name}: {data['tools']['android_studio_commands'][key]}", md)
+
+    def test_parity_for_missing_states(self):
+        fx = self.fixture()
+        data, md = fx.json(), fx.markdown()
+        self.assertEqual(data["tools"]["auth_file"], "missing")
+        self.assertIn("- .agent-auth.yaml: missing", md)
+        self.assertFalse(data["cache"]["present"])
+        self.assertIn("- tooling-cache.json: missing", md)
+        self.assertFalse(data["session"]["present"])
+        self.assertIn("- session.json: missing", md)
+        self.assertEqual(data["tools"]["android_cli"], "missing")
+        self.assertIn("- android CLI: missing", md)
+
+    def test_parity_for_unreadable_states(self):
+        fx = self.fixture()
+        fx.write_bytes(".agent-auth.yaml", b"\xff\xfe")
+        fx.write(".project-orchestration/memory/tooling-cache.json", "{bad")
+        fx.write(".project-orchestration/memory/session.json", "[1, 2]")
+        data, md = fx.json(), fx.markdown()
+        self.assertEqual(data["tools"]["auth_file"], "unreadable")
+        self.assertIn("- .agent-auth.yaml: unreadable", md)
+        self.assertFalse(data["cache"]["readable"])
+        self.assertIn("- cache: unreadable", md)
+        self.assertFalse(data["session"]["readable"])
+        self.assertIn("- session: unreadable", md)
+
+    def test_non_ascii_working_directory_with_c_locale(self):
+        fx = self.fixture()
+        target = os.path.join(fx.root, "dự-án")
+        os.rename(fx.proj, target)
+        fx.proj = target
+        fx.extra_env.update({"LANG": "C", "LC_ALL": "C"})
+        for args in (("--json",), ()):
+            r = fx.run(*args)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertIn("dự-án", fx.markdown())
 
     def test_mode_argument(self):
         fx = self.fixture()
@@ -312,3 +401,50 @@ class OutputContractTests(Base):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# ── Check isolation (in-process; a raising check must not sink the others) ──
+
+class CheckIsolationTests(unittest.TestCase):
+    def setUp(self):
+        sys.path.insert(0, os.path.dirname(SCRIPT))
+        self.addCleanup(sys.path.remove, os.path.dirname(SCRIPT))
+        import tooling_preflight
+        self.core = tooling_preflight
+        self.tmp = tempfile.mkdtemp(prefix="aao-isolation-")
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+        self.cwd = os.getcwd()
+        os.chdir(self.tmp)
+        self.addCleanup(os.chdir, self.cwd)
+
+    def boom(self):
+        raise RuntimeError("SECRET-FROM-EXCEPTION-MESSAGE")
+
+    def patch_check(self, name):
+        original = self.core.CHECKS[name]
+        self.core.CHECKS[name] = (self.boom, original[1])
+        self.addCleanup(self.core.CHECKS.__setitem__, name, original)
+
+    def test_failing_check_keeps_other_results(self):
+        with open(".agent-auth.yaml", "w") as f:
+            f.write('github:\n  personal_access_token: "x"\n')
+        self.patch_check("android")
+        facts = self.core.collect("audit")
+        self.assertEqual(facts["check_errors"], ["android: RuntimeError"])
+        self.assertEqual(facts["auth"]["tokens"]["github_token"], "set")
+        out = self.core.to_json(facts)
+        self.assertEqual(out["tools"]["android_commands"]["docs_search"], "unknown")
+        self.assertIn("check_failed:android", out["non_blocking_gaps"])
+        md = self.core.to_markdown(facts)
+        self.assertIn("## Check errors\n- android: RuntimeError", md)
+        for rendered in (json.dumps(out), md):
+            self.assertNotIn("SECRET-FROM-EXCEPTION-MESSAGE", rendered)
+
+    def test_every_check_has_a_renderable_fallback(self):
+        for name in list(self.core.CHECKS):
+            with self.subTest(check=name):
+                self.patch_check(name)
+                facts = self.core.collect("audit")
+                self.core.to_json(facts)
+                self.core.to_markdown(facts)
+                self.assertIn(f"{name}: RuntimeError", facts["check_errors"])
