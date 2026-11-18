@@ -101,7 +101,7 @@ Always load the referenced file before acting on any stage pointer below. Load `
 
 ## Hard rules
 
-1. **Auth first.** `.agent-auth.yaml` is the single source of truth for all tokens. Never log token values. Never commit the file. Default provisioning mode is `audit`.
+1. **Auth first.** `.agent-auth.yaml` is the single source of truth for all tokens. The agent never sees a token: users write tokens into the file themselves (never into chat); the agent never opens the file and never types a token into a command — it uses `templates/agent_auth.py` (`init` / `status` / `exec`). Never log token values. Never commit the file. Default provisioning mode is `audit`.
 2. **One code owner at a time** — including sub-agents: only the designated code owner may write files or execute mutations; sub-agents are read-only observers.
 3. **One canonical synthesizer.** Orchestrator owns requirements, synthesis, routing, and final go/no-go. No other lane produces canonical artifacts.
 4. **No success without evidence.** Never invent commands. Android commands require discovery/cache or documented support; see `refs/android-cli-compatibility.md`.

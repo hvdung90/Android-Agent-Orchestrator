@@ -249,11 +249,12 @@ Do not block Stage 0 when:
 At Stage -1, run Step 1 (auth init):
 
 ```bash
-test -f .agent-auth.yaml && echo "present" || echo "missing"
+python3 templates/agent_auth.py init          # creates 0600 file from template if missing; never overwrites
+python3 templates/agent_auth.py status --json # states only — never values
 ```
 
-- Present → load, note which tokens have values vs empty.
-- Missing → auto-create from template (all tokens empty); notify user.
+- Never open `.agent-auth.yaml` directly; `agent_auth.py` is the only reader (see `refs/auth-bootstrap.md § Principles`).
+- Created → notify the user; tokens are requested only when a tool needs them.
 
 Token checks for each tool happen **just-in-time** when that tool is called. Do not check everything up front at Stage -1.
 
@@ -261,11 +262,11 @@ Record in preflight report:
 
 ```markdown
 ## Auth
-- .agent-auth.yaml: present | created-empty | missing
-- atlassian.api_token: set | empty
-- figma.personal_access_token: set | empty
-- github.personal_access_token: set | empty
-- project overrides: <count> defined
+- .agent-auth.yaml: present | created-empty | missing | unreadable
+- .agent-auth.yaml permissions: ok | too_open
+- atlassian.api_token: set | empty | missing_key
+- figma.personal_access_token: set | empty | missing_key
+- github.personal_access_token: set | empty | missing_key
 ```
 
 ---
@@ -296,5 +297,5 @@ After Stage -1 finishes (cache miss path only), write:
 - Never delete `graphify-out/` or `.understand-anything/` unless user asked for reset.
 - Never hand-edit `graphify-out/**` or `.understand-anything/**`.
 - Never assume a Claude Code skill is available unless it appears in the agent's own skill list.
-- Never log or print token values from `.agent-auth.yaml`.
+- Never log or print token values from `.agent-auth.yaml`, and never open the file directly — use `templates/agent_auth.py`.
 - Never commit `.agent-auth.yaml` (verify `.gitignore` covers it).

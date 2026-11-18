@@ -23,3 +23,5 @@ jobs:
           python-version: ${{ matrix.python }}
       - name: Run preflight tests
         run: python3 -m unittest discover -s tests/preflight -v
+      - name: Run auth helper tests
+        run: python3 -m unittest discover -s tests/auth -v

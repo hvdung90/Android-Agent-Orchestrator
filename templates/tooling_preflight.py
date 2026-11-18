@@ -21,6 +21,8 @@ from datetime import datetime, timezone
 from importlib import metadata
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
+from agent_auth import AuthFileError, field_state, permission_state, read_auth_file
+
 AUTH_FILE = ".agent-auth.yaml"
 CACHE_PATH = ".project-orchestration/memory/tooling-cache.json"
 TASKS_DIR = ".project-orchestration/tasks"
@@ -108,53 +110,26 @@ def read_json(path: str) -> Tuple[bool, Optional[dict]]:
 
 # ── Auth ─────────────────────────────────────────────────────────────────────
 
-def yaml_section_key(content: str, section: str, key: str) -> Optional[str]:
-    """Value of section.key in a 2-level YAML file.
-
-    Returns '' when present but empty, None when absent. Skips blank and
-    comment lines and strips inline comments. Never returns the value to the
-    caller's output — callers only map it through token_status().
-    """
-    current_section: Optional[str] = None
-    for raw in content.splitlines():
-        stripped = raw.lstrip()
-        if not stripped or stripped.startswith("#"):
-            continue
-        if not raw[0].isspace():
-            current_section = stripped.split(":", 1)[0].strip() if ":" in stripped else None
-            continue
-        if current_section != section:
-            continue
-        name, sep, value = stripped.partition(":")
-        if sep and name.strip() == key:
-            value = value.strip()
-            if " #" in value:
-                value = value[: value.index(" #")].strip()
-            return value.strip("\"'")
-    return None
-
-
-def token_status(value: Optional[str]) -> str:
-    if value is None:
-        return "missing_key"
-    return "set" if value else "empty"
-
-
-def unknown_auth(file_state: str) -> Facts:
-    return {"file": file_state, "tokens": {k: "unknown" for k, _, _ in TOKEN_KEYS}}
+def unknown_auth(file_state: str, permissions: str = "unknown") -> Facts:
+    return {"file": file_state, "permissions": permissions,
+            "tokens": {k: "unknown" for k, _, _ in TOKEN_KEYS}}
 
 
 def check_auth() -> Facts:
+    """Token *states* only, via the same parser agent_auth.py uses."""
     if not os.path.isfile(AUTH_FILE):
         return unknown_auth("missing")
+    perms = permission_state(AUTH_FILE)
     try:
-        with open(AUTH_FILE, encoding="utf-8") as f:
-            content = f.read()
-    except (OSError, UnicodeDecodeError):
-        # Never surface the raw bytes or the decode error (it can quote content).
-        return unknown_auth("unreadable")
-    tokens = {k: token_status(yaml_section_key(content, sec, key)) for k, sec, key in TOKEN_KEYS}
-    return {"file": "present", "tokens": tokens}
+        data = read_auth_file(AUTH_FILE)
+    except AuthFileError:
+        # Never surface the raw bytes or the parse error detail.
+        return unknown_auth("unreadable", perms)
+    tokens = {}
+    for key, section, field in TOKEN_KEYS:
+        block = data.get(section)
+        tokens[key] = field_state(block.get(field)) if isinstance(block, dict) else "missing_key"
+    return {"file": "present", "permissions": perms, "tokens": tokens}
 
 
 # ── Tools ────────────────────────────────────────────────────────────────────
@@ -377,6 +352,8 @@ def gaps(facts: Facts) -> Tuple[List[str], List[str]]:
     warn: List[str] = []
     if facts["auth"]["file"] in ("missing", "unreadable"):
         warn.append(f"auth_file_{facts['auth']['file']}")
+    if facts["auth"]["permissions"] == "too_open":
+        warn.append("auth_file_permissions_too_open")
     if not facts["android"]["cli"]:
         warn.append("android_cli_missing")
     arch = facts["arch"]
@@ -417,6 +394,7 @@ def to_json(facts: Facts) -> Facts:
         "non_blocking_gaps": warn,
         "tools": {
             "auth_file": facts["auth"]["file"],
+            "auth_file_permissions": facts["auth"]["permissions"],
             **facts["auth"]["tokens"],
             "android_cli": present(android["cli"]),
             "adb": present(android["adb"]),
@@ -445,6 +423,8 @@ def md_auth(auth: Facts) -> List[str]:
         "unreadable": "- .agent-auth.yaml: unreadable (not valid UTF-8 or no read permission)",
     }.get(auth["file"], f"- .agent-auth.yaml: {auth['file']}")
     lines = [file_line]
+    if auth["file"] != "missing":
+        lines.append(f"- .agent-auth.yaml permissions: {auth['permissions']}")
     labels = {k: f"{sec}.{key}" for k, sec, key in TOKEN_KEYS}
     return lines + [f"- {labels[k]}: {v}" for k, v in auth["tokens"].items()]
 

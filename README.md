@@ -135,6 +135,7 @@ refs/
 └── playbooks.md                  ← task-type → workflow mapping
 templates/
 ├── agent-auth.example.yaml       ← auth file template (Level 1/2/3)
+├── agent_auth.py                 ← only reader of .agent-auth.yaml: init / status / exec (agent never sees tokens)
 ├── architecture-domain.md        ← docs/ai/architecture/<domain>.md template
 ├── preflight-report.md           ← preflight output template
 ├── start-task-prompts.md         ← copy/paste prompts for starting tasks
@@ -143,7 +144,8 @@ templates/
 examples/
 └── preflight-report.example.md   ← filled example with auth section
 tests/
-└── preflight/test_preflight.py  ← fixture-based regression tests (python3 -m unittest discover -s tests/preflight)
+├── preflight/test_preflight.py  ← fixture-based regression tests (python3 -m unittest discover -s tests/preflight)
+└── auth/test_agent_auth.py      ← credential helper tests (python3 -m unittest discover -s tests/auth)
 docs/
 ├── FLOW.md                       ← complete flow diagram, all use cases
 └── ai/

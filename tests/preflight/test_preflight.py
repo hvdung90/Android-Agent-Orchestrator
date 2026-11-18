@@ -192,6 +192,30 @@ class AuthTokenTests(Base):
             self.assertNotIn("SECRET-XYZ", r.stdout)
             self.assertNotIn("SECRET-XYZ", r.stderr)
 
+    def test_auth_file_permissions(self):
+        fx = self.fixture()
+        fx.copy_template_auth()
+        path = os.path.join(fx.proj, ".agent-auth.yaml")
+        os.chmod(path, 0o644)
+        data = fx.json()
+        self.assertEqual(data["tools"]["auth_file_permissions"], "too_open")
+        self.assertIn("auth_file_permissions_too_open", data["non_blocking_gaps"])
+        self.assertIn("- .agent-auth.yaml permissions: too_open", fx.markdown())
+        os.chmod(path, 0o600)
+        self.assertEqual(fx.json()["tools"]["auth_file_permissions"], "ok")
+
+    def test_project_overrides_do_not_change_default_token_state(self):
+        fx = self.fixture()
+        fx.write(".agent-auth.yaml", textwrap.dedent("""\
+            atlassian:
+              api_token: ""
+            projects:
+              - jira_project_key: "CA"
+                atlassian:
+                  api_token: "project-only"
+            """))
+        self.assertEqual(fx.json()["tools"]["atlassian_token"], "empty")
+
     def test_secret_not_leaked_when_auth_file_is_not_utf8(self):
         """Decode failure must not dump the file (or a traceback quoting it)."""
         fx = self.fixture()
