@@ -13,3 +13,15 @@ graphify-out/
 
 # Python bytecode
 __pycache__/
+
+# Confluence build artifacts (generated — do not commit)
+docs/confluence/*.storage.xhtml
+docs/confluence/*.payload.json
+docs/confluence/backup-*.xhtml
+
+# Internal review / working docs (Vulcanlabs-specific, not part of the skill pack)
+docs/Android-Agent-Orchestrator-Review-*.md
+docs/Android-Agent-Orchestrator-Implementation-Readiness-*.md
+
+# Claude Code local settings
+.claude/settings.local.json
