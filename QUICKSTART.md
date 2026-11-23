@@ -9,13 +9,13 @@ Get from zero to running an Android task in 3 steps.
 From a clone of this repository:
 
 ```bash
-python3 scripts/install_skill.py --ref v6.2.0
+python3 scripts/install_skill.py --ref v6.3.0
 ```
 
 It copies the tracked files of that ref into `~/.claude/skills/android-agent-orchestrator` (tests and CI files left out), records the ref, commit and version in `.aao-install.json`, and moves any existing install to `~/.claude/.aao-skill-backups/` instead of deleting it (outside `skills/`, so it never loads as a duplicate skill). Check what a machine is running at any time:
 
 ```bash
-python3 scripts/install_skill.py --check --ref v6.2.0
+python3 scripts/install_skill.py --check --ref v6.3.0
 ```
 
 Exit 0 means the installed commit matches; exit 1 prints the installed and expected versions. A hand-copied install has no `.aao-install.json` and always reports a mismatch — reinstall it. Start a new Claude Code session after installing.
@@ -159,6 +159,6 @@ graphify-out/                                 ← architecture graph (fallback t
 | Full clean reset | "force reinstall agents" |
 | Check tool readiness | "audit tools" |
 | Hand off to another dev | "dừng lại, bàn giao cho \<dev-name\>" |
-| Change commit behavior (default: commit every task) | "commit once at the end" / "don't commit yet" |
+| Let the agent commit locally (default: the Dev commits; the agent never pushes) | "commit each task" / "commit once at the end" |
 | View all active tasks | Read `.project-orchestration/status.json` |
 | View task handoff state | Read `docs/ai/tasks/{task_id}/handoff.md` |

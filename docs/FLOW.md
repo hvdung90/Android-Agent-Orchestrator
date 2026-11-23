@@ -1,6 +1,6 @@
 # Android Agent Orchestrator — Complete Flow
 
-_Reflects skill v6.2.0. Update when SKILL.md changes._
+_Reflects skill v6.3.0. Update when SKILL.md changes._
 
 ---
 
@@ -235,7 +235,7 @@ All task types start with Stage -1.
     │  Signals from task description only:                  │
     │  - file count estimate, layer crossing, link types    │
     │  - ADR keyword? → governed                            │
-    │  - Jira + Figma both present? → min standard          │
+    │  - sensitive behaviour change? → governed             │
     │  - single-file bug fix, no links? → fast (tentative)  │
     │                                                       │
     │  Write preliminary_mode to session.json               │
@@ -521,7 +521,7 @@ All task types start with Stage -1.
   │                                                               │
   │  ④ Refactor while green                                      │
   │                                                               │
-  │  ⑤ Commit                                                    │
+  │  ⑤ Checkpoint (suggested message; the Dev commits)          │
   │                                                               │
   │  ⑥ Spec-compliance review ✅  (FIRST — does it meet AC?)     │
   │  ⑦ Quality/Karpathy review ✅ (SECOND — is it clean code?)   │
@@ -1035,7 +1035,7 @@ Preliminary mode estimate (from description + links)
         │
         ├── Single-file fix, no links, no ADR keywords  → preliminary: fast
         ├── Feature request, multi-file, one module     → preliminary: standard
-        ├── Jira + Figma both present                   → preliminary: min standard
+        ├── Behaviour change in a sensitive area        → preliminary: governed
         ├── ADR keyword, migration, multi-module        → preliminary: governed
         └── Ambiguous                                   → preliminary: standard
 
@@ -1062,7 +1062,8 @@ Finalize scores after reading all sources:
         │
         └── Apply override rules (in priority order):
               Any ADR trigger fires       → governed (hard floor)
-              Jira + Figma both present   → min standard
+              Governed trigger            → governed
+              Escalation trigger          → min standard
               Human explicit mode request → use as stated
               Ambiguous/incomplete brief  → min standard
 

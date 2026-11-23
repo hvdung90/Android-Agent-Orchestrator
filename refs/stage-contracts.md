@@ -1,6 +1,6 @@
 # Stage Output Contracts
 
-_Skill version: 6.2.0 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 6.3.0 — update this when SKILL.md bumps a minor or major version._
 
 Each stage defines a typed contract: what it requires as input, what it must produce as output, and what state it writes to `session.json` on completion or interrupt.
 
@@ -388,7 +388,7 @@ output_produces:
   - kotlin_android_versions and kotlin_android_rule_checklist written to context-pack / implementation-plan when Kotlin product code is touched
   - docs/ai/tasks/{task_id}/android-memo/<task>.md (Android skills memo, if Android-specific — auto-skip written to skip-log if omitted)
   - docs/ai/tasks/{task_id}/handoff.md (generated when code_owner is confirmed; MANDATORY)
-  - .project-orchestration/tasks/{task_id}/session.json: code_owner, assignee, branch, commit_policy set (commit_policy defaults to per_task; human-request-only)
+  - .project-orchestration/tasks/{task_id}/session.json: code_owner, assignee, branch, commit_policy set (default no_commit — the Dev commits; per_task / single_commit only on the Dev's explicit request — refs/contracts-and-artifacts.md § Commit policy)
   - .project-orchestration/status.json: entry updated (stage_reached: 3, assignee, branch)
   - if TEAM_DOCS_PATH active and coordination mode: <TEAM_DOCS_PATH>/active-tasks/<repo>/locks.json reconciled to final file list, status: locked  [C]
 
@@ -424,6 +424,7 @@ input_requires:
   - docs/ai/tasks/{task_id}/planning/<task>.md (if not auto-skipped by mode)
   - docs/ai/tasks/{task_id}/planning/implementation-plan.md (exists, no placeholders; fast: none — one TDD task, id = task_id, § Fast-mode inputs)
   - session.json: code_owner set, requirements_approved: true
+  - session.json: plan_approval set when workflow_mode = governed (Tech Lead / delegated senior; SKILL.md § Governed plan approval)
   - session.json: adr_status is accepted | deferred | not_required
   - context-pack.json: module_impact_chain (for build scope awareness)
 
@@ -527,10 +528,12 @@ guard_conditions:
   - Kotlin static-analysis evidence must be present or explicitly deferred when Kotlin product code changed
   - every required regression/security/performance row must be passed, blocked, or explicitly deferred
   - no new code changes allowed; QA gate is review only
+  - standard / governed: the Independent Reviewer (refs/sub-agents.md § Review worker) runs in a new read-only context with only AC, plan, revisions/diff and evidence summary; the implementing session never reviews its own change as the independent review
 
 output_produces:
   - .project-orchestration/tasks/{task_id}/reports/execution.md updated with QA review + Gate log
   - Karpathy diff review recorded
+  - standard / governed: execution.md § Independent review with the reviewer output and verdict; session.json independent_review set (fast: not_required — the Karpathy diff review is the review, as for team tier S)
   - .project-orchestration/tasks/{task_id}/session.json: stage_reached: 6
   - .project-orchestration/status.json: entry updated (stage_reached: 6)
 
@@ -538,6 +541,8 @@ approval_gate:
   - if Karpathy flags CRITICAL or HIGH issues → block and report to human
   - if acceptance criteria not fully covered → block and report to human
   - if required regression/security/performance evidence is missing → block and report to human
+  - if the Independent Reviewer returns CHANGES_REQUIRED → back to Stage 4 for the findings, then re-run Stage 5 checks they affect and a fresh review
+  - if the Independent Reviewer returns INCOMPLETE or cannot run → record independent_review.status: pending_pr_review and tell the human the PR is not merge-ready until a human reviewer does it
 
 state_on_complete:
   stage_id: "6_qa_gate"
