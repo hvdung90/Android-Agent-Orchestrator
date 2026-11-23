@@ -3,7 +3,7 @@ name: android-agent-orchestrator
 description: Use when starting, planning, analyzing, or implementing any Android task — new feature, bug fix, refactor, migration, AGP upgrade, architecture review, team task tracking, or repo setup. Use when user says start task, new feature, fix bug, analyze repo, migrate, upgrade, implement, review architecture, team task, or set up agents for an Android project.
 license: MIT
 metadata:
-  version: 6.1.3
+  version: 6.2.0
   category: orchestration
   lanes:
     - orchestrator
@@ -26,7 +26,7 @@ metadata:
     - refs/android-cli-compatibility.md
 ---
 
-# Android Agent Orchestrator v6.1.3
+# Android Agent Orchestrator v6.2.0
 
 ## Activation
 

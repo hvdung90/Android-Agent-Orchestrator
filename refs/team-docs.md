@@ -1,6 +1,6 @@
 # Team Docs Integration
 
-_Skill version: 6.1.3_
+_Skill version: 6.2.0_
 
 ## Hybrid model — what goes where
 

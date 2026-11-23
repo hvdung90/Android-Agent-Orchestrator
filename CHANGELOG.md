@@ -1,6 +1,12 @@
 # Changelog
 
-## Unreleased
+## v6.2.0
+
+Release of PR8a–PR8c (adaptive workflow, model routing, telemetry). The pilot candidate cohort is this tag; the baseline stays at `7711e6a` (also labelled 6.1.3, so cohorts are told apart by commit, not version).
+
+### Added
+
+- **`scripts/install_skill.py`** — installs the skill pack from `git archive <ref>` into `~/.claude/skills/android-agent-orchestrator` (tracked files only, so `.agent-auth.yaml` and local settings are never copied; `tests/` and `.github/` left out), writes `.aao-install.json` with ref, commit and version, and moves an existing install to `~/.claude/.aao-skill-backups/` (outside `skills/`, so it never loads as a duplicate skill) instead of deleting it. `--check --ref <ref>` exits 1 when the installed commit differs, and reports the installed version even for a hand-copied install. Refuses a symlinked destination. Found because a machine was still running a hand-copied 4.3.0. Documented as QUICKSTART Step 0 and in the pilot run steps; tests in `tests/install/`, run in CI.
 
 ### Changed
 

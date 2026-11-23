@@ -4,6 +4,24 @@ Get from zero to running an Android task in 3 steps.
 
 ---
 
+## Step 0 — Install the skill pack at a known version
+
+From a clone of this repository:
+
+```bash
+python3 scripts/install_skill.py --ref v6.2.0
+```
+
+It copies the tracked files of that ref into `~/.claude/skills/android-agent-orchestrator` (tests and CI files left out), records the ref, commit and version in `.aao-install.json`, and moves any existing install to `~/.claude/.aao-skill-backups/` instead of deleting it (outside `skills/`, so it never loads as a duplicate skill). Check what a machine is running at any time:
+
+```bash
+python3 scripts/install_skill.py --check --ref v6.2.0
+```
+
+Exit 0 means the installed commit matches; exit 1 prints the installed and expected versions. A hand-copied install has no `.aao-install.json` and always reports a mismatch — reinstall it. Start a new Claude Code session after installing.
+
+---
+
 ## Step 1 — Bootstrap tools (first time only)
 
 ```
