@@ -1,6 +1,6 @@
 # Team Docs Integration
 
-_Skill version: 6.2.0_
+_Skill version: 6.3.0_
 
 ## Hybrid model — what goes where
 
@@ -251,6 +251,8 @@ Locks are written once at Stage 0 and never touched again until Stage 3 (upgrade
 ## Writes
 
 Steps marked `[C]` run in `coordination` mode only. Steps marked `[both]` run in both modes.
+
+**Push scope.** `commit-push` is the only push the agent ever makes, and only to the team-docs repo at `TEAM_DOCS_PATH`: lock entries, task files, boards and ADR index rows — coordination metadata, never product code. It is an explicit exception to the product-repo rule (`SKILL.md` hard rule 15): a lock that stays local cannot warn another developer, so the push is what makes the lock work. It never pushes the product repository. A team that wants the Dev to push team-docs too sets `TEAM_DOCS_MODE: knowledge` (no lock writes) or runs the printed `commit-push` command itself.
 
 **Write lifecycle (every write step below):** `begin` → write this step's files → `commit-push` with exactly those paths.
 

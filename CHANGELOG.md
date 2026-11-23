@@ -1,5 +1,30 @@
 # Changelog
 
+## v6.3.0
+
+Aligns AAO with the team Confluence workflow "[Mobile] AI Delivery Workflow" v0.4, where AAO is one Android toolkit (ADR-0002). The separate AAO pilot is dropped; AAO is measured inside the team pilot.
+
+### Changed
+
+- **The Dev commits** (`refs/contracts-and-artifacts.md § Commit policy`). `commit_policy` defaults to `no_commit`: the agent records a suggested commit message per task and never commits the product repo; `per_task` / `single_commit` only on the Dev's explicit request for that task (`commit_policy_source`), local only. The plan template's "Commit" step is now a policy-aware "Checkpoint"; refactor rollback under `no_commit` is a read-only `git diff` patch.
+- **Sensitive behaviour changes are `governed`** (`SKILL.md § Governed triggers`). Changing the behaviour of purchases/entitlement, auth/session, migration, startup/SDK init, ads mediation, release config, manifest permissions/components, shared contracts or user-data handling now means `governed` (team tier L), even for a few lines; presentation-only changes there stay `standard`. `governed` waits for `plan_approval` (Tech Lead or delegated senior, with a Jira comment or PR link) before Stage 4; an AC or scope change re-opens it.
+- **Team tiers mapped** (`SKILL.md § Team tiers`): S → `fast` when it also fits FAST, else `standard`; M → `standard`; L → `governed`; N out of scope.
+- **Escalation triggers** gain app startup / SDK initialization, shared base library (BaseLib), Remote Config handling logic, deeplinks / push notifications (mirrored in `workflows/fast.md`). Remote Config key values alone still do not escalate.
+- **Jira + Figma is no longer a `standard` floor**, so an S UI tweak with a Figma frame can be `fast`. Override rules renumbered; a human may not request a mode below the trigger floor.
+- **Independent Reviewer at Stage 6** for `standard` / `governed` (`refs/sub-agents.md § Review worker`, Stage 6 contract, Gate G): a new read-only sub-agent given only AC, plan, revisions/diff and evidence summary; verdict `NO_BLOCKING_FINDINGS | CHANGES_REQUIRED | INCOMPLETE`. If none can run, `independent_review.status: pending_pr_review` and the PR is not merge-ready until a human reviews it. `fast` keeps the Karpathy diff review.
+- **Hard rule 15 — never push the product repo.** The documented exception is `team_docs_sync.py commit-push` to the team-docs coordination repo (lock/task metadata only; `refs/team-docs.md § Push scope`).
+- `session.json` gains `commit_policy_source`, `plan_approval`, `independent_review`.
+- `docs/pilot/README.md` marked as not run separately.
+
+### Added
+
+- `docs/decisions/0002-align-team-delivery-workflow.md`.
+- Lint check `delivery-workflow` (`scripts/lint-contracts.py`) with tests: flags a `per_task` default, a Jira + Figma floor, and missing Governed triggers, Team tiers, no-push rule or Independent Reviewer.
+
+### Fixed
+
+- `tests/contracts`: the "CHANGELOG ahead of SKILL" fixture no longer hardcodes the current release.
+
 ## v6.2.0
 
 Release of PR8a–PR8c (adaptive workflow, model routing, telemetry). The pilot candidate cohort is this tag; the baseline stays at `7711e6a` (also labelled 6.1.3, so cohorts are told apart by commit, not version).

@@ -1,6 +1,6 @@
 # Android Agent Orchestrator
 
-_Current skill version: 6.2.0_
+_Current skill version: 6.3.0_
 
 > **A meta-skill for Android projects.**  
 > Audit the tooling. Read the architecture map. Clarify the task. Approve requirements. Then code with one owner.
@@ -37,7 +37,7 @@ See **[QUICKSTART.md](QUICKSTART.md)** for the setup steps.
 
 The short version:
 
-1. Install the pack at a release tag: `python3 scripts/install_skill.py --ref v6.2.0` (`--check` reports what is installed)
+1. Install the pack at a release tag: `python3 scripts/install_skill.py --ref v6.3.0` (`--check` reports what is installed)
 2. Run `templates/tooling-preflight.sh` once to audit what's installed
 3. Tell the agent your task: `"Implement feature X. Jira: https://..."` or `"Fix bug: <repro>"`
 4. Review and approve the requirements doc — the agent stops and waits at every gate
@@ -56,7 +56,7 @@ Stage  1.5 Clarification        Resolve ambiguities, conflicts, missing info (au
 Stage  2  Requirements          Write canonical requirements doc → STOP for human approval
 Stage  2.5 Decision Gate        Check if ADR-lite is needed → STOP for human approval if yes
 Stage  3  Design                Write design + executable implementation plan (tasks with discovered/fallback commands)
-Stage  4  Implementation        TDD per task: RED → GREEN → spec review → quality review → commit
+Stage  4  Implementation        TDD per task: RED → GREEN → spec review → quality review → checkpoint (the Dev commits)
 Stage  5  Verify                Collect all required evidence (build, tests, screenshots, Kotlin static analysis)
 Stage  6  QA Gate               Karpathy diff review + acceptance, regression, security/performance coverage
 Stage  7  Finalization          ADR status, impact closure, task summary, artifact integrity, handoff finalized
@@ -91,7 +91,7 @@ Every task in the implementation plan follows this loop. The only exceptions are
 2. Write minimum code to pass → run → save `evidence/green-<task>.txt`
 3. Run full module tests
 4. Refactor while green
-5. Commit
+5. Checkpoint — record a suggested commit message; the Dev commits (default `commit_policy: no_commit`)
 6. Spec-compliance review (does it meet acceptance criteria?)
 7. Quality review (Karpathy guidelines)
 

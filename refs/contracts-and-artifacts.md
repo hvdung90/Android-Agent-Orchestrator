@@ -1,6 +1,6 @@
 # Contracts, Artifacts, and Gates
 
-_Skill version: 6.2.0 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 6.3.0 — update this when SKILL.md bumps a minor or major version._
 
 ---
 
@@ -533,8 +533,9 @@ Required structure per task (**`governed` mode** — full example with exact cod
 
 - [ ] **Refactor** — only if tests remain green; no new behavior
 
-- [ ] **Commit**
-  `git commit -m "feat(login): emit error state when credentials invalid"`
+- [ ] **Checkpoint** (per § Commit policy)
+  `no_commit` (default): record the suggested message `feat(login): emit error state when credentials invalid` in `execution.md`; leave the change uncommitted for the Dev.
+  `per_task` (Dev asked): `git commit -m "feat(login): emit error state when credentials invalid"` — local only, never push.
 
 - [ ] **Spec review** ✅ — verify matches acceptance criterion, nothing extra
 - [ ] **Quality review** ✅ — Karpathy gate passed
@@ -995,6 +996,7 @@ An Evidence Gate Matrix item recorded as `unavailable` with a valid Unavailable-
 Required:
 - spec-compliance review ✅ for every completed task,
 - Karpathy/code-quality review ✅ for every completed task,
+- `standard` / `governed`: Independent Reviewer verdict `NO_BLOCKING_FINDINGS`, or `independent_review.status: pending_pr_review` stated in `task-summary.md` for the Dev to carry into the PR description (the PR is then not merge-ready),
 - final execution report written,
 - Kotlin / Android Rule Closure completed for Kotlin product-code changes,
 - Impact Closure completed for regression/security/performance checks,
@@ -1242,9 +1244,12 @@ In-progress task state — allows resume after an interruption.
   "assignee": "dev-name | agent-name | unassigned",
   "handoff_to": "dev-name | null",
   "branch": "feature/ANDROID-42-login | null",
-  "commit_policy": "per_task | single_commit | no_commit",  // default per_task; changed only by explicit human request, never auto-derived from workflow_mode
+  "commit_policy": "no_commit | per_task | single_commit",  // default no_commit (the Dev commits); per_task / single_commit only on the Dev's explicit request for this task, local commits only — see § Commit policy
+  "commit_policy_source": "default | human: <quote>",
   "pr_url": "https://github.com/org/repo/pull/123 | null",
   "requirements_approved": false,
+  "independent_review": null,   // standard/governed: { "status": "done | pending_pr_review", "reviewer": "subagent | pr_reviewer", "verdict": "NO_BLOCKING_FINDINGS | CHANGES_REQUIRED | INCOMPLETE", "head_revision": "<sha>" }; fast: { "status": "not_required" }
+  "plan_approval": null,   // governed only: { "approver": "<Tech Lead / delegated senior>", "approved_at": "<ISO>", "ref": "<Jira comment or PR link>" } — SKILL.md § Governed plan approval
   "approval_source": "human | jira:<KEY>@<updated-timestamp> | scope_confirmation | null",   // fast may use jira/scope_confirmation (SKILL.md § FAST approval); standard/governed: human
   "adr_required": false,
   "adr_status": "proposed | accepted | deferred | superseded | not_required | null",
@@ -1277,6 +1282,18 @@ In-progress task state — allows resume after an interruption.
 **Resume rule:** see `refs/stage-contracts.md` (Resume rule, Integrity reconciliation, § Stage order, § Legacy sessions). The scan is read-only: list every `in_progress` task and let the human pick; never overwrite a session the human did not choose.
 
 **Interrupt safety:** On any error or interruption, write interrupt state before stopping. `partial_outputs` lists artifact paths written before the interrupt — agent must not re-run those steps on resume unless explicitly asked. See `refs/stage-contracts.md` for per-stage interrupt state and `resume_entry_point`.
+
+### Commit policy
+
+The Dev owns commits (Mobile AI Delivery Workflow v0.4, ADR-0002). `commit_policy` in `session.json`:
+
+| Value | Who commits | When it applies |
+|---|---|---|
+| `no_commit` | The Dev | **Default.** The agent never runs `git commit` on the product repo. After each task it records a suggested commit message in `execution.md`; Stage 7 lists them in `task-summary.md` with the files each covers. |
+| `per_task` | The agent, locally | Only when the Dev asks for it in this task (`commit_policy_source: "human: <quote>"`). One local commit per completed TDD task. |
+| `single_commit` | The agent, locally | Only when the Dev asks for it in this task. One local commit at the end of Stage 6. |
+
+Never derived from `workflow_mode`. Under every value the agent never pushes, merges, rebases shared branches or releases the product repo. Refactor safety under `no_commit`: GREEN evidence is recorded before a refactor step, and `git diff > evidence/checkpoint-<task>.patch` (read-only) is the rollback point.
 
 ### `skip-log.json`
 
@@ -1314,7 +1331,7 @@ See `refs/compliance-policy.md` for full tier definitions and confirmation proto
 {
   "schema": "aao-telemetry/1",
   "task_id": "CA-42",
-  "skill_version": "6.2.0",                  // SKILL.md frontmatter version
+  "skill_version": "6.3.0",                  // SKILL.md frontmatter version
   "skill_commit": "653940f",                 // git rev of the skill pack if known, else null
   "cohort": "baseline | candidate | null",   // set only during a pilot (docs/pilot/README.md)
   "workflow_mode": "fast | standard | governed",
@@ -1421,7 +1438,7 @@ artifact_budget:
 ```
 
 **Enforcement rules:**
-- Any `SKILL.md § Escalation triggers` item in the task or the diff → auto-upgrade `fast` to `standard` (or `governed` for an ADR trigger); write the upgrade reason to `skip-log.json` and `session.json.mode_reasons`.
+- Any `SKILL.md § Escalation triggers` item in the task or the diff → auto-upgrade `fast` to `standard` (or `governed` for an ADR trigger or a `SKILL.md § Governed triggers` item); write the upgrade reason to `skip-log.json` and `session.json.mode_reasons`.
 - A `fast` task that needs more than 2 files, more than 5 acceptance criteria, or reveals indirect impact beyond the directly changed feature (shared state, cross-module dependency, cross-feature API) → auto-upgrade to `standard`; write the upgrade reason to `skip-log.json`.
 - If `requirements` content would exceed `max_lines` → trim background/rationale first; keep ACs and facts.
 - If `design_doc: skip` → write one AUTO-SKIP entry to `skip-log.json` with reason `workflow_mode: fast`.

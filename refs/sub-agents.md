@@ -1,6 +1,6 @@
 # Sub-agent Catalog and Dependency Rules
 
-_Skill version: 6.2.0 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 6.3.0 — update this when SKILL.md bumps a minor or major version._
 
 ## Design principle
 
@@ -330,6 +330,42 @@ metrics_to_monitor: []
 rollback_trigger: <condition>
 release_notes_draft: <short>
 ```
+
+---
+
+## Review worker
+
+### Independent Reviewer
+
+Stage 6 in `standard` / `governed` (team tiers M / L). A **new** sub-agent context that did not write the code — never the session that implemented it. Read-only: it may read files and run read-only commands (`git diff`, `git log`, `git show`); it never edits files, runs builds that write outputs into the repo, commits, or reads secrets.
+
+Input — only these, never the implementation conversation or reasoning:
+- the approved acceptance criteria with their source (Jira key + revision, or the requirements file);
+- `implementation-plan.md`;
+- the repo, branch, base revision and head revision (plus the uncommitted diff under `commit_policy: no_commit`);
+- the evidence summary from `execution.md` (paths to logs, CI links, screenshots).
+
+```yaml
+source_type: independent-review
+reviewer: subagent | pr_reviewer
+base_revision: <sha>
+head_revision: <sha | sha+worktree>
+checks:
+  - ac_plan_diff_match        # AC, plan and diff agree; nothing missing, nothing extra
+  - shared_behaviour_kept     # scope and shared contracts unchanged unless planned
+  - errors_lifecycle_concurrency_security_performance
+  - sensitive_changes_have_approval   # governed: plan_approval present for the touched area
+findings:
+  - severity: blocking | major | minor
+    location: <file:line>
+    impact: <what breaks>
+    evidence: <what was observed>
+    requested_change: <what to do>
+scope_checked: <what was and was not reviewed>
+verdict: NO_BLOCKING_FINDINGS | CHANGES_REQUIRED | INCOMPLETE
+```
+
+The verdict reports what was observed; it never turns an AC into PASS — each AC still needs its own evidence. If no sub-agent can be started, record `independent_review.status: pending_pr_review`: the task may close Stage 7, but `task-summary.md` states that the independent review is still owed (the Dev carries this into the PR description) and the PR is not merge-ready until a human reviewer has done it.
 
 ---
 

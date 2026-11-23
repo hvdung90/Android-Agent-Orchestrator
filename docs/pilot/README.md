@@ -1,5 +1,7 @@
 # Pilot: current orchestration vs adaptive workflow (ADR-0001)
 
+> **Status (ADR-0002, 2026-11-23): not run as a separate pilot.** AAO is measured inside the team pilot of the Confluence "[Mobile] AI Delivery Workflow" (per-ticket metrics T12). `aao-telemetry/1` lines and `scripts/pilot_report.py` stay available as supplementary data; the evidence audit below is folded into the team metric "evidence reliability". The rest of this page is kept for reference.
+
 Goal: measure whether the PR8 changes (FAST path, model routing) reduce lead time and cost without more escaped defects. The targets are **hypotheses** (ADR-0001 decision 7), not acceptance criteria, until this pilot has run.
 
 | Hypothesis (per mode, candidate vs baseline, medians) | Target |

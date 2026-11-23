@@ -7,6 +7,7 @@ Run:  python3 -m unittest discover -s tests/contracts -v
 """
 import io
 import os
+import re
 import shutil
 import sys
 import tempfile
@@ -107,12 +108,15 @@ class RetiredPathTests(LintFixture):
 
 
 class VersionTests(LintFixture):
+    def current(self):
+        return re.search(r"^\s+version:\s*([0-9.]+)\s*$", self.read("SKILL.md"), re.M).group(1)
+
     def test_ref_header_mismatch(self):
-        self.replace("refs/playbooks.md", "_Skill version: 6.2.0", "_Skill version: 6.1.1")
+        self.replace("refs/playbooks.md", f"_Skill version: {self.current()}", "_Skill version: 0.0.1")
         self.assert_flagged("version:", "refs/playbooks.md:")
 
     def test_readme_header_mismatch(self):
-        self.replace("README.md", "_Current skill version: 6.2.0_", "_Current skill version: 6.1.0_")
+        self.replace("README.md", f"_Current skill version: {self.current()}_", "_Current skill version: 0.0.1_")
         self.assert_flagged("version:", "README.md:")
 
     def test_historical_versions_in_changelog_are_fine(self):
@@ -127,8 +131,39 @@ class VersionTests(LintFixture):
         self.assert_clean()
 
     def test_changelog_ahead_of_skill_is_flagged(self):
-        self.replace("CHANGELOG.md", "## v6.2.0", "## v6.3.0\n\n- x\n\n## v6.2.0")
+        content = self.read("CHANGELOG.md")
+        self.write("CHANGELOG.md", content.replace("# Changelog\n", "# Changelog\n\n## v99.0.0\n\n- x\n", 1))
         self.assert_flagged("version:", "CHANGELOG.md:")
+
+
+class DeliveryWorkflowTests(LintFixture):
+    """ADR-0002: alignment with the team Mobile AI Delivery Workflow v0.4."""
+
+    def test_commit_default_back_to_per_task_is_flagged(self):
+        self.replace("refs/contracts-and-artifacts.md", "default no_commit (the Dev commits)",
+                     "default per_task")
+        self.assert_flagged("delivery-workflow:", "refs/contracts-and-artifacts.md:")
+
+    def test_jira_figma_floor_is_flagged(self):
+        self.append("SKILL.md", "6. Jira ticket + Figma link both present → minimum `standard`")
+        self.assert_flagged("delivery-workflow:", "SKILL.md:")
+
+    def test_missing_governed_triggers_is_flagged(self):
+        self.replace("SKILL.md", "### Governed triggers", "### Sensitive triggers")
+        self.assert_flagged("delivery-workflow:", "SKILL.md:")
+
+    def test_missing_no_push_rule_is_flagged(self):
+        self.replace("SKILL.md", "**Never push the product repo.**", "**Push carefully.**")
+        self.assert_flagged("delivery-workflow:", "SKILL.md:")
+
+    def test_stage6_without_independent_reviewer_is_flagged(self):
+        content = self.read("refs/stage-contracts.md")
+        start = content.index("## Stage 6 — QA Gate")
+        end = content.index("## Stage 7")
+        self.write("refs/stage-contracts.md",
+                   content[:start] + content[start:end].replace("Independent Reviewer", "reviewer")
+                   + content[end:])
+        self.assert_flagged("delivery-workflow:", "refs/stage-contracts.md:")
 
 
 class StageMinusOneStateTests(LintFixture):

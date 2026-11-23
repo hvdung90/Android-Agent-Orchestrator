@@ -17,7 +17,7 @@ FAST is for an isolated change with clear acceptance criteria: a UI or resource 
 
 ## Escalation triggers
 
-Leave FAST — re-score as `standard` (an ADR trigger means `governed`) — as soon as the task or the diff touches any of these. Record the trigger in `session.json.mode_reasons` and `skip-log.json`, then continue with `SKILL.md` and the full refs.
+Leave FAST — re-score as `standard` (an ADR trigger or a `SKILL.md § Governed triggers` item means `governed`) — as soon as the task or the diff touches any of these. Record the trigger in `session.json.mode_reasons` and `skip-log.json`, then continue with `SKILL.md` and the full refs.
 
 - Billing / in-app purchase
 - Auth / OAuth / account
@@ -30,8 +30,12 @@ Leave FAST — re-score as `standard` (an ADR trigger means `governed`) — as s
 - Unclear or untestable acceptance criteria
 - Ads SDK / mediation
 - Paywall / subscription UI
+- App startup / SDK initialization
+- Shared base library (BaseLib)
+- Remote Config handling logic
+- Deeplinks / push notifications
 
-Also leave FAST when the change needs more than 2 files or more than 5 acceptance criteria, or reaches shared state or another feature. Remote Config keys and analytics events alone do not escalate.
+Also leave FAST when the change needs more than 2 files or more than 5 acceptance criteria, or reaches shared state or another feature. Remote Config key values and analytics events alone do not escalate. A behaviour change in a sensitive area goes straight to `governed` (`SKILL.md § Governed triggers`).
 
 ## Steps
 
@@ -68,7 +72,7 @@ Ask: does the change touch a module boundary, navigation graph, public API or in
 
 ### 3 · Owner and branch
 
-Set `code_owner`, `assignee`, `branch`, `commit_policy` in `session.json`. No plan, design or handoff file: the whole change is one TDD task whose id is the `task_id`. If `TEAM_DOCS_PATH` is in coordination mode, write planning locks with `team_docs_sync.py begin` → edit `locks.json` → `commit-push -- <paths>`.
+Set `code_owner`, `assignee`, `branch`, `commit_policy` in `session.json` (default `no_commit`: the Dev commits; record a suggested commit message instead). No plan, design or handoff file: the whole change is one TDD task whose id is the `task_id`. If `TEAM_DOCS_PATH` is in coordination mode, write planning locks with `team_docs_sync.py begin` → edit `locks.json` → `commit-push -- <paths>`.
 
 ### 4 · Implement with TDD
 

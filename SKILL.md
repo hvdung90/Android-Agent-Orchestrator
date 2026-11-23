@@ -3,7 +3,7 @@ name: android-agent-orchestrator
 description: Use when starting, planning, analyzing, or implementing any Android task — new feature, bug fix, refactor, migration, AGP upgrade, architecture review, team task tracking, or repo setup. Use when user says start task, new feature, fix bug, analyze repo, migrate, upgrade, implement, review architecture, team task, or set up agents for an Android project.
 license: MIT
 metadata:
-  version: 6.2.0
+  version: 6.3.0
   category: orchestration
   lanes:
     - orchestrator
@@ -26,7 +26,7 @@ metadata:
     - refs/android-cli-compatibility.md
 ---
 
-# Android Agent Orchestrator v6.2.0
+# Android Agent Orchestrator v6.3.0
 
 ## Activation
 
@@ -65,7 +65,7 @@ Mode is derived at Stage 0 and finalized at the end of Stage 1. Human override i
 |---|---|---|---|
 | **fast** | Isolated change with clear AC: UI/resource tweak, single-file bug fix, isolated logic fix, ≤ 2 files, no architecture impact, no escalation trigger | -1 → 0 → 1(inline) → 2(approval only) → 2.5(trigger check) → 3(owner + branch) → 4 → 5 → 6(diff review) → 7(summary) | Follow `workflows/fast.md`. Requirements, context and discovery inline in `session.json`; no requirements/design/plan files; the whole change is one TDD task |
 | **standard** | Normal Android feature, multi-file, single module, clear requirements | -1 → 0 → 1 → [1.5] → 2 → [2.5] → 3 → 4 → 5 → 6 → 7 | Requirements ≤ 120 lines, design ≤ 180 lines |
-| **governed** | Large feature, migration, multi-module, Jira + Figma, any ADR trigger | Full -1 → 7 | No restrictions |
+| **governed** | Large feature, migration, multi-module, a § Governed trigger (behaviour change in a sensitive area), any ADR trigger | Full -1 → 7; Tech Lead approves `implementation-plan.md` before Stage 4 | No restrictions |
 
 _`micro` was folded into `fast` (ADR-0001). A legacy session with `workflow_mode: micro` is read as `fast` on resume._
 
@@ -74,7 +74,7 @@ _Stage suffix legend: `(inline)` = content written to `session.json` instead of 
 **What is never skipped — two layers (ADR-0001):**
 
 - **Safety invariants** — every mode, no exception: no secret in context or output (`refs/auth-bootstrap.md`); one code owner; no PASS without evidence (Evidence Gate Matrix items for the `change_type`); ADR trigger check; Gate E.5 RED/GREEN, replaceable only by a row of `refs/compliance-policy.md § TDD exemption table`; Karpathy diff review; `session.json` state transitions; team-docs lock check when active.
-- **Process gates** — required in `standard` / `governed`; `fast` drops them: separate requirements file, Stage 1.5 clarification, design doc, `implementation-plan.md`, full Stage 6 QA report, Stage 7 artifacts beyond `task-summary.md`, and `handoff.md` unless the code owner changes. Stage 2 approval is never dropped, but in `fast` it may come from Jira (§ FAST approval).
+- **Process gates** — required in `standard` / `governed`; `fast` drops them: separate requirements file, Stage 1.5 clarification, design doc, `implementation-plan.md`, full Stage 6 QA report including the Independent Reviewer, Stage 7 artifacts beyond `task-summary.md`, and `handoff.md` unless the code owner changes. Stage 2 approval is never dropped, but in `fast` it may come from Jira (§ FAST approval).
 
 ### FAST approval
 
@@ -95,16 +95,52 @@ A `fast` task escalates to at least `standard` as soon as the task or its diff t
 - Unclear or untestable acceptance criteria
 - Ads SDK / mediation
 - Paywall / subscription UI
+- App startup / SDK initialization
+- Shared base library (BaseLib)
+- Remote Config handling logic
+- Deeplinks / push notifications
 
-Record the trigger in `session.json.mode_reasons` and in `skip-log.json` as a mode upgrade. Remote Config keys and analytics events alone do not escalate.
+Record the trigger in `session.json.mode_reasons` and in `skip-log.json` as a mode upgrade. Remote Config key values and analytics events alone do not escalate; code that reads or acts on Remote Config does.
+
+### Governed triggers
+
+Touching a sensitive area is enough for `standard`; **changing its behaviour** — not only how it looks — means `governed` (team tier L), even for a few lines:
+
+- purchase, transaction, restore or entitlement handling;
+- auth, account, session or keychain logic;
+- database schema or migration;
+- app startup or SDK initialization order;
+- ads SDK or mediation configuration;
+- release config, signing, R8 / ProGuard rules;
+- manifest permissions, exported components, intent filters;
+- a public API or shared-module / BaseLib contract;
+- how user data is stored, sent or protected.
+
+Presentation-only changes in these areas — paywall layout or copy, ad slot styling, a settings label — stay `standard` (tier M). When unsure, choose `governed`; a mode is only ever raised during a task, never lowered.
+
+### Team tiers (Mobile AI Delivery Workflow)
+
+The team workflow sizes work as S / M / L / N. AAO maps them so a task never runs at a lighter level than its tier:
+
+| Team tier | AAO mode | Note |
+|---|---|---|
+| **S** | `fast` when it also fits FAST (≤ 2 files, one module, ≤ 5 AC, no trigger); otherwise `standard` | FAST is stricter than S, so this only ever raises the level |
+| **M** | `standard` | Plan approved once by the Dev |
+| **L** | `governed` | Tech Lead (or a delegated senior) approves `implementation-plan.md` before Stage 4 — § Governed plan approval |
+| **N** | out of scope | New app / Sprint 0 is planned by the team; its tasks come back as S / M / L |
+
+### Governed plan approval
+
+In `governed`, Stage 4 does not start until the Tech Lead or a delegated senior approves `implementation-plan.md`. Record `plan_approval` in `session.json`: `approver`, `approved_at`, `ref` (the Jira comment or PR link holding the approval — a chat message alone does not count). A change to the acceptance criteria or scope after approval re-opens it before work on the affected part continues.
 
 **Override rules (priority order):**
-1. Any ADR trigger fires → minimum `governed`
-2. Jira ticket + Figma link both present → minimum `standard`
-3. Any § Escalation trigger fires → minimum `standard`
-4. Human explicitly requests a mode → use that mode; log `mode_override` in `session.json` (a human may not request `fast` while an escalation trigger fires)
-5. Task brief is incomplete or ambiguous → minimum `standard`
-6. Otherwise → use computed mode from scores
+1. Any ADR trigger or § Governed trigger fires → minimum `governed`
+2. Any § Escalation trigger fires → minimum `standard`
+3. Human explicitly requests a mode → use that mode; log `mode_override` in `session.json` (a human may not request a mode below the floor set by rules 1–2)
+4. Task brief is incomplete or ambiguous → minimum `standard`
+5. Otherwise → use computed mode from scores
+
+A Jira ticket with a Figma link is not a trigger by itself: a team-tier S UI tweak with a Figma frame can still be `fast`.
 
 Scoring, skip rules, and artifact budgets live in `refs/contracts-and-artifacts.md` and `refs/compliance-policy.md`.
 
@@ -143,6 +179,7 @@ Always load the referenced file before acting on any stage pointer below. Load `
 12. **Task file follows the task `[coordination mode only]`.** When `TEAM_DOCS_PATH` is set and `TEAM_DOCS_MODE: coordination`, create/update the team task file at Stage 0. Write pending `locks.json` entries immediately with `status: planning` — do not defer the initial write to Stage 3 (Stage 3 upgrades `planning → locked`, it does not create them). Update on stage transitions. Archive at Stage 7. In `knowledge` mode, skip all of the above (no task files, no locks, no boards).
 13. **Decisions leave a trace `[both modes]`.** Any decision affecting other repos → create ADR in `<TEAM_DOCS_PATH>/ADRs/` + append row to `active-tasks/shared/README.md § Cross-repo Impacts`. In `coordination` mode, also write in team task file `## Decisions`.
 14. **Warn on session end if docs have unpushed changes.** When `TEAM_DOCS_PATH` is set and the session ends or interrupts before Stage 7, run `git -C <TEAM_DOCS_PATH> status --porcelain`; warn if non-empty. Do not auto-push unless the stage contract requires it.
+15. **Never push the product repo.** The agent never pushes, merges, rebases a shared branch, tags or releases the product repository, under any `commit_policy`; the Dev pushes and opens the PR (Mobile AI Delivery Workflow v0.4). The one push the agent makes is `team_docs_sync.py commit-push` to the **team-docs coordination repo** at `TEAM_DOCS_PATH` — lock and task metadata only, never product code — because a lock other developers cannot see does not prevent a conflict (`refs/team-docs.md § Push scope`).
 
 ---
 
@@ -212,7 +249,7 @@ Run Evidence Gate Matrix items for `change_type`; update Graphify when `graph_im
 
 ### Stage 6 — QA gate
 
-Review diff, evidence, acceptance coverage, regression/security/performance closure, Kotlin/Android closure, and Karpathy/code-quality gate. Load `refs/stage-contracts.md § Stage 6`; use `refs/android-cli-compatibility.md` before static-analysis IDE commands.
+Review diff, evidence, acceptance coverage, regression/security/performance closure, Kotlin/Android closure, and Karpathy/code-quality gate. In `standard` / `governed`, also run the **Independent Reviewer** — a new read-only sub-agent given only AC, plan, revisions/diff and evidence summary (`refs/sub-agents.md § Review worker`); the implementing session's own review never counts as independent. Load `refs/stage-contracts.md § Stage 6`; use `refs/android-cli-compatibility.md` before static-analysis IDE commands.
 
 ### Stage 7 — Docs / Decision Finalization
 
@@ -248,7 +285,7 @@ Claude Code only (ADR-0001). Two capability tiers — never a pinned model ID or
 | 3 Design + Plan | design-doc, implementation-plan.md | `default` | `deep-reasoning` when `governed` |
 | 4 Implementation | code, Android TDD | `default` | — |
 | 5 Verify | run tests, check evidence gates | `default` | — |
-| 6 QA gate | Karpathy diff, acceptance coverage | `default` | — |
+| 6 QA gate | Karpathy diff, acceptance coverage, Independent Reviewer (new read-only context) | `default` | — |
 | 7 Finalize | ADR status, task summary, archive | `default` | — |
 | 8 Retro | reflection, telemetry append | `default` | — |
 
@@ -283,9 +320,9 @@ The parent orchestrator must wait:
 2. Before Requirements: wait for required Clarification outputs if any trigger fires.
 3. Before Design: wait for approval of requirements (`fast`: per § FAST approval — Jira-inherited or one-line scope confirmation).
 4. Before Design: wait for approved or explicitly deferred ADR-lite when Stage 2.5 requires one.
-5. Before Implementation: wait for approved requirements, decision gate result, design doc and executable `implementation-plan.md` when the mode requires them (`fast` requires neither), Android memo if Android-specific, and chosen single code owner with branch set.
+5. Before Implementation: wait for approved requirements, decision gate result, design doc and executable `implementation-plan.md` when the mode requires them (`fast` requires neither), Android memo if Android-specific, chosen single code owner with branch set, and — in `governed` — `plan_approval` from the Tech Lead (§ Governed plan approval).
 6. **Gate E.5 — Test-first ready (before each task in Stage 4):** wait for failing test written + RED evidence recorded, or a recorded exemption from `refs/compliance-policy.md § TDD exemption table`. Per-task, not per-stage.
-7. Before Close: wait for runtime evidence, graph update if needed, spec-compliance ✅, Karpathy diff review ✅, acceptance coverage check, and Stage 7 finalization.
+7. Before Close: wait for runtime evidence, graph update if needed, spec-compliance ✅, Karpathy diff review ✅, Independent Reviewer verdict in `standard` / `governed` (or `pending_pr_review` recorded), acceptance coverage check, and Stage 7 finalization.
 
 ---
 

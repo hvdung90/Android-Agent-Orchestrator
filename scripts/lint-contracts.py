@@ -18,7 +18,10 @@ that has already happened at least once (see docs review AOO-004/016/019/020):
   8. TDD exemptions       — one table in compliance-policy; no "no exceptions" /
                             "CONFIRM-SKIP only" elsewhere; tiers and skip-log
                             reasons match the rows (AOO-007/017)
-  9. version headers      — SKILL frontmatter == SKILL heading == README ==
+  9. delivery workflow    — ADR-0002: commit_policy default no_commit; no
+                            Jira+Figma floor; Governed triggers + Team tiers;
+                            Independent Reviewer at Stage 6; never push product repo
+ 10. version headers      — SKILL frontmatter == SKILL heading == README ==
                             FLOW == every refs/*.md header == latest CHANGELOG
 
 A line may mention a retired path only when it also contains the word
@@ -460,6 +463,46 @@ def check_model_routing(root: str) -> Iterable[Finding]:
                               line.strip())
 
 
+OLD_COMMIT_DEFAULT = re.compile(r"default(?:s to)?\s+`?per_task", re.I)
+FIGMA_FLOOR = re.compile(r"Jira (?:ticket )?\+ Figma.*(?:→|->)\s*(?:minimum|min)", re.I)
+
+
+def check_delivery_workflow(root: str) -> Iterable[Finding]:
+    """ADR-0002: aligned with the team Mobile AI Delivery Workflow v0.4 — the Dev
+    commits (default no_commit), behaviour changes in sensitive areas are
+    governed (no Jira+Figma floor), standard/governed get an Independent
+    Reviewer at Stage 6, and the agent never pushes the product repo."""
+    for path in scanned_files(root):
+        rel_path = rel(root, path)
+        for no, line in enumerate(read_lines(path), 1):
+            if "commit_policy" in line and OLD_COMMIT_DEFAULT.search(line):
+                yield Finding(rel_path, no, "delivery-workflow: commit_policy defaults to "
+                              "`no_commit` (the Dev commits)", line.strip())
+            if FIGMA_FLOOR.search(line):
+                yield Finding(rel_path, no, "delivery-workflow: Jira + Figma is not a mode floor; "
+                              "an S UI tweak with Figma may be `fast`", line.strip())
+    schema = read_lines(os.path.join(root, "refs/contracts-and-artifacts.md"))
+    if not any('"commit_policy"' in l and "default no_commit" in l for l in schema):
+        yield Finding("refs/contracts-and-artifacts.md", 0,
+                      "delivery-workflow: session schema must default commit_policy to no_commit", "")
+    skill = "\n".join(read_lines(os.path.join(root, "SKILL.md")))
+    for needle, why in (("### Governed triggers", "`### Governed triggers` section missing"),
+                        ("### Team tiers", "S/M/L → mode mapping (`### Team tiers`) missing"),
+                        ("**Never push the product repo.**", "hard rule 'Never push the product repo' missing"),
+                        ("Independent Reviewer", "Stage 6 must name the Independent Reviewer")):
+        if needle not in skill:
+            yield Finding("SKILL.md", 0, f"delivery-workflow: {why}", "")
+    stage6 = section(read_lines(os.path.join(root, "refs/stage-contracts.md")),
+                     "## Stage 6 — QA Gate", "## Stage 7")
+    if not any("Independent Reviewer" in l for _, l in stage6):
+        yield Finding("refs/stage-contracts.md", stage6[0][0] if stage6 else 0,
+                      "delivery-workflow: Stage 6 contract must run the Independent Reviewer", "")
+    agents = "\n".join(read_lines(os.path.join(root, "refs/sub-agents.md")))
+    if "### Independent Reviewer" not in agents:
+        yield Finding("refs/sub-agents.md", 0,
+                      "delivery-workflow: `### Independent Reviewer` worker missing", "")
+
+
 def first_match(path: str, pattern: str) -> Tuple[Optional[str], int]:
     regex = re.compile(pattern)
     for no, line in enumerate(read_lines(path), 1):
@@ -493,7 +536,7 @@ CHECKS: Tuple[Callable[[str], Iterable[Finding]], ...] = (
     check_stage_ids, check_ref_tier, check_readiness_scope, check_source_mode_inputs,
     check_skipped_stage, check_read_phase_git, check_team_docs_lifecycle,
     check_tdd_exemptions, check_fast_path, check_single_session_schema, check_model_routing,
-    check_versions,
+    check_delivery_workflow, check_versions,
 )
 
 
