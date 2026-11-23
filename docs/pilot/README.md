@@ -51,6 +51,29 @@ Example baseline line (one line in the file; wrapped here for reading):
 {"schema": "aao-telemetry/1", "task_id": "CA-42", "skill_version": "6.1.3", "skill_commit": "7711e6a", "cohort": "baseline", "workflow_mode": "fast", "mode_upgrades": [], "ref_tier": "LIGHT", "approval_source": null, "policy_reads": [{"path": "SKILL.md", "section": null}, {"path": "refs/stage-contracts.md", "section": null}], "human_interrupts": [{"stage_id": "2_requirements", "kind": "approval"}], "started_at": "2026-11-20T09:00:00Z", "first_patch_at": "2026-11-20T10:05:00Z", "closed_at": "2026-11-20T11:20:00Z", "tokens": {"input": 410000, "output": 21000, "cached": 300000, "source": "manual"}, "model_tiers": {"default": 10, "deep-reasoning": 0}, "evidence": {"pass": 3, "fail": 0, "not_run": 1, "blocked": 0}, "outcome": "closed", "review_iterations": null, "escaped_defects": null}
 ```
 
+## Evidence audit (false-PASS)
+
+Right after each run (both cohorts), check whether the evidence the agent reported as passing is real. This decides whether machine-checked evidence (a check runner + validator + commit hook) is worth building next: today every evidence record is written by the agent itself.
+
+For each evidence item the agent reported as `pass` in Stage 5/6, look in the transcript and answer three questions:
+
+1. **Ran** — was the command actually executed in this session (a tool call with its output), not just described?
+2. **Fresh** — did it run after the last product-code edit? An edit after the run makes it stale.
+3. **Matches** — does the output show success (exit 0, `BUILD SUCCESSFUL`, 0 failures) for the scope claimed (right module, right variant, the new tests included)?
+
+An item is a **false PASS** if any answer is no. Append one line per run to `pilot/<YYYY-MM-DD>/evidence-audit.jsonl` (next to `retro-log.jsonl`; not read by `pilot_report.py`, whose schema rejects extra fields):
+
+```json
+{"task_id": "CA-42", "cohort": "candidate", "workflow_mode": "fast", "claimed_pass": 3, "false_pass": 1, "kinds": ["stale"], "auditor": "initials"}
+```
+
+`kinds` uses only `not_run`, `stale`, `mismatch`. Counts and kinds only — no command output, code or brief text.
+
+How to read the total after the smoke pilot:
+
+- **Any false PASS** in either cohort → machine-checked evidence becomes the next priority (proposal PR-A).
+- **None** across all runs → do not add enforcement yet; spend the next iteration on whatever the report shows is slowest (lead time, human interrupts, policy bytes).
+
 ## Later
 
 - After PR review: set `review_iterations` on that task's line.
