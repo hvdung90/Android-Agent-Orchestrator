@@ -25,3 +25,5 @@ jobs:
         run: python3 -m unittest discover -s tests/preflight -v
       - name: Run auth helper tests
         run: python3 -m unittest discover -s tests/auth -v
+      - name: Run skill installer tests
+        run: python3 -m unittest discover -s tests/install -v

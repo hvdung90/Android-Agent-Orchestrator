@@ -1,6 +1,6 @@
 # Android Agent Orchestrator
 
-_Current skill version: 6.1.3_
+_Current skill version: 6.2.0_
 
 > **A meta-skill for Android projects.**  
 > Audit the tooling. Read the architecture map. Clarify the task. Approve requirements. Then code with one owner.
@@ -33,13 +33,14 @@ The agent entry point is `SKILL.md`. The refs, templates, and examples support i
 
 ## How to get started
 
-See **[QUICKSTART.md](QUICKSTART.md)** for the 3-step setup.
+See **[QUICKSTART.md](QUICKSTART.md)** for the setup steps.
 
 The short version:
 
-1. Run `templates/tooling-preflight.sh` once to audit what's installed
-2. Tell the agent your task: `"Implement feature X. Jira: https://..."` or `"Fix bug: <repro>"`
-3. Review and approve the requirements doc — the agent stops and waits at every gate
+1. Install the pack at a release tag: `python3 scripts/install_skill.py --ref v6.2.0` (`--check` reports what is installed)
+2. Run `templates/tooling-preflight.sh` once to audit what's installed
+3. Tell the agent your task: `"Implement feature X. Jira: https://..."` or `"Fix bug: <repro>"`
+4. Review and approve the requirements doc — the agent stops and waits at every gate
 
 ---
 

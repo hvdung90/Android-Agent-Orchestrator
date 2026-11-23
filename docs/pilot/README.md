@@ -19,7 +19,7 @@ Minimum samples per cohort: **5 FAST, 5 STANDARD, 3 GOVERNED**. Below that the r
 | Runner(s) | _ |
 | Android app repo + baseline app commit | _ |
 | Baseline skill commit | `7711e6a` (main before PR8) |
-| Candidate skill commit | _ (main after PR8a + PR8b + PR8c) |
+| Candidate skill commit | `v6.2.0` (main after PR8a + PR8b + PR8c) |
 | Model / Claude Code version (same for both cohorts) | _ |
 | Start / end date | _ |
 | Escaped-defect window | 30 days after each merge |
@@ -34,7 +34,7 @@ Minimum samples per cohort: **5 FAST, 5 STANDARD, 3 GOVERNED**. Below that the r
 
 ## Run each ticket
 
-1. Check out the app commit on a fresh branch; install the skill pack at the cohort's skill commit.
+1. Check out the app commit on a fresh branch; install the skill pack at the cohort's skill commit with `python3 scripts/install_skill.py --ref <skill commit>` and confirm with `--check --ref <skill commit>` (exit 0). The installed `commit` in `.aao-install.json` identifies the cohort; also set it as `skill_commit` in each telemetry line.
 2. Start a new Claude Code session; same model for both cohorts.
 3. Work the ticket as usual until Stage 7 closes or the task is abandoned.
 4. **Candidate cohort:** the agent appends its telemetry line to `.project-orchestration/memory/retro-log.jsonl`. Set `"cohort": "candidate"` in that line.

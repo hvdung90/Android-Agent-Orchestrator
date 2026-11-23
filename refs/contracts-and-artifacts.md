@@ -1,6 +1,6 @@
 # Contracts, Artifacts, and Gates
 
-_Skill version: 6.1.3 — update this when SKILL.md bumps a minor or major version._
+_Skill version: 6.2.0 — update this when SKILL.md bumps a minor or major version._
 
 ---
 
@@ -1314,7 +1314,7 @@ See `refs/compliance-policy.md` for full tier definitions and confirmation proto
 {
   "schema": "aao-telemetry/1",
   "task_id": "CA-42",
-  "skill_version": "6.1.3",                  // SKILL.md frontmatter version
+  "skill_version": "6.2.0",                  // SKILL.md frontmatter version
   "skill_commit": "653940f",                 // git rev of the skill pack if known, else null
   "cohort": "baseline | candidate | null",   // set only during a pilot (docs/pilot/README.md)
   "workflow_mode": "fast | standard | governed",

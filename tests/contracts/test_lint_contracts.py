@@ -108,11 +108,11 @@ class RetiredPathTests(LintFixture):
 
 class VersionTests(LintFixture):
     def test_ref_header_mismatch(self):
-        self.replace("refs/playbooks.md", "_Skill version: 6.1.3", "_Skill version: 6.1.1")
+        self.replace("refs/playbooks.md", "_Skill version: 6.2.0", "_Skill version: 6.1.1")
         self.assert_flagged("version:", "refs/playbooks.md:")
 
     def test_readme_header_mismatch(self):
-        self.replace("README.md", "_Current skill version: 6.1.3_", "_Current skill version: 6.1.0_")
+        self.replace("README.md", "_Current skill version: 6.2.0_", "_Current skill version: 6.1.0_")
         self.assert_flagged("version:", "README.md:")
 
     def test_historical_versions_in_changelog_are_fine(self):
@@ -127,7 +127,7 @@ class VersionTests(LintFixture):
         self.assert_clean()
 
     def test_changelog_ahead_of_skill_is_flagged(self):
-        self.replace("CHANGELOG.md", "## v6.1.3", "## v6.2.0\n\n- x\n\n## v6.1.3")
+        self.replace("CHANGELOG.md", "## v6.2.0", "## v6.3.0\n\n- x\n\n## v6.2.0")
         self.assert_flagged("version:", "CHANGELOG.md:")
 
 
